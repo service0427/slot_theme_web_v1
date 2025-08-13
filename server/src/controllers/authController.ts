@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
 import { pool } from '../config/database';
 import { jwtConfig } from '../config/jwt';
 import { AuthRequest } from '../middleware/auth';
@@ -55,14 +56,14 @@ export async function login(req: Request, res: Response) {
         email: user.email,
         role: user.role
       },
-      jwtConfig.secret as string,
-      { expiresIn: jwtConfig.expiresIn }
+      jwtConfig.secret,
+      { expiresIn: jwtConfig.expiresIn } as SignOptions
     );
 
     const refreshToken = jwt.sign(
       { id: user.id },
-      jwtConfig.secret as string,
-      { expiresIn: jwtConfig.refreshExpiresIn }
+      jwtConfig.secret,
+      { expiresIn: jwtConfig.refreshExpiresIn } as SignOptions
     );
 
     // 마지막 로그인 시간 업데이트
@@ -142,14 +143,14 @@ export async function refreshToken(req: Request, res: Response) {
           email: user.email,
           role: user.role
         },
-        jwtConfig.secret as string,
-        { expiresIn: jwtConfig.expiresIn }
+        jwtConfig.secret,
+        { expiresIn: jwtConfig.expiresIn } as SignOptions
       );
 
       const newRefreshToken = jwt.sign(
         { id: user.id },
-        jwtConfig.secret as string,
-        { expiresIn: jwtConfig.refreshExpiresIn }
+        jwtConfig.secret,
+        { expiresIn: jwtConfig.refreshExpiresIn } as SignOptions
       );
 
       res.json({
