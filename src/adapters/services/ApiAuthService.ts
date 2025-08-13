@@ -1,4 +1,4 @@
-import { IAuthService, ISocketService } from '@/interfaces';
+import { IAuthService } from '@/core/services/AuthService';
 import { UserModel } from '@/core/models/User';
 import { LoginDto, RegisterDto } from '@/dto';
 import { BehaviorSubject, Observable } from 'rxjs';
@@ -12,6 +12,11 @@ interface AuthModel {
     accessToken: string;
     refreshToken: string;
   };
+}
+
+interface ISocketService {
+  connect(userId: string): Promise<void>;
+  disconnect(): void;
 }
 
 export class ApiAuthService implements IAuthService {
@@ -326,5 +331,9 @@ export class ApiAuthService implements IAuthService {
 
   isAuthenticated(): boolean {
     return !!this.accessToken;
+  }
+
+  getCurrentUser(): UserModel | null {
+    return this.authState?.user || null;
   }
 }

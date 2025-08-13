@@ -46,11 +46,20 @@
     <script>
       // 테마 미리 로드
       (function() {
-        const savedTheme = localStorage.getItem('globalTheme');
-        if (savedTheme) {
-          document.body.className = 'theme-' + JSON.parse(savedTheme);
+        function applyTheme() {
+          const savedTheme = localStorage.getItem('globalTheme');
+          if (savedTheme && document.body) {
+            document.body.className = 'theme-' + JSON.parse(savedTheme);
+          } else if (document.body) {
+            document.body.className = 'theme-loading';
+          }
+        }
+        
+        // DOM이 로드되었는지 확인
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', applyTheme);
         } else {
-          document.body.className = 'theme-loading';
+          applyTheme();
         }
       })();
     </script>
