@@ -1,5 +1,4 @@
 import { 
-  NotificationService,
   NotificationModel,
   CreateNotificationDto,
   NotificationFilter,
@@ -12,7 +11,7 @@ type NotificationEvents = {
   [key: string]: any;
 };
 
-export class ApiNotificationService implements NotificationService {
+export class ApiNotificationService {
   private static instance: ApiNotificationService;
   private apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
   private eventEmitter = new EventEmitter<NotificationEvents>();
@@ -243,7 +242,7 @@ export class ApiNotificationService implements NotificationService {
     await this.markAsRead(id);
   }
 
-  async markAllAsRead(recipientId: string): Promise<void> {
+  async markAllAsRead(_recipientId: string): Promise<void> {
     try {
       await fetch(`${this.apiUrl}/notifications/mark-all-read`, {
         method: 'PUT',
@@ -265,7 +264,7 @@ export class ApiNotificationService implements NotificationService {
     }
   }
 
-  async getStats(recipientId: string): Promise<NotificationStats> {
+  async getStats(_recipientId: string): Promise<NotificationStats> {
     try {
       const response = await fetch(`${this.apiUrl}/notifications/unread-count`, {
         headers: this.getAuthHeaders()

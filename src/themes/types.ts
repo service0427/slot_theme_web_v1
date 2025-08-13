@@ -27,6 +27,10 @@ export interface ThemeComponents {
   NotificationTestPage: React.ComponentType;
   OperatorNotificationPage: React.ComponentType;
   NotificationHistoryPage: React.ComponentType;
+  AnnouncementPage: React.ComponentType;
+  AnnouncementManagePage: React.ComponentType;
+  RankingPage: React.ComponentType;
+  SlotBulkRegistrationPage: React.ComponentType;
   
   // Components
   CashChargeForm: React.ComponentType<{ onSubmit: (data: any) => void }>;

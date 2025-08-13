@@ -213,7 +213,7 @@ export class ApiAuthService extends BaseAuthService {
             updatedUser.fullName,
             updatedUser.phone,
             this.currentUser.bankInfo,
-            this.currentUser.businessInfo,
+            this.currentUser.business,
             this.currentUser.lastLoginAt
           );
 

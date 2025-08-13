@@ -35,6 +35,7 @@ export interface ChatRoom {
   id: string;
   name?: string;
   participants: string[];
+  createdBy?: string;
   lastMessageId?: string;
   lastMessage?: string;
   lastMessageTime?: Date;

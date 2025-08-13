@@ -170,7 +170,7 @@ export function BaseNotificationHistoryPage() {
         message: announcementForm.message,
         recipientId: 'all',
         sender: NotificationSender.OPERATOR,
-        auto_close: !announcementForm.pinned,
+        autoClose: !announcementForm.pinned,
         duration: announcementForm.pinned ? 0 : 10000,
         metadata: {
           isAnnouncement: true,

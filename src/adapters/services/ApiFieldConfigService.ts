@@ -6,7 +6,7 @@ export interface FieldConfig {
   id?: number;
   field_key: string;
   label: string;
-  field_type: 'text' | 'number' | 'url' | 'textarea' | 'select' | 'date' | 'email';
+  field_type: 'text' | 'number' | 'url' | 'textarea' | 'select' | 'date' | 'email' | 'phone';
   is_required: boolean;
   is_enabled: boolean;
   show_in_list: boolean;
@@ -18,6 +18,9 @@ export interface FieldConfig {
   display_order: number;
   created_at?: string;
   updated_at?: string;
+  is_system_generated?: boolean;
+  description?: string;
+  required?: boolean; // 이전 버전 호환성
 }
 
 class ApiFieldConfigService {

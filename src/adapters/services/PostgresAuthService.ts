@@ -46,15 +46,16 @@ export class PostgresAuthService extends BaseAuthService {
       }
 
       // 사용자 모델 생성
-      const user = new UserModel({
-        id: userRow.id,
-        email: userRow.email,
-        fullName: userRow.full_name,
-        role: userRow.role,
-        permissions: this.getRolePermissions(userRow.role),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+      const user = new UserModel(
+        userRow.id,
+        userRow.email,
+        userRow.role,
+        'active',
+        new Date(),
+        new Date(),
+        userRow.full_name
+      );
+      user.permissions = this.getRolePermissions(userRow.role);
 
       // 토큰 생성 (실제 프로덕션에서는 JWT 사용 권장)
       const tokens: AuthToken = {
@@ -100,7 +101,7 @@ export class PostgresAuthService extends BaseAuthService {
     }
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthResult<AuthToken>> {
+  async refreshToken(_refreshToken: string): Promise<AuthResult<AuthToken>> {
     try {
       // 실제 구현에서는 리프레시 토큰 검증 로직 필요
       if (!this.currentUser) {
@@ -133,7 +134,7 @@ export class PostgresAuthService extends BaseAuthService {
 
   async updateUser(userId: string, updates: Partial<User>): Promise<AuthResult<User>> {
     try {
-      const allowedUpdates = ['full_name', 'password'];
+      // const allowedUpdates = ['full_name', 'password']; // 미사용 변수
       const updateFields: string[] = [];
       const values: any[] = [];
       let paramIndex = 1;
@@ -181,11 +182,20 @@ export class PostgresAuthService extends BaseAuthService {
 
       // 현재 사용자 정보 업데이트
       if (this.currentUser && this.currentUser.id === userId) {
-        this.currentUser = new UserModel({
-          ...this.currentUser,
-          fullName: updatedRow.full_name,
-          updatedAt: new Date()
-        });
+        this.currentUser = new UserModel(
+          this.currentUser.id,
+          this.currentUser.email,
+          this.currentUser.role,
+          this.currentUser.status,
+          this.currentUser.createdAt,
+          new Date(),
+          updatedRow.full_name,
+          this.currentUser.phone,
+          this.currentUser.bankInfo,
+          this.currentUser.business,
+          this.currentUser.lastLoginAt
+        );
+        this.currentUser.permissions = this.getRolePermissions(this.currentUser.role);
 
         this.eventEmitter.emit('authStateChange', this.currentUser);
       }

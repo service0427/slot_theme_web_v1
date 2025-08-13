@@ -42,7 +42,7 @@ export class ApiChatService implements IChatService {
     }
   }
 
-  async getRooms(userId: string): Promise<ChatResult<ChatRoom[]>> {
+  async getRooms(_userId: string): Promise<ChatResult<ChatRoom[]>> {
     try {
       const response = await fetch(`${this.baseUrl}/rooms`, {
         method: 'GET',
@@ -79,12 +79,12 @@ export class ApiChatService implements IChatService {
     }
   }
 
-  async joinRoom(roomId: string, userId: string): Promise<ChatResult<boolean>> {
+  async joinRoom(_roomId: string, _userId: string): Promise<ChatResult<boolean>> {
     // For support chat, users are automatically joined when room is created
     return { success: true, data: true };
   }
 
-  async leaveRoom(roomId: string, userId: string): Promise<ChatResult<boolean>> {
+  async leaveRoom(_roomId: string, _userId: string): Promise<ChatResult<boolean>> {
     // Not implemented for support chat
     return { success: true, data: true };
   }
@@ -139,12 +139,12 @@ export class ApiChatService implements IChatService {
     }
   }
 
-  async markMessageAsRead(messageId: string, userId: string): Promise<ChatResult<boolean>> {
+  async markMessageAsRead(_messageId: string, _userId: string): Promise<ChatResult<boolean>> {
     // Individual message read marking not implemented
     return { success: true, data: true };
   }
 
-  async markAllAsRead(roomId: string, userId: string): Promise<ChatResult<boolean>> {
+  async markAllAsRead(roomId: string, _userId: string): Promise<ChatResult<boolean>> {
     try {
       const response = await fetch(
         `${this.baseUrl}/rooms/${roomId}/read`,
@@ -165,7 +165,7 @@ export class ApiChatService implements IChatService {
     }
   }
 
-  async deleteMessage(messageId: string, userId: string): Promise<ChatResult<boolean>> {
+  async deleteMessage(_messageId: string, _userId: string): Promise<ChatResult<boolean>> {
     // Message deletion not implemented
     return { success: false, error: 'Message deletion not supported' };
   }

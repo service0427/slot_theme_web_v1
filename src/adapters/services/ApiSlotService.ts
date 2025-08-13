@@ -16,7 +16,7 @@ export class ApiSlotService extends BaseSlotService {
     this.accessToken = localStorage.getItem('accessToken');
   }
 
-  async getUserSlots(userId: string): Promise<SlotResult<UserSlot[]>> {
+  async getUserSlots(_userId: string): Promise<SlotResult<UserSlot[]>> {
     try {
       this.updateAccessToken();
       
@@ -107,12 +107,12 @@ export class ApiSlotService extends BaseSlotService {
     }
   }
 
-  async createSlot(userId: string, params: { customFields: Record<string, string> }): Promise<SlotResult<UserSlot>> {
+  async createSlot(_userId: string, params: { customFields: Record<string, string> }): Promise<SlotResult<UserSlot>> {
     try {
       this.updateAccessToken();
       
       // customFields에서 필요한 필드 추출
-      const { keywords, landingUrl, description, mid } = params.customFields;
+      const { keywords, landingUrl, mid } = params.customFields;
       
       const response = await fetch(`${API_BASE_URL}/slots`, {
         method: 'POST',
@@ -347,7 +347,7 @@ export class ApiSlotService extends BaseSlotService {
     }
   }
 
-  async searchSlots(query: string, filters?: any): Promise<SlotResult<Slot[]>> {
+  async searchSlots(query: string, filters?: any): Promise<SlotResult<UserSlot[]>> {
     try {
       this.updateAccessToken();
       
@@ -373,7 +373,7 @@ export class ApiSlotService extends BaseSlotService {
       }
 
       if (result.success && result.data) {
-        const slots = result.data.items.map((item: any) => new SlotModel(
+        const slots = result.data.items.map((item: any) => new UserSlotModel(
           item.id,
           item.user_id,
           item.name,
@@ -587,11 +587,11 @@ export class ApiSlotService extends BaseSlotService {
     }
   }
 
-  async fillEmptySlot(slotId: string, params: CreateSlotParams): Promise<SlotResult<UserSlot>> {
+  async fillEmptySlot(slotId: string, params: UpdateSlotParams): Promise<SlotResult<UserSlot>> {
     try {
       this.updateAccessToken();
       
-      const { keywords, landingUrl, description, mid } = params.customFields || {};
+      const { keywords, landingUrl, mid } = params.customFields || {};
       
       const response = await fetch(`${API_BASE_URL}/slots/${slotId}/fill`, {
         method: 'PUT',

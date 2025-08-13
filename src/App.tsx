@@ -101,7 +101,7 @@ function App() {
   // Core 인스턴스 생성
   const coreApp = useMemo(() => {
     const cashService = new MockCashService();
-    const useCashSystem = import.meta.env.VITE_USE_CASH_SYSTEM === 'true';
+    // const useCashSystem = import.meta.env.VITE_USE_CASH_SYSTEM === 'true';
     return new CoreApp({
       authService: new ApiAuthService(), // API 기반 AuthService 사용
       cashService: cashService,

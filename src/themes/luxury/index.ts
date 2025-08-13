@@ -18,6 +18,8 @@ import { OperatorNotificationPage } from './pages/OperatorNotificationPage';
 import { NotificationHistoryPage } from './pages/NotificationHistoryPage';
 import { AnnouncementPage } from './pages/AnnouncementPage';
 import { AnnouncementManagePage } from './pages/AnnouncementManagePage';
+import { RankingPage } from './pages/RankingPage';
+import { SlotBulkRegistrationPage } from './pages/SlotBulkRegistrationPage';
 import { CashChargeForm } from './components/CashChargeForm';
 import { CashChargeModal } from './components/CashChargeModal';
 import { AdSlotCard } from './components/AdSlotCard';
@@ -53,6 +55,8 @@ export const luxuryTheme: Theme = {
     NotificationHistoryPage,
     AnnouncementPage,
     AnnouncementManagePage,
+    RankingPage,
+    SlotBulkRegistrationPage,
     
     // Components
     CashChargeForm,

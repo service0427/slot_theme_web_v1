@@ -15,9 +15,17 @@ export interface UserSlot {
   rejectionReason?: string;
   expiredAt?: Date;
   updatedAt: Date;
+  // 추가 속성들
+  amount?: number;
+  startDate?: string | Date;
+  endDate?: string | Date;
+  workCount?: number;
+  description?: string;
+  slot_number?: number;
+  fieldValues?: any[];
 }
 
-export type SlotStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'expired';
+export type SlotStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'expired' | 'empty';
 
 export class UserSlotModel implements UserSlot {
   constructor(

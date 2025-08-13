@@ -69,7 +69,7 @@ export function BaseOperatorNotificationPage() {
   // 필터링된 사용자 목록
   const filteredUsers = allUsers.filter(user => 
     !selectedUsers.includes(user.id) &&
-    (user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.fullName && user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
      user.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
