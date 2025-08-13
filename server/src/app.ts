@@ -29,7 +29,8 @@ const io = new SocketIOServer(httpServer, {
       'http://cpc-korea.com',
       'http://www.cpc-korea.com',
       'https://cpc-korea.com',
-      'https://www.cpc-korea.com'
+      'https://www.cpc-korea.com',
+      'https://api.cpc-korea.com'
     ],
     credentials: true
   }
@@ -50,7 +51,8 @@ app.use(cors({
     'http://cpc-korea.com',
     'http://www.cpc-korea.com',
     'https://cpc-korea.com',
-    'https://www.cpc-korea.com'
+    'https://www.cpc-korea.com',
+    'https://api.cpc-korea.com'
   ],
   credentials: true
 }));
