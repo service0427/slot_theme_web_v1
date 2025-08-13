@@ -1,96 +1,151 @@
-import { BaseAuthService, LoginCredentials, AuthResult, AuthToken } from '@/core/services/AuthService';
-import { User, UserModel } from '@/core/models/User';
+import { IAuthService, ISocketService } from '@/interfaces';
+import { UserModel } from '@/core/models/User';
+import { LoginDto, RegisterDto } from '@/dto';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { ApiNotificationService } from './ApiNotificationService';
+import { AuthResult } from '@/types/auth.types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+// 임시 타입 정의
+interface AuthModel {
+  user: UserModel;
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+  };
+}
 
-export class ApiAuthService extends BaseAuthService {
+export class ApiAuthService implements IAuthService {
+  private authStateSubject = new BehaviorSubject<AuthModel | null>(null);
+  public authState$: Observable<AuthModel | null> = this.authStateSubject.asObservable();
   private accessToken: string | null = null;
+  private socketService: ISocketService | null = null;
+  
+  // API URL 설정
+  private apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
   constructor() {
-    super();
-    // 로컬 스토리지에서 토큰 복원
-    this.restoreSession();
+    // 토큰 복원
+    this.accessToken = localStorage.getItem('accessToken');
+    if (this.accessToken) {
+      this.validateAndRestoreSession();
+    }
   }
 
-  async login(credentials: LoginCredentials): Promise<AuthResult<{ user: User; tokens: AuthToken }>> {
+  setSocketService(socketService: ISocketService) {
+    this.socketService = socketService;
+  }
+
+  private async validateAndRestoreSession() {
+    // 세션 복원 로직
+  }
+
+  private setAuthState(user: UserModel | null, tokens: any | null) {
+    const authModel = user && tokens ? { user, tokens } : null;
+    this.authStateSubject.next(authModel);
+  }
+
+  get authState(): AuthModel | null {
+    return this.authStateSubject.value;
+  }
+
+  async login(dto: LoginDto): Promise<AuthResult<AuthModel>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      // Cloudflare 최적화: Keep-Alive 헤더 추가
+      const response = await fetch(`${this.apiUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Connection': 'keep-alive',
+          'Accept-Encoding': 'gzip, deflate, br',
         },
-        body: JSON.stringify(credentials),
+        body: JSON.stringify(dto),
+        // 요청 타임아웃 설정
+        signal: AbortSignal.timeout(15000) // 15초 타임아웃
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
+        const error = await response.json();
+        return {
+          success: false,
+          error: error.error || '로그인에 실패했습니다.'
+        };
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
         return {
           success: false,
           error: result.error || '로그인에 실패했습니다.'
         };
       }
 
-      if (result.success && result.data) {
-        const { user, tokens } = result.data;
-        
-        // API 응답 디버깅
-        console.log('API Response:', result.data);
-        console.log('User object:', user);
-        
-        // 사용자 모델 생성
-        const userModel = new UserModel(
-          user.id,
-          user.email,
-          user.role,
-          'active', // status
-          new Date(), // createdAt
-          new Date(), // updatedAt
-          user.fullName,
-          user.phone, // phone
-          undefined, // bankInfo
-          undefined, // business
-          new Date() // lastLoginAt
-        );
-        
-        // permissions는 UserModel에 없으므로 별도로 추가
-        (userModel as any).permissions = user.permissions;
+      const { user, tokens } = result.data;
+      
+      // UserModel 생성
+      const userModel = new UserModel(
+        user.id,
+        user.email,
+        user.fullName,
+        user.role
+      );
+      
+      // permissions는 UserModel에 없으므로 별도로 추가
+      (userModel as any).permissions = user.permissions;
 
-        // 토큰 저장
-        this.accessToken = tokens.accessToken;
-        localStorage.setItem('accessToken', tokens.accessToken);
-        localStorage.setItem('refreshToken', tokens.refreshToken);
-        
-        // 인증 상태 설정
-        this.setAuthState(userModel, tokens);
-        
-        // 디버깅용 로그
-        console.log('Login successful:', {
-          email: userModel.email,
-          role: userModel.role,
-          permissions: userModel.permissions
-        });
-
-        // 로그인 성공 시 알림 폴링 시작
+      // 토큰 저장
+      this.accessToken = tokens.accessToken;
+      localStorage.setItem('accessToken', tokens.accessToken);
+      localStorage.setItem('refreshToken', tokens.refreshToken);
+      
+      // 사용자 정보 저장 (operator 체크를 위해)
+      localStorage.setItem('user', JSON.stringify({
+        id: userModel.id,
+        email: userModel.email,
+        role: userModel.role,
+        fullName: userModel.fullName
+      }));
+      
+      // 인증 상태 설정
+      this.setAuthState(userModel, tokens);
+      
+      // 디버깅용 로그
+      console.log('Login successful:', {
+        email: userModel.email,
+        role: userModel.role
+      });
+      
+      // Socket.IO 연결
+      if (this.socketService && userModel.id) {
+        await this.socketService.connect(userModel.id);
+      }
+      
+      // 로그인 성공 시 알림 서비스 시작 (운영자 제외)
+      if (userModel.role !== 'operator') {
         const notificationService = ApiNotificationService.getInstance();
         notificationService.startPolling();
-
+      }
+      
+      const authModel = { user: userModel, tokens };
+      
+      return {
+        success: true,
+        data: authModel
+      };
+    } catch (error: any) {
+      console.error('Login error:', error);
+      
+      // 타임아웃 에러 처리
+      if (error.name === 'AbortError') {
         return {
-          success: true,
-          data: { user: userModel, tokens }
+          success: false,
+          error: '서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
         };
       }
-
+      
       return {
         success: false,
-        error: '로그인에 실패했습니다.'
-      };
-    } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        error: '서버와의 통신 중 오류가 발생했습니다.'
+        error: error.message || '로그인 중 오류가 발생했습니다.'
       };
     }
   }
@@ -104,193 +159,172 @@ export class ApiAuthService extends BaseAuthService {
       // 로컬 스토리지 클리어
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user'); // user 정보도 삭제
       
       // 상태 초기화
       this.accessToken = null;
       this.setAuthState(null, null);
       
-      return { success: true };
-    } catch (error) {
+      // Socket.IO 연결 해제
+      if (this.socketService) {
+        this.socketService.disconnect();
+      }
+      
+      return {
+        success: true
+      };
+    } catch (error: any) {
       console.error('Logout error:', error);
       return {
         success: false,
-        error: '로그아웃 중 오류가 발생했습니다.'
+        error: error.message || '로그아웃 중 오류가 발생했습니다.'
       };
     }
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthResult<AuthToken>> {
+  async register(dto: RegisterDto): Promise<AuthResult<void>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      const response = await fetch(`${this.apiUrl}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Connection': 'keep-alive',
         },
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify(dto),
+        signal: AbortSignal.timeout(15000) // 15초 타임아웃
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        // 리프레시 토큰도 만료된 경우 로그아웃
-        if (response.status === 403) {
-          await this.logout();
-        }
+        const error = await response.json();
         return {
           success: false,
-          error: result.error || '토큰 갱신에 실패했습니다.'
+          error: error.error || '회원가입에 실패했습니다.'
         };
       }
 
-      if (result.success && result.data) {
-        const tokens = result.data;
-        
-        // 새 토큰 저장
-        this.accessToken = tokens.accessToken;
-        localStorage.setItem('accessToken', tokens.accessToken);
-        localStorage.setItem('refreshToken', tokens.refreshToken);
-        
-        this.tokens = tokens;
-
+      const result = await response.json();
+      
+      if (!result.success) {
         return {
-          success: true,
-          data: tokens
+          success: false,
+          error: result.error || '회원가입에 실패했습니다.'
         };
       }
 
+      const { user, tokens } = result.data;
+      
+      // UserModel 생성
+      const userModel = new UserModel(
+        user.id,
+        user.email,
+        user.fullName,
+        user.role
+      );
+      
+      // 토큰 업데이트
+      this.accessToken = tokens.accessToken;
+      localStorage.setItem('accessToken', tokens.accessToken);
+      localStorage.setItem('refreshToken', tokens.refreshToken);
+      
+      // 사용자 정보도 업데이트 (operator 체크를 위해)
+      if (user) {
+        const userModel = new UserModel(
+          user.id,
+          user.email,
+          user.fullName,
+          user.role
+        );
+        localStorage.setItem('user', JSON.stringify({
+          id: userModel.id,
+          email: userModel.email,
+          role: userModel.role,
+          fullName: userModel.fullName
+        }));
+      }
+      
+      // 인증 상태 설정
+      this.setAuthState(userModel, tokens);
+      
       return {
-        success: false,
-        error: '토큰 갱신에 실패했습니다.'
+        success: true
       };
-    } catch (error) {
-      console.error('Token refresh error:', error);
+    } catch (error: any) {
+      console.error('Register error:', error);
+      
+      // 타임아웃 에러 처리
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          error: '서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+        };
+      }
+      
       return {
         success: false,
-        error: '서버와의 통신 중 오류가 발생했습니다.'
+        error: error.message || '회원가입 중 오류가 발생했습니다.'
       };
     }
   }
 
-  async updateUser(userId: string, updates: any): Promise<AuthResult<User>> {
+  async changePassword(currentPassword: string, newPassword: string): Promise<AuthResult<void>> {
     try {
-      const requestBody = {
-        fullName: updates.fullName,
-        phone: updates.phone,
-        password: updates.password,
-        currentPassword: updates.currentPassword
-      };
-      
-      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      const response = await fetch(`${this.apiUrl}/auth/change-password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.accessToken}`
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Connection': 'keep-alive',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          currentPassword,
+          password: newPassword
+        }),
+        signal: AbortSignal.timeout(15000) // 15초 타임아웃
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
+        const error = await response.json();
         return {
           success: false,
-          error: result.error || '프로필 업데이트에 실패했습니다.'
+          error: error.error || '비밀번호 변경에 실패했습니다.'
         };
       }
 
-      if (result.success && result.data) {
-        const updatedUser = result.data;
-        
-        // 현재 사용자 정보 업데이트
-        if (this.currentUser && this.currentUser.id === userId) {
-          this.currentUser = new UserModel(
-            this.currentUser.id,
-            this.currentUser.email,
-            this.currentUser.role,
-            this.currentUser.status,
-            this.currentUser.createdAt,
-            new Date(),
-            updatedUser.fullName,
-            updatedUser.phone,
-            this.currentUser.bankInfo,
-            this.currentUser.business,
-            this.currentUser.lastLoginAt
-          );
-
-          this.eventEmitter.emit('authStateChange', this.currentUser);
-        }
-
+      const result = await response.json();
+      
+      if (!result.success) {
         return {
-          success: true,
-          data: this.currentUser!
+          success: false,
+          error: result.error || '비밀번호 변경에 실패했습니다.'
         };
       }
 
       return {
-        success: false,
-        error: '프로필 업데이트에 실패했습니다.'
+        success: true
       };
-    } catch (error) {
-      console.error('Update user error:', error);
+    } catch (error: any) {
+      console.error('Change password error:', error);
+      
+      // 타임아웃 에러 처리
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          error: '서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+        };
+      }
+      
       return {
         success: false,
-        error: '서버와의 통신 중 오류가 발생했습니다.'
+        error: error.message || '비밀번호 변경 중 오류가 발생했습니다.'
       };
     }
   }
 
-  private async restoreSession() {
-    const accessToken = localStorage.getItem('accessToken');
-    const refreshToken = localStorage.getItem('refreshToken');
+  async refreshAuth(): Promise<void> {
+    // 토큰 갱신 로직
+  }
 
-    if (!accessToken || !refreshToken) {
-      return;
-    }
-
-    this.accessToken = accessToken;
-
-    try {
-      // 현재 사용자 정보 가져오기
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          const user = result.data;
-          
-          const userModel = new UserModel(
-            user.id,
-            user.email,
-            user.role,
-            'active',
-            new Date(),
-            new Date(),
-            user.fullName,
-            user.phone,
-            undefined,
-            undefined,
-            new Date()
-          );
-          
-          (userModel as any).permissions = user.permissions;
-
-          this.setAuthState(userModel, {
-            accessToken,
-            refreshToken,
-            expiresIn: 24 * 60 * 60 * 1000
-          });
-        }
-      } else if (response.status === 403) {
-        // 토큰이 만료된 경우 리프레시 시도
-        await this.refreshToken(refreshToken);
-      }
-    } catch (error) {
-      // 세션 복원 실패 시 조용히 로그아웃
-      await this.logout();
-    }
+  isAuthenticated(): boolean {
+    return !!this.accessToken;
   }
 }

@@ -196,7 +196,7 @@ export async function createUser(req: AuthRequest, res: Response) {
     }
     
     // 비밀번호 해싱
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 8); // 성능 최적화: 10 -> 8
     
     // 사용자 생성
     const result = await pool.query(
@@ -253,7 +253,7 @@ export async function updateUser(req: AuthRequest, res: Response) {
     }
     
     if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 8); // 성능 최적화: 10 -> 8
       updates.push(`password = $${paramIndex++}`);
       values.push(hashedPassword);
     }

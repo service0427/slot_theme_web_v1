@@ -8,6 +8,7 @@ import { AuthRequest } from '../middleware/auth';
 
 export async function login(req: Request, res: Response) {
   try {
+    const startTime = Date.now();
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -18,10 +19,13 @@ export async function login(req: Request, res: Response) {
     }
 
     // 사용자 조회
+    console.log(`[LOGIN] 1. DB 조회 시작: ${email}`);
+    const dbStartTime = Date.now();
     const result = await pool.query(
       'SELECT id, email, password, full_name, phone, role, is_active FROM users WHERE email = $1',
       [email]
     );
+    console.log(`[LOGIN] 2. DB 조회 완료: ${Date.now() - dbStartTime}ms`);
 
     if (result.rows.length === 0) {
       return res.status(401).json({
@@ -41,7 +45,11 @@ export async function login(req: Request, res: Response) {
     }
 
     // 비밀번호 검증
+    console.log(`[LOGIN] 3. bcrypt 비교 시작`);
+    const bcryptStartTime = Date.now();
     const isValidPassword = await bcrypt.compare(password, user.password);
+    console.log(`[LOGIN] 4. bcrypt 비교 완료: ${Date.now() - bcryptStartTime}ms`);
+    
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
@@ -67,14 +75,19 @@ export async function login(req: Request, res: Response) {
     );
 
     // 마지막 로그인 시간 업데이트
+    console.log(`[LOGIN] 5. 로그인 시간 업데이트 시작`);
+    const updateStartTime = Date.now();
     await pool.query(
       'UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
       [user.id]
     );
+    console.log(`[LOGIN] 6. 로그인 시간 업데이트 완료: ${Date.now() - updateStartTime}ms`);
 
     // 권한 매핑
     const permissions = getPermissionsByRole(user.role);
 
+    console.log(`[LOGIN] 전체 소요 시간: ${Date.now() - startTime}ms`);
+    
     res.json({
       success: true,
       data: {
@@ -222,7 +235,7 @@ export async function updateProfile(req: AuthRequest, res: Response) {
         });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 8); // 성능 최적화: 10 -> 8
       updates.push(`password = $${paramIndex++}`);
       values.push(hashedPassword);
     }

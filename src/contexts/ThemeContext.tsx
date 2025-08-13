@@ -48,15 +48,24 @@ const availableThemes = [
 ];
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [isLoading, setIsLoading] = useState(true);
   const [currentTheme, setCurrentTheme] = useState<ThemeType>(() => {
     // 로컬 스토리지에서 저장된 테마 불러오기
     const saved = localStorage.getItem('selectedTheme');
     return (saved as ThemeType) || 'simple';
   });
 
+  useEffect(() => {
+    // 테마 로딩 완료 표시
+    setIsLoading(false);
+    // body 클래스 업데이트
+    document.body.className = `theme-${currentTheme}`;
+  }, [currentTheme]);
+
   const setTheme = (themeName: ThemeType) => {
     setCurrentTheme(themeName);
     localStorage.setItem('selectedTheme', themeName);
+    document.body.className = `theme-${themeName}`;
   };
 
   const theme = themes[currentTheme];

@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useMemo, Suspense } from 'react';
 import { CoreApp } from '@/core';
 import { CoreProvider, useAuthContext } from '@/adapters/react';
 import { MockCashService } from '@/services/mock';
@@ -9,10 +9,18 @@ import { ConfigProvider } from './contexts/ConfigContext';
 import { EnhancedConfigProvider } from './contexts/EnhancedConfigContext';
 import { SystemSettingsProvider, useSystemSettings } from './contexts/SystemSettingsContext';
 import { LoginPreviewPage } from './pages/LoginPreviewPage';
+import { ThemedLoadingScreen } from './components/LoadingScreen';
 
 function AppContent() {
-  const { theme } = useSystemSettings();
+  const { theme, isLoading: settingsLoading } = useSystemSettings();
   const auth = useAuthContext();
+  
+  // 설정 로딩 중일 때 로딩 화면 표시
+  if (settingsLoading) {
+    const savedTheme = localStorage.getItem('globalTheme');
+    const themeName = savedTheme ? JSON.parse(savedTheme) : 'simple';
+    return <ThemedLoadingScreen theme={themeName} />;
+  }
 
 
   const {
