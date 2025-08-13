@@ -1,0 +1,1 @@
+export { BaseOperatorNotificationPage as OperatorNotificationPage } from '@/components/base/BaseOperatorNotificationPage';

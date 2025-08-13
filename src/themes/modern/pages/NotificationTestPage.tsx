@@ -1,0 +1,1 @@
+export { BaseNotificationTestPage as NotificationTestPage } from '@/components/base/BaseNotificationTestPage';

@@ -1,0 +1,1 @@
+export { BaseNotificationHistoryPage as NotificationHistoryPage } from '@/components/base/BaseNotificationHistoryPage';

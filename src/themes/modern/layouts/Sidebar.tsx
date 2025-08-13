@@ -1,0 +1,1 @@
+export { BaseSidebar as Sidebar } from '@/components/base/BaseSidebar';

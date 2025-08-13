@@ -1,0 +1,1 @@
+export { SlotBulkRegistrationPage as BaseSlotBulkRegistrationPage } from '@/themes/simple/pages/SlotBulkRegistrationPage';
