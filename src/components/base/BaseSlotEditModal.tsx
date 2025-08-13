@@ -39,7 +39,8 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
     
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`http://localhost:8001/api/slots/${slot.id}/field-values`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const response = await fetch(`${apiUrl}/slots/${slot.id}/field-values`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

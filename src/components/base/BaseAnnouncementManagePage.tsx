@@ -63,7 +63,8 @@ export function BaseAnnouncementManagePage() {
   const loadAnnouncements = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8001/api/announcements?includeInactive=true&limit=100', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const response = await fetch(`${apiUrl}/announcements?includeInactive=true&limit=100`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
@@ -87,9 +88,10 @@ export function BaseAnnouncementManagePage() {
 
   const handleSubmit = async () => {
     try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
       const url = editingAnnouncement 
-        ? `http://localhost:8001/api/announcements/${editingAnnouncement.id}`
-        : 'http://localhost:8001/api/announcements';
+        ? `${apiUrl}/announcements/${editingAnnouncement.id}`
+        : `${apiUrl}/announcements`;
       
       const method = editingAnnouncement ? 'PUT' : 'POST';
       
@@ -121,7 +123,8 @@ export function BaseAnnouncementManagePage() {
     if (!confirm('정말 삭제하시겠습니까?')) return;
 
     try {
-      const response = await fetch(`http://localhost:8001/api/announcements/${id}`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const response = await fetch(`${apiUrl}/announcements/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`

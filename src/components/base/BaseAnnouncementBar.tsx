@@ -38,7 +38,8 @@ export function BaseAnnouncementBar({
   useEffect(() => {
     const fetchPinnedAnnouncements = async () => {
       try {
-        const response = await fetch('http://localhost:8001/api/announcements/pinned');
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+        const response = await fetch(`${apiUrl}/announcements/pinned`);
         const data = await response.json();
         
         if (data.success && data.data.length > 0) {
@@ -97,7 +98,8 @@ export function BaseAnnouncementBar({
   // 공지사항 상세 조회
   const fetchAnnouncementDetail = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:8001/api/announcements/${id}`);
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const response = await fetch(`${apiUrl}/announcements/${id}`);
       const data = await response.json();
       
       if (data.success) {

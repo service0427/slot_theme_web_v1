@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useCallback } from 'react';
 import ReactQuill, { Quill } from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -32,7 +32,9 @@ export function RichTextEditor({
       formData.append('image', file);
 
       try {
-        const response = await fetch('http://localhost:8001/api/upload/image', {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+        const siteUrl = import.meta.env.VITE_SITE_URL || 'http://localhost:8001';
+        const response = await fetch(`${apiUrl}/upload/image`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -49,7 +51,7 @@ export function RichTextEditor({
             // 이미지 URL을 절대 경로로 변환
             const imageUrl = result.data.url.startsWith('http') 
               ? result.data.url 
-              : `http://localhost:8001${result.data.url}`;
+              : `${siteUrl}${result.data.url}`;
             quill?.insertEmbed(range.index, 'image', imageUrl);
           }
         } else {

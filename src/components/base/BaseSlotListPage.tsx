@@ -593,7 +593,8 @@ export function BaseSlotListPage({
   const handleEditSlot = async (slotId: string, data: Record<string, string>) => {
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`http://localhost:8001/api/slots/${slotId}/update-fields`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const response = await fetch(`${apiUrl}/slots/${slotId}/update-fields`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

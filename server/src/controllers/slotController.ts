@@ -927,3 +927,42 @@ export async function fillEmptySlot(req: AuthRequest, res: Response) {
     });
   }
 }
+
+// 슬롯 개수만 조회 (관리자 대시보드용)
+export async function getSlotCount(req: AuthRequest, res: Response) {
+  try {
+    const userRole = req.user?.role;
+    const { status = '' } = req.query;
+
+    let countQuery = '';
+    const countParams: any[] = [];
+
+    // 관리자는 모든 슬롯 개수, 일반 사용자는 자신의 슬롯 개수만
+    if (userRole === 'operator') {
+      countQuery = 'SELECT COUNT(*) FROM slots s WHERE 1=1';
+    } else {
+      countParams.push(req.user?.id);
+      countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
+    }
+
+    // 상태 필터
+    if (status) {
+      countParams.push(status);
+      countQuery += ` AND s.status = $${countParams.length}`;
+    }
+
+    const countResult = await pool.query(countQuery, countParams);
+    const count = parseInt(countResult.rows[0].count);
+
+    res.json({
+      success: true,
+      data: { count }
+    });
+  } catch (error) {
+    console.error('[ERROR] Get slot count error:', error);
+    res.status(500).json({
+      success: false,
+      error: '슬롯 개수 조회 중 오류가 발생했습니다.'
+    });
+  }
+}

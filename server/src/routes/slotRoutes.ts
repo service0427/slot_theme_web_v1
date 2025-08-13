@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { 
   getSlots, 
+  getSlotCount,
   createSlot, 
   updateSlotStatus, 
   approveSlot, 
@@ -21,6 +22,9 @@ router.use(authenticateToken);
 
 // 슬롯 목록 조회
 router.get('/', getSlots);
+
+// 슬롯 개수 조회 (관리자 대시보드용)
+router.get('/count', getSlotCount);
 
 // 슬롯 생성
 router.post('/', createSlot);

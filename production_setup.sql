@@ -425,6 +425,8 @@ INSERT INTO public.system_settings (key, value, category, description, updated_a
 ('field_mid', 'false', 'field', '', '2025-08-12 15:45:59.949176', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
 ('field_url_product_id', 'true', 'field', '', '2025-08-12 14:45:59.949176', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
 ('theme', 'modern', 'theme', '현재 테마', '2025-08-13 10:51:27.949177', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
+('globalTheme', '"modern"', 'theme', '시스템 전체 테마', '2025-08-13 10:51:27.949177', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
+('globalLayout', '"classic"', 'theme', '시스템 전체 레이아웃', '2025-08-13 14:39:25.931503', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
 ('themePrimaryColor', '#8B5CF6', 'theme', '메인 색상', '2025-08-11 17:05:15.493634', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
 ('darkMode', 'false', 'theme', '다크 모드', '2025-08-11 17:05:15.493634', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
 ('enableFieldParsing', 'true', 'field', 'URL 파싱 활성화', '2025-08-12 14:31:17.489577', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
@@ -437,6 +439,46 @@ INSERT INTO public.system_settings (key, value, category, description, updated_a
 ('siteTitle', '마케팅의정석 - 슬롯 관리 시스템', 'business', '사이트 제목', '2025-08-11 17:05:15.493634', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
 ('systemVersion', '1.0.0', 'business', '시스템 버전', '2025-08-11 17:05:15.493634', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3'),
 ('maintenanceMode', 'false', 'feature', '유지보수 모드', '2025-08-11 17:05:15.493634', '4c085f0c-be5d-43a8-8c37-7084ffe4a9c3');
+
+-- =============================================================================
+-- 9. 공지사항 테이블 생성
+-- =============================================================================
+
+-- 공지사항 테이블 생성
+CREATE TABLE IF NOT EXISTS announcements (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    content_type VARCHAR(10) DEFAULT 'text', -- text, html
+    category VARCHAR(50) DEFAULT 'general', -- general, event, update, maintenance
+    priority VARCHAR(20) DEFAULT 'normal', -- low, normal, high, urgent
+    is_pinned BOOLEAN DEFAULT false, -- 상단 고정 여부
+    is_active BOOLEAN DEFAULT true, -- 활성화 여부
+    author_id VARCHAR(255) NOT NULL, -- 작성자 ID
+    author_name VARCHAR(255) NOT NULL, -- 작성자 이름
+    view_count INTEGER DEFAULT 0, -- 조회수
+    start_date TIMESTAMP, -- 게시 시작일
+    end_date TIMESTAMP, -- 게시 종료일
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 공지사항 읽음 표시 테이블
+CREATE TABLE IF NOT EXISTS announcement_reads (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    announcement_id UUID NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+    user_id VARCHAR(255) NOT NULL,
+    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(announcement_id, user_id)
+);
+
+-- 공지사항 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_announcements_active ON announcements(is_active, is_pinned DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_announcements_category ON announcements(category);
+CREATE INDEX IF NOT EXISTS idx_announcements_dates ON announcements(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON announcements(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_announcement_reads_user ON announcement_reads(user_id);
+CREATE INDEX IF NOT EXISTS idx_announcement_reads_announcement ON announcement_reads(announcement_id);
 
 -- =============================================================================
 -- 10. 완료 메시지

@@ -28,6 +28,9 @@ export interface ISlotService {
   rejectSlot(slotId: string, reason: string): Promise<SlotResult<void>>;
   getAllSlots(statusFilter?: string): Promise<SlotResult<UserSlot[]>>;
   getAllPendingSlots(): Promise<SlotResult<UserSlot[]>>;
+  // 슬롯 개수 조회
+  getSlotCount(statusFilter?: string): Promise<SlotResult<{ count: number }>>;
+  getPendingSlotCount(): Promise<SlotResult<{ count: number }>>;
   // 선슬롯발행 기능
   fillEmptySlot(slotId: string, params: CreateSlotParams): Promise<SlotResult<UserSlot>>;
 }
@@ -50,6 +53,8 @@ export abstract class BaseSlotService implements ISlotService {
   abstract rejectSlot(slotId: string, reason: string): Promise<SlotResult<void>>;
   abstract getAllSlots(statusFilter?: string): Promise<SlotResult<UserSlot[]>>;
   abstract getAllPendingSlots(): Promise<SlotResult<UserSlot[]>>;
+  abstract getSlotCount(statusFilter?: string): Promise<SlotResult<{ count: number }>>;
+  abstract getPendingSlotCount(): Promise<SlotResult<{ count: number }>>;
   abstract fillEmptySlot(slotId: string, params: CreateSlotParams): Promise<SlotResult<UserSlot>>;
 
   onSlotCreated(callback: (slot: UserSlot) => void): () => void {

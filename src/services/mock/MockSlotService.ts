@@ -416,4 +416,22 @@ export class MockSlotService extends BaseSlotService {
       data: pendingSlots
     };
   }
+
+  async getSlotCount(statusFilter?: string): Promise<SlotResult<{ count: number }>> {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    let count = this.slots.length;
+    if (statusFilter && statusFilter !== 'all') {
+      count = this.slots.filter(s => s.status === statusFilter).length;
+    }
+    
+    return {
+      success: true,
+      data: { count }
+    };
+  }
+
+  async getPendingSlotCount(): Promise<SlotResult<{ count: number }>> {
+    return this.getSlotCount('pending');
+  }
 }

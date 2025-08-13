@@ -56,7 +56,7 @@ const defaultStyles: AdminDashboardStyles = {
 
 export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDashboardPageProps) {
   const { config } = useConfig();
-  const { loadPendingSlots } = useSlotContext();
+  const { loadPendingSlotCount } = useSlotContext();
   const cashContext = config.useCashSystem ? useCashContext() : null;
   const [pendingSlotsCount, setPendingSlotsCount] = useState(0);
   const [pendingChargesCount, setPendingChargesCount] = useState(0);
@@ -64,7 +64,7 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
 
   useEffect(() => {
     const promises = [
-      loadPendingSlots().then(slots => setPendingSlotsCount(slots.length))
+      loadPendingSlotCount().then(count => setPendingSlotsCount(count))
     ];
     
     if (config.useCashSystem && cashContext) {

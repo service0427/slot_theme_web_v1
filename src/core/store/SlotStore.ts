@@ -211,6 +211,20 @@ export class SlotStore extends Store<SlotState> {
     return this.loadAllSlots('pending');
   }
 
+  // 관리자 기능 - 대기중인 슬롯 개수만 조회 (대시보드용)
+  async loadPendingSlotCount(): Promise<number> {
+    try {
+      const result = await this.slotService.getPendingSlotCount();
+      if (result.success && result.data) {
+        return result.data.count;
+      }
+      return 0;
+    } catch (error) {
+      console.error('대기중인 슬롯 개수 로드 실패:', error);
+      return 0;
+    }
+  }
+
   async approveSlot(slotId: string, approvedPrice?: number): Promise<boolean> {
     try {
       const result = await this.slotService.approveSlot(slotId, approvedPrice);

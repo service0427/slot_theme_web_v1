@@ -45,7 +45,8 @@ export function BaseAnnouncementPage() {
         params.append('category', category);
       }
 
-      const response = await fetch(`http://localhost:8001/api/announcements?${params}`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const response = await fetch(`${apiUrl}/announcements?${params}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
@@ -68,7 +69,8 @@ export function BaseAnnouncementPage() {
     
     // 조회수 증가 및 읽음 표시
     try {
-      await fetch(`http://localhost:8001/api/announcements/${announcement.id}`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      await fetch(`${apiUrl}/announcements/${announcement.id}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }

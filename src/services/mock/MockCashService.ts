@@ -12,11 +12,9 @@ export class MockCashService extends BaseCashService {
 
   constructor() {
     super();
-    // Mock 초기 잔액 설정
-    this.balances.set('1', new BalanceModel('1', 50000, new Date()));
-    
-    // Mock 초기 충전 요청 (테스트용)
-    this.initMockCharges();
+    // Mock 데이터 비활성화 (운영서버용)
+    // this.balances.set('1', new BalanceModel('1', 50000, new Date()));
+    // this.initMockCharges();
   }
 
   private initMockCharges() {
@@ -73,11 +71,8 @@ export class MockCashService extends BaseCashService {
   async getBalance(userId: string): Promise<CashResult<Balance>> {
     await new Promise(resolve => setTimeout(resolve, 300));
     
-    let balance = this.balances.get(userId);
-    if (!balance) {
-      balance = new BalanceModel(userId, 0, new Date());
-      this.balances.set(userId, balance);
-    }
+    // 운영서버용: 항상 잔액 0 반환 (Mock 데이터 비활성화)
+    const balance = new BalanceModel(userId, 0, new Date());
     
     return {
       success: true,
@@ -131,26 +126,20 @@ export class MockCashService extends BaseCashService {
   async getChargeRequests(userId?: string): Promise<CashResult<{ requests: ChargeRequest[] }>> {
     await new Promise(resolve => setTimeout(resolve, 200));
     
-    const requests = userId 
-      ? this.chargeRequests.filter(r => r.userId === userId)
-      : this.chargeRequests;
-    
+    // 운영서버용: 빈 배열 반환 (Mock 데이터 비활성화)
     return {
       success: true,
-      data: { requests }
+      data: { requests: [] }
     };
   }
 
   async getCashHistory(userId?: string): Promise<CashResult<{ history: CashTransaction[] }>> {
     await new Promise(resolve => setTimeout(resolve, 200));
     
-    const history = userId
-      ? this.cashHistory.filter(h => h.userId === userId)
-      : this.cashHistory;
-    
+    // 운영서버용: 빈 배열 반환 (Mock 데이터 비활성화)
     return {
       success: true,
-      data: { history }
+      data: { history: [] }
     };
   }
 
@@ -196,11 +185,10 @@ export class MockCashService extends BaseCashService {
   async getAllPendingCharges(): Promise<CashResult<CashCharge[]>> {
     await new Promise(resolve => setTimeout(resolve, 200));
     
-    const pendingCharges = this.cashCharges.filter(c => c.status === 'pending');
-    
+    // 운영서버용: 빈 배열 반환 (Mock 데이터 비활성화)
     return {
       success: true,
-      data: pendingCharges
+      data: []
     };
   }
 

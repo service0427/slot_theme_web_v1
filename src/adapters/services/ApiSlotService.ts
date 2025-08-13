@@ -514,6 +514,48 @@ export class ApiSlotService extends BaseSlotService {
     return this.getAllSlots('pending');
   }
 
+  // 슬롯 개수만 가져오는 함수 (관리자 대시보드용)
+  async getSlotCount(statusFilter?: string): Promise<SlotResult<{ count: number }>> {
+    try {
+      this.updateAccessToken();
+      
+      const params = new URLSearchParams();
+      if (statusFilter && statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/slots/count?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`
+        }
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || '슬롯 개수를 가져오는데 실패했습니다.'
+        };
+      }
+
+      return {
+        success: true,
+        data: { count: result.data.count }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '슬롯 개수 조회 중 오류가 발생했습니다.'
+      };
+    }
+  }
+
+  // Pending 슬롯 개수만 가져오는 함수
+  async getPendingSlotCount(): Promise<SlotResult<{ count: number }>> {
+    return this.getSlotCount('pending');
+  }
+
   async updateSlot(slotId: string, params: UpdateSlotParams): Promise<SlotResult<UserSlot>> {
     try {
       this.updateAccessToken();

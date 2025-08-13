@@ -59,6 +59,10 @@ interface SystemSettingsContextType {
   
   // 권한
   isAdmin: boolean;
+  
+  // 사이트 정보
+  companyName: string;
+  siteTitle: string;
 }
 
 const SystemSettingsContext = createContext<SystemSettingsContextType | undefined>(undefined);
@@ -156,6 +160,11 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
       if (data.theme?.globalLayout) {
         setCurrentLayout(data.theme.globalLayout);
       }
+      
+      // 사이트 타이틀 업데이트
+      if (data.business?.siteTitle) {
+        document.title = data.business.siteTitle;
+      }
     } catch (err) {
       console.error('Failed to load system settings:', err);
       setError('설정을 불러오는데 실패했습니다.');
@@ -193,6 +202,11 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
         
         // 전체 설정 업데이트
         setSettings(latestSettings);
+        
+        // 사이트 타이틀 업데이트
+        if (latestSettings.business?.siteTitle) {
+          document.title = latestSettings.business.siteTitle;
+        }
       } catch (err) {
         console.error('Failed to check for settings updates:', err);
       }
@@ -332,6 +346,10 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
     
     // 권한
     isAdmin,
+    
+    // 사이트 정보
+    companyName: settings.business?.companyName || '마케팅의정석',
+    siteTitle: settings.business?.siteTitle || 'Simple Slot - 유연한 디자인 시스템',
   };
 
   return (

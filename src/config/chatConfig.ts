@@ -96,7 +96,7 @@ export const defaultChatConfig: ChatConfig = {
   },
   
   api: {
-    baseUrl: 'http://localhost:8001/api/chat',
+    baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/chat`,
     timeout: 30000
   }
 };

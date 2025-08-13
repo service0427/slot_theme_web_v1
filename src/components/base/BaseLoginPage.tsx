@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/adapters/react';
+import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 
 // 테마별 스타일 설정 타입
 export interface LoginPageStyles {
@@ -19,15 +20,18 @@ export interface LoginPageStyles {
 export interface BaseLoginPageProps {
   styles: LoginPageStyles;
   title?: string;
+  showCompanyName?: boolean;
 }
 
 // 공통 로직을 가진 베이스 LoginPage 컴포넌트
 export function BaseLoginPage({ 
   styles, 
-  title = "로그인" 
+  title = "로그인",
+  showCompanyName = true
 }: BaseLoginPageProps) {
   const navigate = useNavigate();
   const { login, isLoading, error, isAuthenticated, user } = useAuthContext();
+  const { companyName } = useSystemSettings();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -46,6 +50,11 @@ export function BaseLoginPage({
 
   return (
     <div className={styles.container}>
+      {showCompanyName && (
+        <div className="text-center mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">{companyName}</h2>
+        </div>
+      )}
       <h1 className={styles.title}>{title}</h1>
       
       {error && (

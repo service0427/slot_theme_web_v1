@@ -37,6 +37,11 @@ export function useSlot(slotStore: SlotStore) {
     return slots;
   }, [slotStore]);
 
+  const loadPendingSlotCount = useCallback(async () => {
+    const count = await slotStore.loadPendingSlotCount();
+    return count;
+  }, [slotStore]);
+
   const approveSlot = useCallback(async (slotId: string, approvedPrice?: number) => {
     return await slotStore.approveSlot(slotId, approvedPrice);
   }, [slotStore]);
@@ -64,6 +69,7 @@ export function useSlot(slotStore: SlotStore) {
     // 관리자 기능
     loadAllSlots,
     loadPendingSlots,
+    loadPendingSlotCount,
     approveSlot,
     rejectSlot
   };

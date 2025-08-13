@@ -22,6 +22,8 @@ export const useNotifications = () => {
     if (user.role === 'operator') {
       setNotifications([]);
       setUnreadCount(0);
+      // 폴링도 중지
+      notificationService.stopPolling();
       return;
     }
     
@@ -63,6 +65,8 @@ export const useNotifications = () => {
       if (user.role === 'operator') {
         setNotifications([]);
         setUnreadCount(0);
+        // 폴링도 중지
+        notificationService.stopPolling();
         return;
       }
       

@@ -10,7 +10,8 @@ class SocketService {
     }
 
     this.userId = userId;
-    this.socket = io('http://localhost:8001', {
+    const socketUrl = import.meta.env.VITE_SITE_URL || 'http://localhost:8001';
+    this.socket = io(socketUrl, {
       withCredentials: true,
       transports: ['websocket', 'polling']  // polling도 허용
     });
