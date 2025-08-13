@@ -1,5 +1,5 @@
-import { IAuthService } from '@/core/services/AuthService';
-import { UserModel } from '@/core/models/User';
+import { IAuthService, LoginCredentials, AuthToken } from '@/core/services/AuthService';
+import { UserModel, User } from '@/core/models/User';
 import { LoginDto, RegisterDto } from '@/dto';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { ApiNotificationService } from './ApiNotificationService';
@@ -53,7 +53,10 @@ export class ApiAuthService implements IAuthService {
     return this.authStateSubject.value;
   }
 
-  async login(dto: LoginDto): Promise<AuthResult<AuthModel>> {
+  // IAuthService 인터페이스 구현 - LoginCredentials 받는 메소드
+  async login(credentials: LoginCredentials): Promise<AuthResult<{ user: User; tokens: AuthToken }>>;
+  async login(dto: LoginDto): Promise<AuthResult<AuthModel>>;
+  async login(credentialsOrDto: LoginCredentials | LoginDto): Promise<AuthResult<any>> {
     try {
       // Cloudflare 최적화: Keep-Alive 헤더 추가
       const response = await fetch(`${this.apiUrl}/auth/login`, {
@@ -63,7 +66,7 @@ export class ApiAuthService implements IAuthService {
           'Connection': 'keep-alive',
           'Accept-Encoding': 'gzip, deflate, br',
         },
-        body: JSON.stringify(dto),
+        body: JSON.stringify(credentialsOrDto),
         // 요청 타임아웃 설정
         signal: AbortSignal.timeout(15000) // 15초 타임아웃
       });
@@ -335,5 +338,122 @@ export class ApiAuthService implements IAuthService {
 
   getCurrentUser(): UserModel | null {
     return this.authState?.user || null;
+  }
+
+  onAuthStateChange(callback: (user: UserModel | null) => void): () => void {
+    const subscription = this.authState$.subscribe((authState) => {
+      callback(authState?.user || null);
+    });
+    
+    // 구독 해제 함수 반환
+    return () => {
+      subscription.unsubscribe();
+    };
+  }
+
+  async refreshToken(refreshToken: string): Promise<AuthResult<any>> {
+    try {
+      const response = await fetch(`${this.apiUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Connection': 'keep-alive',
+        },
+        body: JSON.stringify({ refreshToken }),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return {
+          success: false,
+          error: error.error || '토큰 갱신에 실패했습니다.'
+        };
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || '토큰 갱신에 실패했습니다.'
+        };
+      }
+
+      const { tokens } = result.data;
+      
+      // 토큰 업데이트
+      this.accessToken = tokens.accessToken;
+      localStorage.setItem('accessToken', tokens.accessToken);
+      localStorage.setItem('refreshToken', tokens.refreshToken);
+      
+      return {
+        success: true,
+        data: tokens
+      };
+    } catch (error: any) {
+      console.error('Refresh token error:', error);
+      return {
+        success: false,
+        error: error.message || '토큰 갱신 중 오류가 발생했습니다.'
+      };
+    }
+  }
+
+  async updateUser(userId: string, updates: Partial<UserModel>): Promise<AuthResult<UserModel>> {
+    try {
+      const response = await fetch(`${this.apiUrl}/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Connection': 'keep-alive',
+        },
+        body: JSON.stringify(updates),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return {
+          success: false,
+          error: error.error || '사용자 정보 업데이트에 실패했습니다.'
+        };
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || '사용자 정보 업데이트에 실패했습니다.'
+        };
+      }
+
+      const updatedUser = result.data;
+      const userModel = new UserModel(
+        updatedUser.id,
+        updatedUser.email,
+        updatedUser.fullName,
+        updatedUser.role
+      );
+      
+      // 현재 인증 상태가 있으면 업데이트
+      if (this.authState) {
+        const authModel = { user: userModel, tokens: this.authState.tokens };
+        this.authStateSubject.next(authModel);
+      }
+      
+      return {
+        success: true,
+        data: userModel
+      };
+    } catch (error: any) {
+      console.error('Update user error:', error);
+      return {
+        success: false,
+        error: error.message || '사용자 정보 업데이트 중 오류가 발생했습니다.'
+      };
+    }
   }
 }
