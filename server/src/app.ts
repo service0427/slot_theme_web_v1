@@ -21,7 +21,16 @@ const app = express();
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+    origin: [
+      'http://localhost:5173', 
+      'http://localhost:5174', 
+      'http://localhost:5175', 
+      'http://211.37.173.150',
+      'http://cpc-korea.com',
+      'http://www.cpc-korea.com',
+      'https://cpc-korea.com',
+      'https://www.cpc-korea.com'
+    ],
     credentials: true
   }
 });
@@ -33,7 +42,16 @@ export { io };
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+  origin: [
+    'http://localhost:5173', 
+    'http://localhost:5174', 
+    'http://localhost:5175', 
+    'http://211.37.173.150',
+    'http://cpc-korea.com',
+    'http://www.cpc-korea.com',
+    'https://cpc-korea.com',
+    'https://www.cpc-korea.com'
+  ],
   credentials: true
 }));
 app.use(bodyParser.json());
