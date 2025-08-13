@@ -55,13 +55,13 @@ export async function login(req: Request, res: Response) {
         email: user.email,
         role: user.role
       },
-      jwtConfig.secret,
+      jwtConfig.secret as string,
       { expiresIn: jwtConfig.expiresIn }
     );
 
     const refreshToken = jwt.sign(
       { id: user.id },
-      jwtConfig.secret,
+      jwtConfig.secret as string,
       { expiresIn: jwtConfig.refreshExpiresIn }
     );
 
@@ -142,13 +142,13 @@ export async function refreshToken(req: Request, res: Response) {
           email: user.email,
           role: user.role
         },
-        jwtConfig.secret,
+        jwtConfig.secret as string,
         { expiresIn: jwtConfig.expiresIn }
       );
 
       const newRefreshToken = jwt.sign(
         { id: user.id },
-        jwtConfig.secret,
+        jwtConfig.secret as string,
         { expiresIn: jwtConfig.refreshExpiresIn }
       );
 

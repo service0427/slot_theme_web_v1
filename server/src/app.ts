@@ -85,7 +85,7 @@ async function startServer() {
     // 데이터베이스 연결 테스트
     await testConnection();
 
-    httpServer.listen(PORT, '0.0.0.0', () => {
+    httpServer.listen(Number(PORT), '0.0.0.0', () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
       console.log(`📝 API Documentation: http://localhost:${PORT}/api/health`);
       console.log(`🔌 Socket.IO is ready for connections`);
