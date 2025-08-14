@@ -1019,7 +1019,7 @@ export function BaseSlotListPage({
       </div>
 
       {/* 슬롯 목록 */}
-      {isLoading ? (
+      {isLoading || fieldConfigsLoading ? (
         <div className="text-center py-8">로딩 중...</div>
       ) : filteredSlots.length === 0 ? (
         <div className={styles.emptyState}>

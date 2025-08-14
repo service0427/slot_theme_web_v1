@@ -87,6 +87,25 @@ function CombinedSlotRowComponent({
         
         initialData[field.field_key] = value;
       });
+    } else {
+      // fieldConfigs가 없을 때도 기본 필드는 설정
+      if (slot.keyword) initialData['keyword'] = slot.keyword;
+      if (slot.url) initialData['url'] = slot.url;
+      if (slot.mid) initialData['mid'] = slot.mid;
+      
+      // customFields의 모든 값도 포함
+      if (slot.customFields) {
+        Object.assign(initialData, slot.customFields);
+      }
+      
+      // fieldValues의 모든 값도 포함
+      if (slot.fieldValues && Array.isArray(slot.fieldValues)) {
+        slot.fieldValues.forEach((fv: any) => {
+          if (fv.field_key && fv.value) {
+            initialData[fv.field_key] = fv.value;
+          }
+        });
+      }
     }
     
     console.log('[CombinedSlotRow] 초기 formData 설정:', { 
