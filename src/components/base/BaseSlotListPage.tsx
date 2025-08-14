@@ -631,10 +631,19 @@ export function BaseSlotListPage({
     let successCount = 0;
     let failCount = 0;
     
+    console.log('[DEBUG] 선택한 슬롯들:', selectedSlotIds);
+    console.log('[DEBUG] 폼 데이터:', emptySlotsForms);
+    
     for (const slotId of selectedSlotIds) {
-      const formData = emptySlotsForms[slotId];
-      if (formData && Object.keys(formData).some(key => formData[key])) {
-        // 하나라도 값이 있으면 저장
+      const formData = emptySlotsForms[slotId] || {};
+      console.log(`[DEBUG] 슬롯 ${slotId}의 formData:`, formData);
+      
+      // 선발행 모드에서는 빈 슬롯도 저장 가능
+      const slot = slots.find(s => s.id === slotId);
+      const isPreAllocatedEmptySlot = slot?.issue_type === 'pre_issued' && slot?.is_empty;
+      
+      if (isPreAllocatedEmptySlot || (formData && Object.keys(formData).some(key => formData[key]))) {
+        // 선발행 빈 슬롯이거나 데이터가 있으면 저장
         const success = await fillEmptySlot(slotId, { customFields: formData });
         if (success) {
           successCount++;
@@ -642,7 +651,7 @@ export function BaseSlotListPage({
           failCount++;
         }
       } else {
-        // 비어있는 폼은 건너뛰기
+        // 일반 빈 폼은 건너뛰기
         failCount++;
       }
     }
