@@ -839,6 +839,13 @@ export async function fillEmptySlot(req: AuthRequest, res: Response) {
       ...(mid && { mid })
     };
     
+    // 기존 값들 삭제 (항상 실행 - 빈 슬롯도 처리)
+    await pool.query(
+      'DELETE FROM slot_field_values WHERE slot_id = $1',
+      [id]
+    );
+    
+    // 필드가 있을 경우에만 저장
     if (Object.keys(allFields).length > 0) {
       // URL 파싱하여 추가 필드 생성
       const finalFields = { ...allFields };
@@ -849,12 +856,6 @@ export async function fillEmptySlot(req: AuthRequest, res: Response) {
         Object.assign(finalFields, parsedUrlFields);
         urlValue = urlToUse;
       }
-      
-      // 기존 값들 삭제
-      await pool.query(
-        'DELETE FROM slot_field_values WHERE slot_id = $1',
-        [id]
-      );
       
       // 새로운 값들 삽입 (파싱된 필드 포함)
       for (const [fieldKey, value] of Object.entries(finalFields)) {
