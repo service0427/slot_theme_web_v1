@@ -49,7 +49,7 @@ function CombinedSlotRowComponent({
   // formData 초기화 - 부모에서 전달받은 데이터 우선 사용
   const [formData, setFormData] = useState<Record<string, string>>(() => {
     // 부모에서 전달받은 formData가 있으면 사용
-    if (slot.formData) {
+    if (slot.formData && Object.keys(slot.formData).length > 0) {
       console.log('[CombinedSlotRow] 부모 formData 사용:', { 
         slotId: slot.id, 
         formData: slot.formData 
@@ -97,61 +97,61 @@ function CombinedSlotRowComponent({
     return initialData;
   });
   
-  // slot 데이터가 변경되면 업데이트
+  // 부모 formData가 변경되면 동기화
   useEffect(() => {
-    const newData: Record<string, string> = {};
-    
-    // 모든 필드에 대해 최신 데이터 가져오기
-    fieldConfigs.forEach(field => {
-      let value = '';
+    if (slot.formData && Object.keys(slot.formData).length > 0) {
+      setFormData(slot.formData);
+    }
+  }, [slot.formData]);
+
+  // slot.id가 변경될 때만 초기화
+  useEffect(() => {
+    if (!slot.formData || Object.keys(slot.formData).length === 0) {
+      const newData: Record<string, string> = {};
       
-      // customFields 우선 확인
-      if (slot.customFields && slot.customFields[field.field_key] !== undefined) {
-        value = slot.customFields[field.field_key];
-      } 
-      // fieldValues 확인
-      else if (slot.fieldValues && slot.fieldValues.length > 0) {
-        const fieldValue = slot.fieldValues.find((fv: any) => fv.field_key === field.field_key);
-        if (fieldValue) {
-          value = fieldValue.value;
+      fieldConfigs.forEach(field => {
+        let value = '';
+        
+        if (slot.customFields && slot.customFields[field.field_key] !== undefined) {
+          value = slot.customFields[field.field_key];
+        } 
+        else if (slot.fieldValues && slot.fieldValues.length > 0) {
+          const fieldValue = slot.fieldValues.find((fv: any) => fv.field_key === field.field_key);
+          if (fieldValue) {
+            value = fieldValue.value;
+          }
         }
-      }
-      // 기본 필드 확인
-      else if (field.field_key === 'keyword' && slot.keyword) {
-        value = slot.keyword;
-      } else if ((field.field_key === 'url' || field.field_key === 'landingUrl') && slot.url) {
-        value = slot.url;
-      } else if (field.field_key === 'mid' && slot.mid) {
-        value = slot.mid;
-      }
+        else if (field.field_key === 'keyword' && slot.keyword) {
+          value = slot.keyword;
+        } else if ((field.field_key === 'url' || field.field_key === 'landingUrl') && slot.url) {
+          value = slot.url;
+        } else if (field.field_key === 'mid' && slot.mid) {
+          value = slot.mid;
+        }
+        
+        newData[field.field_key] = value;
+      });
       
-      newData[field.field_key] = value;
-    });
-    
-    console.log('[CombinedSlotRow] 데이터 업데이트:', { 
-      slotId: slot.id, 
-      newData 
-    });
-    
-    setFormData(newData);
-  }, [slot, fieldConfigs]);
+      setFormData(newData);
+    }
+  }, [slot.id]);
 
   const handleFieldChange = (fieldKey: string, value: string) => {
-    setFormData(prev => {
-      const newData = {
-        ...prev,
-        [fieldKey]: value
-      };
-      
-      console.log('[CombinedSlotRow] 필드 변경:', { slotId: slot.id, fieldKey, value, newData });
-      
-      // 부모 컴포넌트에 변경사항 전달
-      if (slot.onFormDataChange) {
+    const newData = {
+      ...formData,
+      [fieldKey]: value
+    };
+    
+    console.log('[CombinedSlotRow] 필드 변경:', { slotId: slot.id, fieldKey, value, newData });
+    
+    setFormData(newData);
+    
+    // 부모 컴포넌트에 변경사항 전달 (렌더링 후에)
+    if (slot.onFormDataChange) {
+      setTimeout(() => {
         slot.onFormDataChange(slot.id, newData);
-      }
-      
-      return newData;
-    });
+      }, 0);
+    }
     
     if (errors[fieldKey]) {
       setErrors(prev => {
@@ -211,15 +211,23 @@ function CombinedSlotRowComponent({
           
           // 현재 필드에 첫 번째 데이터 적용
           const firstRowData = allRowsData[0];
-          const newFormData = { ...formData };
-          Object.entries(firstRowData).forEach(([key, value]) => {
-            newFormData[key] = value;
-          });
-          setFormData(newFormData);
+          setFormData(prev => ({
+            ...prev,
+            ...firstRowData
+          }));
           
-          // 나머지 데이터가 있으면 다음 빈 슬롯들에 적용
-          if (allRowsData.length > 1) {
-            applyDataToNextEmptySlots(allRowsData.slice(1), fieldKey);
+          // 나머지 데이터가 있으면 부모 컴포넌트의 벌크 페이스트 핸들러로 처리
+          if (allRowsData.length > 1 && onBulkPaste) {
+            // 각 행의 키워드만 먼저 설정하고, URL은 별도로 처리
+            const remainingKeywords = allRowsData.slice(1).map(rowData => rowData.keyword).filter(Boolean);
+            const remainingUrls = allRowsData.slice(1).map(rowData => rowData.url).filter(Boolean);
+            
+            if (remainingKeywords.length > 0) {
+              onBulkPaste(slotIndex + 1, 'keyword', remainingKeywords);
+            }
+            if (remainingUrls.length > 0) {
+              onBulkPaste(slotIndex + 1, 'url', remainingUrls);
+            }
           }
         }
       }
@@ -236,14 +244,14 @@ function CombinedSlotRowComponent({
         }));
       }
       
-      // 나머지 값들은 DOM을 통해 다음 빈 슬롯들에 적용
-      if (lines.length > 1) {
+      // 나머지 값들은 부모 컴포넌트로 전달
+      if (lines.length > 1 && onBulkPaste) {
         const remainingValues = lines.slice(1).map(line => 
           line.trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '')
         ).filter(v => v);
         
         if (remainingValues.length > 0) {
-          applySingleFieldToNextEmptySlots(remainingValues, fieldKey);
+          onBulkPaste(slotIndex + 1, fieldKey, remainingValues);
         }
       }
     }
@@ -259,103 +267,7 @@ function CombinedSlotRowComponent({
     }
   };
 
-  // DOM을 통해 다음 빈 슬롯들에 데이터 적용
-  const applyDataToNextEmptySlots = (remainingData: Array<{[key: string]: string}>, currentFieldKey: string) => {
-    try {
-      // 현재 input 요소를 찾기
-      const currentInput = document.activeElement as HTMLInputElement;
-      if (!currentInput || currentInput.tagName !== 'INPUT') {
-        return;
-      }
-      
-      // 현재 행(tr) 찾기
-      const currentRow = currentInput.closest('tr');
-      if (!currentRow) {
-        return;
-      }
-      
-      // 다음 빈 슬롯 행들 찾기
-      let nextRow = currentRow.nextElementSibling as HTMLTableRowElement;
-      let dataIndex = 0;
-      
-      while (nextRow && dataIndex < remainingData.length) {
-        // 입력 필드가 있는지 확인 (완료된 슬롯 제외)
-        const hasInputFields = nextRow.querySelectorAll('input[type="text"]').length > 0;
-        
-        if (hasInputFields) {
-          
-          // 이 행의 입력 필드들에 데이터 적용
-          const rowData = remainingData[dataIndex];
-          const inputFields = nextRow.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>;
-          
-          // 필드 설정 순서대로 input 매칭
-          fieldConfigs.forEach((field, fieldIndex) => {
-            if (rowData[field.field_key] && inputFields[fieldIndex]) {
-              const input = inputFields[fieldIndex];
-              const value = rowData[field.field_key];
-              
-              input.value = value;
-              // React의 상태 업데이트를 위해 input 이벤트 발생
-              const inputEvent = new Event('input', { bubbles: true });
-              input.dispatchEvent(inputEvent);
-            }
-          });
-          
-          dataIndex++;
-        }
-        
-        nextRow = nextRow.nextElementSibling as HTMLTableRowElement;
-      }
-      
-    } catch (error) {
-      console.error('Error applying data to next slots:', error);
-    }
-  };
-
-  // 단일 필드를 다음 빈 슬롯들에 적용
-  const applySingleFieldToNextEmptySlots = (values: string[], targetFieldKey: string) => {
-    try {
-      const currentInput = document.activeElement as HTMLInputElement;
-      if (!currentInput || currentInput.tagName !== 'INPUT') {
-        return;
-      }
-      
-      const currentRow = currentInput.closest('tr');
-      if (!currentRow) {
-        return;
-      }
-      
-      let nextRow = currentRow.nextElementSibling as HTMLTableRowElement;
-      let valueIndex = 0;
-      
-      while (nextRow && valueIndex < values.length) {
-        const hasInputFields = nextRow.querySelectorAll('input[type="text"]').length > 0;
-        
-        if (hasInputFields) {
-          
-          // 해당 필드의 input 찾기
-          const inputFields = nextRow.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>;
-          const targetFieldIndex = fieldConfigs.findIndex(f => f.field_key === targetFieldKey);
-          
-          if (targetFieldIndex >= 0 && inputFields[targetFieldIndex]) {
-            const input = inputFields[targetFieldIndex];
-            const value = values[valueIndex];
-            
-            input.value = value;
-            const inputEvent = new Event('input', { bubbles: true });
-            input.dispatchEvent(inputEvent);
-          }
-          
-          valueIndex++;
-        }
-        
-        nextRow = nextRow.nextElementSibling as HTMLTableRowElement;
-      }
-      
-    } catch (error) {
-      console.error('Error applying single field to next slots:', error);
-    }
-  };
+  // DOM 조작 함수들 제거 - 부모 컴포넌트에서 상태 관리
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -420,43 +332,50 @@ function CombinedSlotRowComponent({
           <td key={field.field_key} className={`${isReadOnlyField ? 'px-1 py-2' : 'px-3 py-2'} ${fieldIndex < fieldConfigs.length - 1 ? 'border-r' : ''}`}>
             {canEdit && !isReadOnlyField ? (
               <div className="relative">
-                <input
-                  type="text"
-                  value={formData[field.field_key] || ''}
-                  onChange={(e) => handleFieldChange(field.field_key, e.target.value)}
-                  onPaste={(e) => handlePaste(e, field.field_key)}
-                  placeholder={field.placeholder || `${field.label} 입력`}
-                  className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                    errors[field.field_key] ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
-                  title={`${field.label} - ${canEdit ? 'Ctrl+V로 Excel 데이터를 붙여넣을 수 있습니다' : '읽기 전용'}`}
-                />
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={formData[field.field_key] || ''}
+                    onChange={(e) => handleFieldChange(field.field_key, e.target.value)}
+                    onPaste={(e) => handlePaste(e, field.field_key)}
+                    placeholder={field.placeholder || `${field.label} 입력`}
+                    className={`flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      errors[field.field_key] ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
+                    title={`${field.label} - ${canEdit ? 'Ctrl+V로 Excel 데이터를 붙여넣을 수 있습니다' : '읽기 전용'}`}
+                  />
+                  {/* URL 필드인 경우 모니터 아이콘 추가 */}
+                  {isUrlField && (formData[field.field_key] || '').trim() && (
+                    <button
+                      onClick={() => {
+                        const url = formData[field.field_key] || '';
+                        if (url.trim()) {
+                          const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+                          const windowId = 'slot-preview-popup';
+                          
+                          // 기존 창이 있으면 닫고 새로 열기
+                          if (window[windowId] && !window[windowId].closed) {
+                            window[windowId].close();
+                          }
+                          
+                          window[windowId] = window.open(fullUrl, windowId, 'width=700,height=800');
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-800 transition-colors p-1"
+                      title={`${formData[field.field_key]} 새 창에서 열기`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
                 {errors[field.field_key] && (
                   <div className="absolute top-full left-0 mt-1 text-xs text-red-600 whitespace-nowrap z-10">
                     {errors[field.field_key]}
                   </div>
                 )}
-              </div>
-            ) : isUrlField && getFieldValue(field.field_key) ? (
-              // URL 필드는 아이콘으로 표시
-              <div className="flex justify-center">
-                <button
-                  onClick={() => {
-                    const url = getFieldValue(field.field_key);
-                    if (url) {
-                      // URL이 http/https로 시작하지 않으면 추가
-                      const fullUrl = url.startsWith('http') ? url : `https://${url}`;
-                      window.open(fullUrl, '_blank', 'width=700,height=800');
-                    }
-                  }}
-                  className="text-blue-600 hover:text-blue-800 transition-colors"
-                  title={getFieldValue(field.field_key)}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </button>
               </div>
             ) : (
               <div className={`text-gray-900 truncate ${isReadOnlyField ? 'text-xs' : 'text-sm'}`} title={getFieldValue(field.field_key) || ''}>
@@ -478,12 +397,33 @@ function CombinedSlotRowComponent({
           day: '2-digit'
         }).replace(/\./g, '-').replace(/-$/, '') : '-'}
       </td>
-      <td className="px-3 py-4 text-center border-r text-gray-400 text-sm">
-        {slot.endDate ? new Date(slot.endDate).toLocaleDateString('ko-KR', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }).replace(/\./g, '-').replace(/-$/, '') : '-'}
+      <td className="px-3 py-4 text-center border-r text-sm">
+        {slot.endDate ? (() => {
+          const now = new Date();
+          const end = new Date(slot.endDate);
+          const timeLeft = end.getTime() - now.getTime();
+          const daysLeft = timeLeft / (1000 * 60 * 60 * 24);
+          
+          let colorClass = 'text-gray-400'; // 기본 색상
+          
+          if (now > end) {
+            colorClass = 'text-green-600 font-medium'; // 완료 - 녹색
+          } else if (daysLeft <= 3) {
+            colorClass = 'text-red-600 font-semibold'; // 3일 미만 - 빨간색
+          } else if (daysLeft <= 7) {
+            colorClass = 'text-orange-500 font-medium'; // 1주일 미만 - 주황색
+          }
+          
+          return (
+            <span className={colorClass}>
+              {end.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+              }).replace(/\./g, '-').replace(/-$/, '')}
+            </span>
+          );
+        })() : <span className="text-gray-400">-</span>}
       </td>
       
       {/* 통합된 상태 컬럼 (상태 + 저장 버튼) */}

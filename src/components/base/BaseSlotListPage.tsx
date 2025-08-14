@@ -424,6 +424,8 @@ export function BaseSlotListPage({
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [fieldConfigsLoading, setFieldConfigsLoading] = useState(true);
   const [emptySlotsForms, setEmptySlotsForms] = useState<Record<string, Record<string, string>>>({});
+  // 모든 슬롯의 formData를 중앙 관리
+  const [slotsFormData, setSlotsFormData] = useState<Record<string, Record<string, string>>>({});
   // 선슬롯발행 모드에서는 개별 저장으로 변경 - 체크박스 제거
   // const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [editingSlot, setEditingSlot] = useState<any>(null);
@@ -434,6 +436,36 @@ export function BaseSlotListPage({
     loadUserSlots();
     loadFieldConfigs();
   }, []);
+
+  // 슬롯의 formData 변경 핸들러
+  const handleFormDataChange = (slotId: string, newFormData: Record<string, string>) => {
+    setSlotsFormData(prev => ({
+      ...prev,
+      [slotId]: newFormData
+    }));
+  };
+
+  // 벌크 페이스트 핸들러
+  const handleBulkPaste = (startFromSlotIndex: number, fieldKey: string, values: string[]) => {
+    console.log('[handleBulkPaste] 시작:', { startFromSlotIndex, fieldKey, values });
+    
+    values.forEach((value, valueIndex) => {
+      const targetSlotIndex = startFromSlotIndex + valueIndex;
+      if (targetSlotIndex < paginatedSlots.length && value?.trim()) {
+        const targetSlot = paginatedSlots[targetSlotIndex];
+        if (targetSlot) {
+          console.log(`[handleBulkPaste] 슬롯 ${targetSlot.id}(인덱스: ${targetSlotIndex})에 ${fieldKey}=${value} 설정`);
+          setSlotsFormData(prev => ({
+            ...prev,
+            [targetSlot.id]: {
+              ...prev[targetSlot.id] || {},
+              [fieldKey]: value.trim()
+            }
+          }));
+        }
+      }
+    });
+  };
 
   // 필드 설정 로드
   const loadFieldConfigs = async () => {
@@ -500,16 +532,59 @@ export function BaseSlotListPage({
       // 검색어 필터
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        if (!slot.customFields.keywords?.toLowerCase().includes(query) && 
-            !slot.customFields.landingUrl?.toLowerCase().includes(query) &&
-            !(slot.customFields.description?.toLowerCase().includes(query))) {
+        
+        // 키워드 검색 - 여러 필드에서 검색
+        const keywordMatch = 
+          slot.customFields?.keyword?.toLowerCase().includes(query) ||
+          slot.customFields?.keywords?.toLowerCase().includes(query) ||
+          slot.keyword?.toLowerCase().includes(query);
+          
+        // URL 검색 - 여러 URL 필드에서 검색  
+        const urlMatch = 
+          slot.customFields?.url?.toLowerCase().includes(query) ||
+          slot.customFields?.landingUrl?.toLowerCase().includes(query) ||
+          slot.url?.toLowerCase().includes(query);
+          
+        // 기타 필드 검색
+        const otherMatch = 
+          slot.customFields?.description?.toLowerCase().includes(query) ||
+          slot.customFields?.mid?.toLowerCase().includes(query) ||
+          slot.mid?.toLowerCase().includes(query);
+        
+        if (!keywordMatch && !urlMatch && !otherMatch) {
           return false;
         }
       }
       
       // 상태 필터
-      if (statusFilter !== 'all' && slot.status !== statusFilter) {
-        return false;
+      if (statusFilter !== 'all') {
+        const now = new Date();
+        const start = slot.startDate ? new Date(slot.startDate) : null;
+        const end = slot.endDate ? new Date(slot.endDate) : null;
+        
+        let actualStatus = '';
+        
+        if (slot.status === 'empty') {
+          actualStatus = 'empty';
+        } else if (slot.status === 'pending' && slotOperationMode !== 'pre-allocation') {
+          actualStatus = 'pending';
+        } else if (slot.status === 'paused') {
+          actualStatus = 'paused';
+        } else if (slot.status === 'rejected') {
+          actualStatus = 'rejected';
+        } else if (slot.status === 'active') {
+          if (start && now < start) {
+            actualStatus = 'waiting';
+          } else if (end && now > end) {
+            actualStatus = 'completed';
+          } else {
+            actualStatus = 'active';
+          }
+        }
+        
+        if (actualStatus !== statusFilter) {
+          return false;
+        }
       }
       
       return true;
@@ -690,62 +765,7 @@ export function BaseSlotListPage({
   };
   */
 
-  // 여러 슬롯에 대량 붙여넣기 처리 (입력 필드에만 값 설정, 저장하지 않음)
-  const handleBulkPaste = (startEmptySlotIndex: number, fieldKey: string, values: string[] | Array<{[key: string]: string}>) => {
-    
-    if (!emptySlots || emptySlots.length === 0) {
-      return;
-    }
-    
-    const updatedForms = { ...emptySlotsForms };
-    
-    // values가 문자열 배열인지 객체 배열인지 확인
-    if (typeof values[0] === 'string') {
-      // 단일 필드 값들
-      (values as string[]).forEach((value, index) => {
-        const targetEmptySlotIndex = startEmptySlotIndex + index;
-        if (targetEmptySlotIndex < emptySlots.length) {
-          const targetSlot = emptySlots[targetEmptySlotIndex];
-          
-          // 해당 슬롯의 폼 데이터가 없으면 초기화
-          if (!updatedForms[targetSlot.id]) {
-            updatedForms[targetSlot.id] = {};
-            fieldConfigs.forEach(field => {
-              updatedForms[targetSlot.id][field.field_key] = '';
-            });
-          }
-          
-          // 해당 필드에 값 설정
-          updatedForms[targetSlot.id][fieldKey] = value;
-        } else {
-        }
-      });
-    } else {
-      // 여러 필드 값들 (객체 배열)
-      (values as Array<{[key: string]: string}>).forEach((rowData, index) => {
-        const targetEmptySlotIndex = startEmptySlotIndex + index;
-        if (targetEmptySlotIndex < emptySlots.length) {
-          const targetSlot = emptySlots[targetEmptySlotIndex];
-          
-          // 해당 슬롯의 폼 데이터가 없으면 초기화
-          if (!updatedForms[targetSlot.id]) {
-            updatedForms[targetSlot.id] = {};
-            fieldConfigs.forEach(field => {
-              updatedForms[targetSlot.id][field.field_key] = '';
-            });
-          }
-          
-          // 여러 필드에 값 설정
-          Object.entries(rowData).forEach(([key, value]) => {
-            updatedForms[targetSlot.id][key] = value;
-          });
-        } else {
-        }
-      });
-    }
-    
-    setEmptySlotsForms(updatedForms);
-  };
+  // 기존 handleBulkPaste 함수 제거됨
 
   const canAffordSlot = !config.useCashSystem || (balance && balance.amount >= slotPrice);
 
@@ -891,6 +911,25 @@ export function BaseSlotListPage({
             />
           </div>
           
+          {/* 먼저 상태 드롭박스를 표시 */}
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className={styles.select}
+          >
+            <option value="all">전체 상태</option>
+            <option value="empty">입력 대기</option>
+            {slotOperationMode !== 'pre-allocation' && <option value="pending">승인 대기</option>}
+            <option value="waiting">대기중</option>
+            <option value="active">활성</option>
+            <option value="completed">완료</option>
+            <option value="paused">일시정지</option>
+            <option value="rejected">거절됨</option>
+          </select>
+          
           {/* 선슬롯발행 모드에서 전체 저장 버튼 */}
           {slotOperationMode === 'pre-allocation' && (
             <button
@@ -915,12 +954,29 @@ export function BaseSlotListPage({
                     
                     if (slot) {
                       const formData = {};
+                      let hasRequiredFields = true;
+                      let missingFields = [];
+                      
                       inputs.forEach((input: HTMLInputElement, index) => {
                         if (fieldConfigs[index]) {
-                          formData[fieldConfigs[index].field_key] = input.value || '';
+                          const fieldKey = fieldConfigs[index].field_key;
+                          const value = input.value?.trim() || '';
+                          formData[fieldKey] = value;
+                          
+                          // 필수 필드 체크
+                          if (fieldConfigs[index].is_required && !value) {
+                            hasRequiredFields = false;
+                            missingFields.push(fieldConfigs[index].label);
+                          }
                         }
                       });
-                      editableSlots.push({ slot, formData });
+                      
+                      // 필수 필드가 모두 있을 때만 저장 대상에 추가
+                      if (hasRequiredFields) {
+                        editableSlots.push({ slot, formData });
+                      } else {
+                        console.log(`슬롯 #${slot.slot_number || slot.seq} 스킵 (필수 필드 누락: ${missingFields.join(', ')})`);
+                      }
                     }
                   }
                 }
@@ -959,34 +1015,31 @@ export function BaseSlotListPage({
               저장
             </button>
           )}
-          
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className={styles.select}
-          >
-            <option value="all">전체 상태</option>
-            <option value="pending">대기중</option>
-            <option value="active">활성</option>
-            <option value="paused">일시정지</option>
-            <option value="rejected">거절됨</option>
-            <option value="deleted">삭제됨</option>
-          </select>
         </div>
       </div>
 
       {/* 슬롯 목록 */}
       {isLoading ? (
         <div className="text-center py-8">로딩 중...</div>
-      ) : slots.length === 0 && slotOperationMode === 'normal' ? (
+      ) : filteredSlots.length === 0 ? (
         <div className={styles.emptyState}>
-          <p className="text-gray-600 mb-4">등록된 슬롯이 없습니다.</p>
-          <p className="text-sm text-gray-500">
-            새 슬롯을 등록하여 광고를 시작하세요.
-          </p>
+          {searchQuery || statusFilter !== 'all' ? (
+            // 검색 조건이 있을 때
+            <>
+              <p className="text-gray-600 mb-4 text-lg font-medium">검색결과가 없습니다.</p>
+              <p className="text-sm text-gray-500">
+                다른 검색 조건으로 다시 시도해보세요.
+              </p>
+            </>
+          ) : (
+            // 전체 상태에서 슬롯이 없을 때
+            <>
+              <p className="text-gray-600 mb-4 text-lg font-medium">운영자가 슬롯을 발급해줘야 합니다.</p>
+              <p className="text-sm text-gray-500">
+                관리자에게 문의하여 슬롯을 발급받으세요.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <>
@@ -1040,8 +1093,12 @@ export function BaseSlotListPage({
                         return (
                           <CombinedSlotRow
                             key={slot.id}
-                            slot={slot}
-                            slotIndex={emptySlotIndex >= 0 ? emptySlotIndex : slotIndex}
+                            slot={{
+                              ...slot,
+                              formData: slotsFormData[slot.id],
+                              onFormDataChange: handleFormDataChange
+                            }}
+                            slotIndex={slotIndex}
                             fieldConfigs={fieldConfigs}
                             onSave={
                               slot.status === 'empty' 
