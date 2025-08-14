@@ -10,7 +10,7 @@ export class ApiChatService implements IChatService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = 'http://localhost:8001/api/chat';
+    this.baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/chat`;
   }
 
   private getAuthHeaders(): HeadersInit {

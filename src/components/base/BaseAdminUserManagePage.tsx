@@ -4,7 +4,7 @@ import { User } from '@/core/models/User';
 import { UserFilter } from '@/core/services/UserService';
 import { BaseSlotAllocationModal, PreAllocationData } from './BaseSlotAllocationModal';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
 interface AdminUserManageThemeProps {
   containerClass?: string;
