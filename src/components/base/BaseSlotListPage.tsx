@@ -640,7 +640,15 @@ export function BaseSlotListPage({
       
       // 선발행 모드에서는 빈 슬롯도 저장 가능
       const slot = slots.find(s => s.id === slotId);
-      const isPreAllocatedEmptySlot = slot?.issue_type === 'pre_issued' && slot?.is_empty;
+      console.log(`[DEBUG] 슬롯 정보:`, slot);
+      console.log(`[DEBUG] issue_type: ${slot?.issue_type}, is_empty: ${slot?.is_empty}`);
+      
+      // issue_type이 'pre_issued' 또는 'pre-issued' 또는 status가 'empty'인 경우 모두 처리
+      const isPreAllocatedEmptySlot = 
+        (slot?.issue_type === 'pre_issued' || slot?.issue_type === 'pre-issued' || slot?.status === 'empty') 
+        && slot?.is_empty;
+      
+      console.log(`[DEBUG] isPreAllocatedEmptySlot: ${isPreAllocatedEmptySlot}`);
       
       if (isPreAllocatedEmptySlot || (formData && Object.keys(formData).some(key => formData[key]))) {
         // 선발행 빈 슬롯이거나 데이터가 있으면 저장
