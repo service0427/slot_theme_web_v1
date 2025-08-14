@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuthContext } from '@/adapters/react';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 import { 
   HomeIcon, 
   ChartBarIcon,
@@ -16,6 +17,7 @@ import {
 export function BaseTopNavigation() {
   const { user, logout } = useAuthContext();
   const { config } = useConfig();
+  const { getSetting } = useSystemSettings();
   const isAdmin = user?.role === 'operator';
   
   const navLinkClasses = ({ isActive }: { isActive: boolean }) => 
@@ -48,7 +50,7 @@ export function BaseTopNavigation() {
           <div className="flex items-center space-x-8">
             {/* 로고 */}
             <div className="flex-shrink-0 flex items-center">
-              <h2 className="text-xl font-bold text-gray-900">마케팅의정석</h2>
+              <h2 className="text-xl font-bold text-gray-900">{getSetting('siteName', 'business') || 'Simple Slot'}</h2>
             </div>
             
             {/* 네비게이션 메뉴 */}

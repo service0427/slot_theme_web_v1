@@ -52,7 +52,7 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
   const navigate = useNavigate();
   const { user, logout } = useAuthContext();
   const { config } = useEnhancedConfig();
-  const { currentTheme } = useSystemSettings();
+  const { currentTheme, getSetting } = useSystemSettings();
   
   // Hook은 항상 호출되어야 함 - 조건부로 호출하지 않음
   const cashContext = useCashContext();
@@ -81,7 +81,7 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
     <aside className={styles.container}>
       {/* 상단 정보 */}
       <div className={styles.header}>
-        <h2 className={styles.title}>마케팅의정석</h2>
+        <h2 className={styles.title}>{getSetting('siteName', 'business') || 'Simple Slot'}</h2>
         
         <div className={styles.userInfo}>
           <div>{user?.email || 'test@example.com'}</div>

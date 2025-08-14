@@ -90,10 +90,19 @@ export function CombinedSlotRow({
   }, [slot.formData, slot.customFields, slot.fieldValues, slot.keyword, slot.url, slot.mid, fieldConfigs, isEmptySlot]);
 
   const handleFieldChange = (fieldKey: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [fieldKey]: value
-    }));
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [fieldKey]: value
+      };
+      
+      // 부모 컴포넌트에 변경사항 전달 (선택적)
+      if (slot.onFormDataChange) {
+        slot.onFormDataChange(slot.id, newData);
+      }
+      
+      return newData;
+    });
     
     if (errors[fieldKey]) {
       setErrors(prev => {

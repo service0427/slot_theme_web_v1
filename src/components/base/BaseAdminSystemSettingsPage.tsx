@@ -377,6 +377,42 @@ export function BaseAdminSystemSettingsPage() {
           사이트 전체의 시스템 설정을 관리합니다.
         </p>
 
+        {/* 사이트 정보 설정 */}
+        <div className={styles.section} style={{border: '2px solid red', padding: '20px'}}>
+          <h2 className={styles.sectionTitle} style={{color: 'red', fontSize: '24px', fontWeight: 'bold'}}>🔥 사이트 정보 설정 🔥</h2>
+          <p className={styles.sectionDesc}>사이트 이름과 부제목을 설정합니다.</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                사이트 이름
+              </label>
+              <input
+                type="text"
+                value={getSetting('siteName', 'business') || 'Simple Slot'}
+                onChange={(e) => updateSetting('siteName', e.target.value, 'business')}
+                placeholder="사이트 이름을 입력하세요"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">사이드바와 상단 네비게이션에 표시됩니다</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                사이트 부제목
+              </label>
+              <input
+                type="text"
+                value={getSetting('siteTitle', 'business') || '유연한 디자인 시스템'}
+                onChange={(e) => updateSetting('siteTitle', e.target.value, 'business')}
+                placeholder="사이트 부제목을 입력하세요"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">브라우저 탭 제목에 표시됩니다</p>
+            </div>
+          </div>
+        </div>
+
         {/* 테마 설정 섹션 */}
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>테마 설정</h2>

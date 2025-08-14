@@ -38,19 +38,29 @@ function EmptySlotRow({ slot, slotIndex, fieldConfigs, onSave, onBulkPaste, allE
     return initialData;
   });
 
-  // 부모로부터 데이터 변경 감지
+  // 부모로부터 데이터 변경 감지 - formData가 있을 때만 업데이트
+  // 선택 상태 변경으로 인한 리렌더링 시 데이터 유지
   useEffect(() => {
-    if (slot.formData) {
+    if (slot.formData && Object.keys(slot.formData).length > 0) {
       setFormData(slot.formData);
     }
   }, [slot.formData]);
 
   // 필드 값 변경 처리
   const handleFieldChange = (fieldKey: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [fieldKey]: value
-    }));
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [fieldKey]: value
+      };
+      
+      // 부모 컴포넌트에 변경사항 전달 (선택적)
+      if (slot.onFormDataChange) {
+        slot.onFormDataChange(slot.id, newData);
+      }
+      
+      return newData;
+    });
     
     // 오류 삭제
     if (errors[fieldKey]) {
@@ -986,7 +996,13 @@ export function BaseSlotListPage({
                             key={slot.id}
                             slot={{
                               ...slot,
-                              formData: slot.status === 'empty' ? (emptySlotsForms[slot.id] || {}) : undefined
+                              formData: slot.status === 'empty' ? (emptySlotsForms[slot.id] || {}) : undefined,
+                              onFormDataChange: slot.status === 'empty' ? (slotId: string, data: Record<string, string>) => {
+                                setEmptySlotsForms(prev => ({
+                                  ...prev,
+                                  [slotId]: data
+                                }));
+                              } : undefined
                             }}
                             slotIndex={emptySlotIndex >= 0 ? emptySlotIndex : slotIndex}
                             fieldConfigs={fieldConfigs}

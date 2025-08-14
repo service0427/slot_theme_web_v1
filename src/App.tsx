@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useMemo, Suspense } from 'react';
+import { useMemo, Suspense, useEffect } from 'react';
 import { CoreApp } from '@/core';
 import { CoreProvider, useAuthContext } from '@/adapters/react';
 import { MockCashService } from '@/services/mock';
@@ -12,8 +12,15 @@ import { LoginPreviewPage } from './pages/LoginPreviewPage';
 import { ThemedLoadingScreen } from './components/LoadingScreen';
 
 function AppContent() {
-  const { theme, isLoading: settingsLoading } = useSystemSettings();
+  const { theme, isLoading: settingsLoading, getSetting } = useSystemSettings();
   const auth = useAuthContext();
+  
+  // 사이트 제목 동적 설정
+  useEffect(() => {
+    const siteName = getSetting('siteName', 'business') || 'Simple Slot';
+    const siteTitle = getSetting('siteTitle', 'business') || '유연한 디자인 시스템';
+    document.title = `${siteName} - ${siteTitle}`;
+  }, [getSetting]);
   
   // 설정 로딩 중일 때 로딩 화면 표시
   if (settingsLoading) {

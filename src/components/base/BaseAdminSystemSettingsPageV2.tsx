@@ -435,9 +435,75 @@ export function BaseAdminSystemSettingsPageV2() {
 function ThemeSettingsTab({ styles, currentTheme, currentLayout, availableThemes, availableLayouts, onThemeChange, onLayoutChange, onSave }: any) {
   const [selectedTheme, setSelectedTheme] = useState(currentTheme);
   const [selectedLayout, setSelectedLayout] = useState(currentLayout);
+  const { getSetting, updateSetting } = useSystemSettings();
+  
+  // 사이트 정보 로컬 상태 (한글 입력 문제 해결)
+  const [siteInfo, setSiteInfo] = useState({
+    siteName: getSetting('siteName', 'business') || 'Simple Slot',
+    siteTitle: getSetting('siteTitle', 'business') || '유연한 디자인 시스템'
+  });
+  
+  // 사이트 정보 저장
+  const handleSaveSiteInfo = async () => {
+    try {
+      await updateSetting('siteName', siteInfo.siteName, 'business');
+      await updateSetting('siteTitle', siteInfo.siteTitle, 'business');
+      alert('사이트 정보가 저장되었습니다.');
+      // 페이지 새로고침으로 변경사항 반영
+      window.location.reload();
+    } catch (error) {
+      alert('저장에 실패했습니다.');
+    }
+  };
   
   return (
     <div>
+      {/* 사이트 정보 설정 */}
+      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200">
+        <h2 className={styles.sectionTitle}>사이트 정보 설정</h2>
+        <p className={styles.sectionDesc}>사이트 이름과 부제목을 설정합니다</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              사이트 이름
+            </label>
+            <input
+              type="text"
+              value={siteInfo.siteName}
+              onChange={(e) => setSiteInfo(prev => ({ ...prev, siteName: e.target.value }))}
+              placeholder="사이트 이름을 입력하세요"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">사이드바와 상단 네비게이션에 표시됩니다</p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              사이트 부제목
+            </label>
+            <input
+              type="text"
+              value={siteInfo.siteTitle}
+              onChange={(e) => setSiteInfo(prev => ({ ...prev, siteTitle: e.target.value }))}
+              placeholder="사이트 부제목을 입력하세요"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">브라우저 탭 제목에 표시됩니다</p>
+          </div>
+        </div>
+        
+        {/* 저장 버튼 */}
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={handleSaveSiteInfo}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+          >
+            사이트 정보 저장
+          </button>
+        </div>
+      </div>
+
       <h2 className={styles.sectionTitle}>테마 및 레이아웃 설정</h2>
       <p className={styles.sectionDesc}>시스템 전체에 적용될 테마와 레이아웃을 선택합니다</p>
       
