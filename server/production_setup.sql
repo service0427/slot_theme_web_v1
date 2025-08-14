@@ -180,8 +180,8 @@ CREATE TABLE IF NOT EXISTS public.slots (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
     seq integer NOT NULL,
-    keyword character varying(255) NOT NULL,
-    url character varying(500) NOT NULL,
+    keyword character varying(255),
+    url character varying(500),
     mid character varying(100),
     daily_budget numeric(10,2) DEFAULT 0,
     status character varying(50) DEFAULT 'pending'::character varying NOT NULL,
@@ -372,44 +372,44 @@ ALTER TABLE ONLY public.pre_issued_slot_usage ALTER COLUMN id SET DEFAULT nextva
 -- Primary Keys and Constraints
 --
 
-ALTER TABLE ONLY public.users ADD CONSTRAINT IF NOT EXISTS users_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.users ADD CONSTRAINT IF NOT EXISTS users_email_key UNIQUE (email);
+ALTER TABLE ONLY public.users ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.users ADD CONSTRAINT users_email_key UNIQUE (email);
 
-ALTER TABLE ONLY public.system_settings ADD CONSTRAINT IF NOT EXISTS system_settings_pkey PRIMARY KEY (key);
+ALTER TABLE ONLY public.system_settings ADD CONSTRAINT system_settings_pkey PRIMARY KEY (key);
 
-ALTER TABLE ONLY public.field_configs ADD CONSTRAINT IF NOT EXISTS field_configs_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.field_configs ADD CONSTRAINT IF NOT EXISTS field_configs_field_key_key UNIQUE (field_key);
+ALTER TABLE ONLY public.field_configs ADD CONSTRAINT field_configs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.field_configs ADD CONSTRAINT field_configs_field_key_key UNIQUE (field_key);
 
-ALTER TABLE ONLY public.announcements ADD CONSTRAINT IF NOT EXISTS announcements_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.announcements ADD CONSTRAINT announcements_pkey PRIMARY KEY (id);
 
-ALTER TABLE ONLY public.announcement_reads ADD CONSTRAINT IF NOT EXISTS announcement_reads_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.announcement_reads ADD CONSTRAINT IF NOT EXISTS announcement_reads_announcement_id_user_id_key UNIQUE (announcement_id, user_id);
+ALTER TABLE ONLY public.announcement_reads ADD CONSTRAINT announcement_reads_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.announcement_reads ADD CONSTRAINT announcement_reads_announcement_id_user_id_key UNIQUE (announcement_id, user_id);
 
-ALTER TABLE ONLY public.slots ADD CONSTRAINT IF NOT EXISTS slots_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.slots ADD CONSTRAINT IF NOT EXISTS slots_user_id_seq_key UNIQUE (user_id, seq);
+ALTER TABLE ONLY public.slots ADD CONSTRAINT slots_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.slots ADD CONSTRAINT slots_user_id_seq_key UNIQUE (user_id, seq);
 
-ALTER TABLE ONLY public.slot_field_values ADD CONSTRAINT IF NOT EXISTS slot_field_values_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.slot_field_values ADD CONSTRAINT IF NOT EXISTS slot_field_values_slot_id_field_key_key UNIQUE (slot_id, field_key);
+ALTER TABLE ONLY public.slot_field_values ADD CONSTRAINT slot_field_values_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.slot_field_values ADD CONSTRAINT slot_field_values_slot_id_field_key_key UNIQUE (slot_id, field_key);
 
-ALTER TABLE ONLY public.user_slot_allocations ADD CONSTRAINT IF NOT EXISTS user_slot_allocations_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.user_slot_allocations ADD CONSTRAINT IF NOT EXISTS user_slot_allocations_user_id_key UNIQUE (user_id);
+ALTER TABLE ONLY public.user_slot_allocations ADD CONSTRAINT user_slot_allocations_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.user_slot_allocations ADD CONSTRAINT user_slot_allocations_user_id_key UNIQUE (user_id);
 
-ALTER TABLE ONLY public.notifications ADD CONSTRAINT IF NOT EXISTS notifications_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.notifications ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
 
-ALTER TABLE ONLY public.notification_reads ADD CONSTRAINT IF NOT EXISTS notification_reads_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.notification_reads ADD CONSTRAINT IF NOT EXISTS notification_reads_notification_id_user_id_key UNIQUE (notification_id, user_id);
+ALTER TABLE ONLY public.notification_reads ADD CONSTRAINT notification_reads_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.notification_reads ADD CONSTRAINT notification_reads_notification_id_user_id_key UNIQUE (notification_id, user_id);
 
-ALTER TABLE ONLY public.chat_rooms ADD CONSTRAINT IF NOT EXISTS chat_rooms_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.chat_messages ADD CONSTRAINT IF NOT EXISTS chat_messages_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.chat_participants ADD CONSTRAINT IF NOT EXISTS chat_participants_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.chat_participants ADD CONSTRAINT IF NOT EXISTS chat_participants_room_id_user_id_key UNIQUE (room_id, user_id);
-ALTER TABLE ONLY public.chat_auto_replies ADD CONSTRAINT IF NOT EXISTS chat_auto_replies_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.chat_rooms ADD CONSTRAINT chat_rooms_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.chat_messages ADD CONSTRAINT chat_messages_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.chat_participants ADD CONSTRAINT chat_participants_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.chat_participants ADD CONSTRAINT chat_participants_room_id_user_id_key UNIQUE (room_id, user_id);
+ALTER TABLE ONLY public.chat_auto_replies ADD CONSTRAINT chat_auto_replies_pkey PRIMARY KEY (id);
 
-ALTER TABLE ONLY public.messages ADD CONSTRAINT IF NOT EXISTS messages_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.message_reads ADD CONSTRAINT IF NOT EXISTS message_reads_pkey PRIMARY KEY (message_id, user_id);
+ALTER TABLE ONLY public.messages ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.message_reads ADD CONSTRAINT message_reads_pkey PRIMARY KEY (message_id, user_id);
 
-ALTER TABLE ONLY public.pre_issued_slots ADD CONSTRAINT IF NOT EXISTS pre_issued_slots_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.pre_issued_slot_usage ADD CONSTRAINT IF NOT EXISTS pre_issued_slot_usage_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.pre_issued_slots ADD CONSTRAINT pre_issued_slots_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.pre_issued_slot_usage ADD CONSTRAINT pre_issued_slot_usage_pkey PRIMARY KEY (id);
 
 --
 -- Indexes
@@ -455,26 +455,26 @@ CREATE TRIGGER update_pre_issued_slots_updated_at BEFORE UPDATE ON public.pre_is
 -- Foreign Key Constraints
 --
 
-ALTER TABLE ONLY public.system_settings ADD CONSTRAINT IF NOT EXISTS system_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id);
-ALTER TABLE ONLY public.announcement_reads ADD CONSTRAINT IF NOT EXISTS announcement_reads_announcement_id_fkey FOREIGN KEY (announcement_id) REFERENCES public.announcements(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.slots ADD CONSTRAINT IF NOT EXISTS slots_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.slots ADD CONSTRAINT IF NOT EXISTS slots_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id);
-ALTER TABLE ONLY public.slots ADD CONSTRAINT IF NOT EXISTS slots_allocation_id_fkey FOREIGN KEY (allocation_id) REFERENCES public.user_slot_allocations(id) ON DELETE SET NULL;
-ALTER TABLE ONLY public.slot_field_values ADD CONSTRAINT IF NOT EXISTS slot_field_values_slot_id_fkey FOREIGN KEY (slot_id) REFERENCES public.slots(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.slot_field_values ADD CONSTRAINT IF NOT EXISTS slot_field_values_field_key_fkey FOREIGN KEY (field_key) REFERENCES public.field_configs(field_key) ON DELETE CASCADE;
-ALTER TABLE ONLY public.user_slot_allocations ADD CONSTRAINT IF NOT EXISTS user_slot_allocations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.notification_reads ADD CONSTRAINT IF NOT EXISTS notification_reads_notification_id_fkey FOREIGN KEY (notification_id) REFERENCES public.notifications(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.notification_reads ADD CONSTRAINT IF NOT EXISTS notification_reads_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.chat_rooms ADD CONSTRAINT IF NOT EXISTS chat_rooms_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
-ALTER TABLE ONLY public.chat_messages ADD CONSTRAINT IF NOT EXISTS chat_messages_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.chat_rooms(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.chat_messages ADD CONSTRAINT IF NOT EXISTS chat_messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.users(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.chat_participants ADD CONSTRAINT IF NOT EXISTS chat_participants_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.chat_rooms(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.chat_participants ADD CONSTRAINT IF NOT EXISTS chat_participants_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.message_reads ADD CONSTRAINT IF NOT EXISTS message_reads_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.messages(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.pre_issued_slots ADD CONSTRAINT IF NOT EXISTS pre_issued_slots_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.pre_issued_slots ADD CONSTRAINT IF NOT EXISTS pre_issued_slots_issued_by_fkey FOREIGN KEY (issued_by) REFERENCES public.users(id);
-ALTER TABLE ONLY public.pre_issued_slot_usage ADD CONSTRAINT IF NOT EXISTS pre_issued_slot_usage_pre_issued_id_fkey FOREIGN KEY (pre_issued_id) REFERENCES public.pre_issued_slots(id) ON DELETE CASCADE;
-ALTER TABLE ONLY public.pre_issued_slot_usage ADD CONSTRAINT IF NOT EXISTS pre_issued_slot_usage_slot_id_fkey FOREIGN KEY (slot_id) REFERENCES public.slots(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.system_settings ADD CONSTRAINT system_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id);
+ALTER TABLE ONLY public.announcement_reads ADD CONSTRAINT announcement_reads_announcement_id_fkey FOREIGN KEY (announcement_id) REFERENCES public.announcements(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.slots ADD CONSTRAINT slots_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.slots ADD CONSTRAINT slots_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id);
+ALTER TABLE ONLY public.slots ADD CONSTRAINT slots_allocation_id_fkey FOREIGN KEY (allocation_id) REFERENCES public.user_slot_allocations(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.slot_field_values ADD CONSTRAINT slot_field_values_slot_id_fkey FOREIGN KEY (slot_id) REFERENCES public.slots(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.slot_field_values ADD CONSTRAINT slot_field_values_field_key_fkey FOREIGN KEY (field_key) REFERENCES public.field_configs(field_key) ON DELETE CASCADE;
+ALTER TABLE ONLY public.user_slot_allocations ADD CONSTRAINT user_slot_allocations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.notification_reads ADD CONSTRAINT notification_reads_notification_id_fkey FOREIGN KEY (notification_id) REFERENCES public.notifications(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.notification_reads ADD CONSTRAINT notification_reads_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.chat_rooms ADD CONSTRAINT chat_rooms_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.chat_messages ADD CONSTRAINT chat_messages_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.chat_rooms(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.chat_messages ADD CONSTRAINT chat_messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.chat_participants ADD CONSTRAINT chat_participants_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.chat_rooms(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.chat_participants ADD CONSTRAINT chat_participants_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.message_reads ADD CONSTRAINT message_reads_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.messages(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.pre_issued_slots ADD CONSTRAINT pre_issued_slots_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.pre_issued_slots ADD CONSTRAINT pre_issued_slots_issued_by_fkey FOREIGN KEY (issued_by) REFERENCES public.users(id);
+ALTER TABLE ONLY public.pre_issued_slot_usage ADD CONSTRAINT pre_issued_slot_usage_pre_issued_id_fkey FOREIGN KEY (pre_issued_id) REFERENCES public.pre_issued_slots(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.pre_issued_slot_usage ADD CONSTRAINT pre_issued_slot_usage_slot_id_fkey FOREIGN KEY (slot_id) REFERENCES public.slots(id) ON DELETE SET NULL;
 
 --
 -- Essential Data Inserts
