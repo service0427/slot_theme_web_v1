@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/adapters/react';
+import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { login, isLoading, error, isAuthenticated, user } = useAuthContext();
+  const { getSetting } = useSystemSettings();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -37,7 +39,7 @@ export function LoginPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </div>
-          <h1 className="text-4xl font-bold mb-4">마케팅의정석</h1>
+          <h1 className="text-4xl font-bold mb-4">{getSetting('siteName', 'business') || 'Simple Slot'}</h1>
           <p className="text-blue-100 text-lg mb-6">효율적인 광고 슬롯 관리</p>
           <div className="space-y-3 text-blue-200 text-sm">
             <div className="flex items-center">
@@ -144,7 +146,7 @@ export function LoginPage() {
 
           <div className="mt-8 pt-6 border-t border-gray-200 text-center">
             <p className="text-gray-400 text-xs">
-              © 2024 마케팅의정석. All rights reserved.
+              © 2024 {getSetting('siteName', 'business') || 'Simple Slot'}. All rights reserved.
             </p>
           </div>
         </div>

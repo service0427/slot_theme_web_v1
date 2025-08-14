@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSlotContext } from '@/adapters/react/hooks/useSlotContext';
 import { useCashContext } from '@/adapters/react/hooks/useCashContext';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 
 interface AdminDashboardCardStyle {
   container: string;
@@ -58,6 +59,7 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
   const { config } = useConfig();
   const { loadPendingSlotCount } = useSlotContext();
   const cashContext = config.useCashSystem ? useCashContext() : null;
+  const { getSetting } = useSystemSettings();
   const [pendingSlotsCount, setPendingSlotsCount] = useState(0);
   const [pendingChargesCount, setPendingChargesCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,7 +86,7 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
     <div className={styles.container}>
       <div className="mb-8">
         <h1 className={styles.header.title}>관리자 대시보드</h1>
-        <p className={styles.header.description}>마케팅의정석 관리자 시스템</p>
+        <p className={styles.header.description}>{getSetting('siteName', 'business') || 'Simple Slot'} 관리자 시스템</p>
       </div>
 
       <div className={styles.grid}>

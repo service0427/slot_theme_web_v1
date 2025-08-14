@@ -348,8 +348,8 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
     isAdmin,
     
     // 사이트 정보
-    companyName: settings.business?.companyName || '마케팅의정석',
-    siteTitle: settings.business?.siteTitle || 'Simple Slot - 유연한 디자인 시스템',
+    companyName: settings.business?.siteName || 'Simple Slot',
+    siteTitle: settings.business?.siteTitle || '유연한 디자인 시스템',
   };
 
   return (

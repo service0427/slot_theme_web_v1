@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/adapters/react';
+import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { login, isLoading, error, isAuthenticated, user } = useAuthContext();
+  const { getSetting } = useSystemSettings();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -43,7 +45,7 @@ export function LoginPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-amber-400 font-bold text-lg">마케팅의정석</h1>
+            <h1 className="text-amber-400 font-bold text-lg">{getSetting('siteName', 'business') || 'Simple Slot'}</h1>
             <p className="text-amber-600/80 text-xs">LUXURY EDITION</p>
           </div>
         </div>
