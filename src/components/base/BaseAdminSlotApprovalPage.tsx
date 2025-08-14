@@ -109,11 +109,32 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     loadFieldConfigs();
     
     loadAllSlots(statusFilter === 'all' ? undefined : statusFilter).then(slots => {
-      setAllSlots(slots);
-      setPendingSlots(slots);
+      let filteredSlots = slots;
+      
+      // 선슬롯발행 모드에서 날짜 기반 필터링
+      if (isPreAllocationMode && statusFilter !== 'all') {
+        const now = new Date();
+        filteredSlots = slots.filter(slot => {
+          if (statusFilter === 'waiting') {
+            // 대기중: active 상태이면서 시작일 전
+            return slot.status === 'active' && 
+                   slot.startDate && 
+                   new Date(slot.startDate) > now;
+          } else if (statusFilter === 'completed') {
+            // 완료: active 상태이면서 종료일 지남
+            return slot.status === 'active' && 
+                   slot.endDate && 
+                   new Date(slot.endDate) < now;
+          }
+          return true;
+        });
+      }
+      
+      setAllSlots(filteredSlots);
+      setPendingSlots(filteredSlots);
       setIsLoading(false);
     });
-  }, [statusFilter]);
+  }, [statusFilter, isPreAllocationMode]);
 
   // 검색 및 가격 필터링
   useEffect(() => {
@@ -287,15 +308,30 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     return <div className={mergedTheme.loadingClass}>로딩 중...</div>;
   }
 
-  // 상태별 통계
+  // 상태별 통계 (날짜 기반 상태 포함)
+  const now = new Date();
   const statusCounts = {
     all: allSlots.length,
+    empty: allSlots.filter(s => s.status === 'empty').length,
     pending: allSlots.filter(s => s.status === 'pending').length,
-    active: allSlots.filter(s => s.status === 'active').length,
-    rejected: allSlots.filter(s => s.status === 'rejected').length,
+    waiting: allSlots.filter(s => {
+      if (s.status !== 'active') return false;
+      const start = s.startDate ? new Date(s.startDate) : null;
+      return start && now < start;
+    }).length,
+    active: allSlots.filter(s => {
+      if (s.status !== 'active') return false;
+      const start = s.startDate ? new Date(s.startDate) : null;
+      const end = s.endDate ? new Date(s.endDate) : null;
+      return (!start || now >= start) && (!end || now <= end);
+    }).length,
+    completed: allSlots.filter(s => {
+      if (s.status !== 'active') return false;
+      const end = s.endDate ? new Date(s.endDate) : null;
+      return end && now > end;
+    }).length,
     paused: allSlots.filter(s => s.status === 'paused').length,
-    expired: allSlots.filter(s => s.status === 'expired').length,
-    empty: allSlots.filter(s => s.status === 'empty').length
+    rejected: allSlots.filter(s => s.status === 'rejected').length
   };
 
   const getStatusBadge = (status: string) => {
@@ -317,8 +353,18 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           <div>
             <h1 className={mergedTheme.titleClass}>{isPreAllocationMode ? '슬롯 관리' : '슬롯 승인'}</h1>
             <p className={mergedTheme.subtitleClass}>
-              전체 슬롯: {statusCounts.all}개 
-              ({isPreAllocationMode ? `입력대기: ${statusCounts.empty}, ` : ''}대기: {statusCounts.pending}, 승인: {statusCounts.active}, 거부: {statusCounts.rejected})
+              전체 슬롯: {statusCounts.all}개
+              {isPreAllocationMode && (
+                <span className="ml-2">
+                  (입력대기: {statusCounts.empty}, 승인대기: {statusCounts.pending}, 대기중: {statusCounts.waiting}, 
+                  활성: {statusCounts.active}, 완료: {statusCounts.completed}, 일시정지: {statusCounts.paused})
+                </span>
+              )}
+              {!isPreAllocationMode && (
+                <span className="ml-2">
+                  (대기: {statusCounts.pending}, 활성: {statusCounts.active}, 거부: {statusCounts.rejected})
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -380,6 +426,30 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           >
             거부됨 ({statusCounts.rejected})
           </button>
+          {isPreAllocationMode && (
+            <>
+              <button
+                onClick={() => setStatusFilter('waiting')}
+                className={`px-4 py-2 rounded-lg ${
+                  statusFilter === 'waiting' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                }`}
+              >
+                대기중 ({statusCounts.waiting})
+              </button>
+              <button
+                onClick={() => setStatusFilter('completed')}
+                className={`px-4 py-2 rounded-lg ${
+                  statusFilter === 'completed' 
+                    ? 'bg-gray-600 text-white' 
+                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                }`}
+              >
+                완료 ({statusCounts.completed})
+              </button>
+            </>
+          )}
         </div>
 
         {/* 검색 바 */}
@@ -431,7 +501,6 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">종료일</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">금액</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">액션</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -457,20 +526,21 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                     return (
                       <td key={field.field_key} className="px-3 py-2 text-sm text-gray-900">
                         {field.field_type === 'url' && fieldValue ? (
-                          <a 
-                            href={fieldValue} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-blue-600 underline hover:text-blue-800"
-                          >
-                            {(() => {
-                              try {
-                                return new URL(fieldValue).hostname;
-                              } catch {
-                                return fieldValue;
-                              }
-                            })()}
-                          </a>
+                          <div className="flex justify-center">
+                            <button 
+                              onClick={() => {
+                                const url = fieldValue.startsWith('http') ? fieldValue : `https://${fieldValue}`;
+                                window.open(url, '_blank', 'width=700,height=800');
+                              }}
+                              className="text-blue-600 hover:text-blue-800 transition-colors"
+                              title={fieldValue}
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                            </button>
+                          </div>
                         ) : (
                           <span className={field.field_key === 'keyword' ? 'font-medium' : ''}>
                             {fieldValue || '-'}
@@ -543,47 +613,37 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                     </div>
                   </td>
                   <td className="px-3 py-2 text-sm">
-                    <span className={`px-2 py-1 text-xs rounded-full ${getStatusBadge(slot.status)}`}>
-                      {slot.status === 'pending' ? '대기중' :
-                       slot.status === 'active' ? '승인됨' :
-                       slot.status === 'rejected' ? '거부됨' :
-                       slot.status === 'paused' ? '일시정지' :
-                       slot.status === 'expired' ? '만료됨' :
-                       slot.status === 'empty' ? '입력대기' : slot.status}
+                    <span className={`px-2 py-1 text-xs rounded-full ${(() => {
+                      if (slot.status === 'empty') return 'bg-blue-100 text-blue-800';
+                      if (slot.status === 'pending') return 'bg-yellow-100 text-yellow-800';
+                      if (slot.status === 'rejected') return 'bg-red-100 text-red-800';
+                      if (slot.status === 'paused') return 'bg-gray-100 text-gray-800';
+                      if (slot.status === 'active') {
+                        const now = new Date();
+                        const start = slot.startDate ? new Date(slot.startDate) : null;
+                        const end = slot.endDate ? new Date(slot.endDate) : null;
+                        if (start && now < start) return 'bg-blue-100 text-blue-800';
+                        if (end && now > end) return 'bg-gray-100 text-gray-800';
+                        return 'bg-green-100 text-green-800';
+                      }
+                      return 'bg-gray-100 text-gray-800';
+                    })()}`}>
+                      {(() => {
+                        if (slot.status === 'empty') return '입력대기';
+                        if (slot.status === 'pending') return '승인대기';
+                        if (slot.status === 'rejected') return '거부됨';
+                        if (slot.status === 'paused') return '일시정지';
+                        if (slot.status === 'active') {
+                          const now = new Date();
+                          const start = slot.startDate ? new Date(slot.startDate) : null;
+                          const end = slot.endDate ? new Date(slot.endDate) : null;
+                          if (start && now < start) return '대기중';
+                          if (end && now > end) return '완료';
+                          return '활성';
+                        }
+                        return slot.status;
+                      })()}
                     </span>
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm">
-                    {slot.status === 'pending' && !isPreAllocationMode ? (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleApprove(slot.id)}
-                          className={mergedTheme.approveButtonClass}
-                        >
-                          승인
-                        </button>
-                        <button
-                          onClick={() => setRejectingSlot(slot.id)}
-                          className={mergedTheme.rejectButtonClass}
-                        >
-                          거부
-                        </button>
-                      </div>
-                    ) : slot.status === 'active' ? (
-                      <button
-                        onClick={() => handleComplete(slot.id)}
-                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        완료
-                      </button>
-                    ) : slot.status === 'rejected' ? (
-                      <span className="text-red-600 font-medium">거부됨</span>
-                    ) : slot.status === 'empty' ? (
-                      <span className="text-blue-600 font-medium">입력 대기중</span>
-                    ) : slot.status === 'pending' && isPreAllocationMode ? (
-                      <span className="text-yellow-600 font-medium">자동 승인 대기</span>
-                    ) : (
-                      <span className="text-gray-500">-</span>
-                    )}
                   </td>
                 </tr>
               ))}

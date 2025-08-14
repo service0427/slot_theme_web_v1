@@ -57,25 +57,78 @@ const defaultStyles: AdminDashboardStyles = {
 
 export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDashboardPageProps) {
   const { config } = useConfig();
-  const { loadPendingSlotCount } = useSlotContext();
+  const { loadPendingSlotCount, loadAllSlots } = useSlotContext();
   const cashContext = config.useCashSystem ? useCashContext() : null;
   const { getSetting } = useSystemSettings();
-  const [pendingSlotsCount, setPendingSlotsCount] = useState(0);
+  const [slotStats, setSlotStats] = useState({
+    empty: 0,
+    pending: 0,
+    active: 0,
+    waiting: 0,
+    completed: 0,
+    paused: 0,
+    rejected: 0
+  });
   const [pendingChargesCount, setPendingChargesCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const promises = [
-      loadPendingSlotCount().then(count => setPendingSlotsCount(count))
-    ];
+    const loadStats = async () => {
+      try {
+        // 모든 슬롯 로드
+        const allSlots = await loadAllSlots();
+        
+        // 상태별 카운트 계산
+        const stats = {
+          empty: 0,
+          pending: 0,
+          active: 0,
+          waiting: 0,
+          completed: 0,
+          paused: 0,
+          rejected: 0
+        };
+        
+        const now = new Date();
+        
+        allSlots.forEach(slot => {
+          if (slot.status === 'empty') {
+            stats.empty++;
+          } else if (slot.status === 'pending') {
+            stats.pending++;
+          } else if (slot.status === 'paused') {
+            stats.paused++;
+          } else if (slot.status === 'rejected') {
+            stats.rejected++;
+          } else if (slot.status === 'active') {
+            const start = slot.startDate ? new Date(slot.startDate) : null;
+            const end = slot.endDate ? new Date(slot.endDate) : null;
+            
+            if (start && now < start) {
+              stats.waiting++;
+            } else if (end && now > end) {
+              stats.completed++;
+            } else {
+              stats.active++;
+            }
+          }
+        });
+        
+        setSlotStats(stats);
+        
+        // 캐시 충전 대기 로드
+        if (config.useCashSystem && cashContext) {
+          const charges = await cashContext.loadPendingCharges();
+          setPendingChargesCount(charges.length);
+        }
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    if (config.useCashSystem && cashContext) {
-      promises.push(
-        cashContext.loadPendingCharges().then(charges => setPendingChargesCount(charges.length))
-      );
-    }
-    
-    Promise.all(promises).then(() => setIsLoading(false));
+    loadStats();
   }, []);
 
   if (isLoading) {
@@ -90,7 +143,7 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
       </div>
 
       <div className={styles.grid}>
-        {/* 슬롯 승인 카드 */}
+        {/* 슬롯 관리 카드 */}
         <Link
           to="/admin/slots"
           className={styles.card.container}
@@ -101,16 +154,24 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            {pendingSlotsCount > 0 && (
+            {(slotStats.empty + slotStats.pending) > 0 && (
               <span className={styles.card.badge}>
-                {pendingSlotsCount}
+                {slotStats.empty + slotStats.pending}
               </span>
             )}
           </div>
-          <h3 className={styles.card.title}>슬롯 승인 관리</h3>
-          <p className={styles.card.description}>
-            승인 대기 중인 슬롯: {pendingSlotsCount}개
-          </p>
+          <h3 className={styles.card.title}>슬롯 관리</h3>
+          <div className={styles.card.description}>
+            <div className="space-y-1">
+              {slotStats.empty > 0 && <div>• 입력 대기: {slotStats.empty}개</div>}
+              {slotStats.pending > 0 && <div>• 승인 대기: {slotStats.pending}개</div>}
+              {slotStats.waiting > 0 && <div>• 대기중: {slotStats.waiting}개</div>}
+              {slotStats.active > 0 && <div>• 활성: {slotStats.active}개</div>}
+              {slotStats.completed > 0 && <div>• 완료: {slotStats.completed}개</div>}
+              {slotStats.paused > 0 && <div>• 일시정지: {slotStats.paused}개</div>}
+              {slotStats.rejected > 0 && <div>• 거절됨: {slotStats.rejected}개</div>}
+            </div>
+          </div>
         </Link>
 
         {/* 캐시 충전 승인 카드 (캐시 시스템 ON일 때만) */}

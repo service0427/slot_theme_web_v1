@@ -107,7 +107,7 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
   // 테마 병합
   const mergedTheme = { ...defaultTheme, ...theme };
 
-  // 모든 사용자의 슬롯 할당 정보 로드
+  // 모든 사용자의 실제 슬롯 개수 로드
   const loadAllUserAllocations = async (userList: User[]) => {
     try {
       const token = localStorage.getItem('accessToken');
@@ -116,7 +116,8 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
       await Promise.all(
         userList.map(async (user) => {
           try {
-            const response = await fetch(`${API_BASE_URL}/slots/allocation/${user.id}`, {
+            // 실제 슬롯 목록을 가져와서 개수 세기
+            const response = await fetch(`${API_BASE_URL}/slots?userId=${user.id}`, {
               headers: {
                 'Authorization': `Bearer ${token}`
               }
@@ -125,14 +126,19 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
             if (response.ok) {
               const result = await response.json();
               if (result.success && result.data) {
+                // result.data.items에 슬롯 배열이 있음
+                const slots = result.data.items || [];
+                const totalSlots = slots.length;
+                const usedSlots = slots.filter((slot: any) => slot.status !== 'empty').length;
+                
                 allocations[user.id] = {
-                  allocated: result.data.allocated_slots,
-                  used: result.data.used_slots
+                  allocated: totalSlots,
+                  used: usedSlots
                 };
               }
             }
           } catch (error) {
-            console.error(`Failed to load allocation for user ${user.id}:`, error);
+            console.error(`Failed to load slots for user ${user.id}:`, error);
           }
         })
       );

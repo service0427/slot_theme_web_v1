@@ -562,17 +562,33 @@ export class ApiSlotService extends BaseSlotService {
       
       const customFields = params.customFields || {};
       
-      const response = await fetch(`${API_BASE_URL}/slots/${slotId}`, {
+      // 슬롯 상태 확인 (empty 슬롯은 /fill, 나머지는 /update-fields)
+      const slotResponse = await fetch(`${API_BASE_URL}/slots/${slotId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`
+        }
+      });
+      
+      const slotData = await slotResponse.json();
+      const isEmptySlot = slotData.data?.is_empty || slotData.data?.status === 'empty';
+      
+      // empty 슬롯은 /fill 엔드포인트, 나머지는 /update-fields 엔드포인트 사용
+      const endpoint = isEmptySlot ? 
+        `${API_BASE_URL}/slots/${slotId}/fill` : 
+        `${API_BASE_URL}/slots/${slotId}/update-fields`;
+      
+      const response = await fetch(endpoint, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.accessToken}`
         },
         body: JSON.stringify({
-          keyword: customFields.keyword || '',
-          url: customFields.url || '',
-          customFields: customFields,
-          dailyBudget: 0
+          keyword: customFields.keyword || customFields.keywords || '',
+          url: customFields.url || customFields.landingUrl || '',
+          mid: customFields.mid || '',
+          customFields: customFields
         })
       });
 

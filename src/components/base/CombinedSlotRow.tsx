@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FieldConfig } from '@/adapters/services/ApiFieldConfigService';
 import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 
@@ -15,7 +15,7 @@ interface CombinedSlotRowProps {
   onSelectionChange?: (slotId: string, checked: boolean) => void;
 }
 
-export function CombinedSlotRow({ 
+function CombinedSlotRowComponent({ 
   slot, 
   slotIndex, 
   fieldConfigs, 
@@ -33,61 +33,108 @@ export function CombinedSlotRow({
   
   const isEmptySlot = slot.status === 'empty';
   
-  // 선슬롯발행 모드에서는 active 상태에서도 수정 가능
-  const canEdit = isEmptySlot || (isPreAllocationMode && (slot.status === 'active' || slot.status === 'pending'));
+  // 날짜 기반 상태 확인
+  const now = new Date();
+  const start = slot.startDate ? new Date(slot.startDate) : null;
+  const end = slot.endDate ? new Date(slot.endDate) : null;
+  const isWaiting = slot.status === 'active' && start && now < start;
+  const isCompleted = slot.status === 'active' && end && now > end;
+  
+  // 선슬롯발행 모드에서는 active/pending/대기중 상태에서도 수정 가능 (완료 제외)
+  const canEdit = isEmptySlot || (isPreAllocationMode && ((slot.status === 'active' && !isCompleted) || slot.status === 'pending'));
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formData, setFormData] = useState<Record<string, string>>({});
-
-  // formData 초기화 - fieldConfigs와 slot 데이터가 변경될 때
-  useEffect(() => {
-    // slot.formData가 있으면 우선 사용
+  
+  
+  // formData 초기화 - 부모에서 전달받은 데이터 우선 사용
+  const [formData, setFormData] = useState<Record<string, string>>(() => {
+    // 부모에서 전달받은 formData가 있으면 사용
     if (slot.formData) {
-      setFormData(slot.formData);
-      return;
+      console.log('[CombinedSlotRow] 부모 formData 사용:', { 
+        slotId: slot.id, 
+        formData: slot.formData 
+      });
+      return slot.formData;
     }
     
+    // 초기값 설정
     const initialData: Record<string, string> = {};
     
-    // 빈 슬롯이 아닌 경우, 실제 슬롯 데이터로 초기화
-    if (!isEmptySlot && fieldConfigs.length > 0) {
-      
+    // 모든 슬롯에 대해 데이터 초기화
+    if (fieldConfigs.length > 0) {
       fieldConfigs.forEach(field => {
-        // customFields에서 먼저 찾기
-        if (slot.customFields && slot.customFields[field.field_key]) {
-          initialData[field.field_key] = slot.customFields[field.field_key];
-        }
-        // fieldValues에서 찾기
-        else if (slot.fieldValues) {
+        let value = '';
+        
+        // customFields 우선 확인
+        if (slot.customFields && slot.customFields[field.field_key] !== undefined) {
+          value = slot.customFields[field.field_key];
+        } 
+        // fieldValues 확인
+        else if (slot.fieldValues && slot.fieldValues.length > 0) {
           const fieldValue = slot.fieldValues.find((fv: any) => fv.field_key === field.field_key);
           if (fieldValue) {
-            initialData[field.field_key] = fieldValue.value;
+            value = fieldValue.value;
           }
         }
-        // slots 테이블의 기본 필드
+        // 기본 필드 확인
         else if (field.field_key === 'keyword' && slot.keyword) {
-          initialData[field.field_key] = slot.keyword;
+          value = slot.keyword;
+        } else if ((field.field_key === 'url' || field.field_key === 'landingUrl') && slot.url) {
+          value = slot.url;
+        } else if (field.field_key === 'mid' && slot.mid) {
+          value = slot.mid;
         }
-        else if ((field.field_key === 'url' || field.field_key === 'landingUrl') && slot.url) {
-          initialData[field.field_key] = slot.url;
-        }
-        else if (field.field_key === 'mid' && slot.mid) {
-          initialData[field.field_key] = slot.mid;
-        }
-        else {
-          initialData[field.field_key] = '';
-        }
+        
+        initialData[field.field_key] = value;
       });
-      
-      setFormData(initialData);
-    } else if (isEmptySlot && fieldConfigs.length > 0) {
-      // 빈 슬롯인 경우 빈 값으로 초기화
-      fieldConfigs.forEach(field => {
-        initialData[field.field_key] = '';
-      });
-      setFormData(initialData);
     }
-  }, [slot.formData, slot.customFields, slot.fieldValues, slot.keyword, slot.url, slot.mid, fieldConfigs, isEmptySlot]);
+    
+    console.log('[CombinedSlotRow] 초기 formData 설정:', { 
+      slotId: slot.id, 
+      initialData 
+    });
+    
+    return initialData;
+  });
+  
+  // slot 데이터가 변경되면 업데이트
+  useEffect(() => {
+    const newData: Record<string, string> = {};
+    
+    // 모든 필드에 대해 최신 데이터 가져오기
+    fieldConfigs.forEach(field => {
+      let value = '';
+      
+      // customFields 우선 확인
+      if (slot.customFields && slot.customFields[field.field_key] !== undefined) {
+        value = slot.customFields[field.field_key];
+      } 
+      // fieldValues 확인
+      else if (slot.fieldValues && slot.fieldValues.length > 0) {
+        const fieldValue = slot.fieldValues.find((fv: any) => fv.field_key === field.field_key);
+        if (fieldValue) {
+          value = fieldValue.value;
+        }
+      }
+      // 기본 필드 확인
+      else if (field.field_key === 'keyword' && slot.keyword) {
+        value = slot.keyword;
+      } else if ((field.field_key === 'url' || field.field_key === 'landingUrl') && slot.url) {
+        value = slot.url;
+      } else if (field.field_key === 'mid' && slot.mid) {
+        value = slot.mid;
+      }
+      
+      newData[field.field_key] = value;
+    });
+    
+    console.log('[CombinedSlotRow] 데이터 업데이트:', { 
+      slotId: slot.id, 
+      newData 
+    });
+    
+    setFormData(newData);
+  }, [slot, fieldConfigs]);
 
   const handleFieldChange = (fieldKey: string, value: string) => {
     setFormData(prev => {
@@ -96,7 +143,9 @@ export function CombinedSlotRow({
         [fieldKey]: value
       };
       
-      // 부모 컴포넌트에 변경사항 전달 (선택적)
+      console.log('[CombinedSlotRow] 필드 변경:', { slotId: slot.id, fieldKey, value, newData });
+      
+      // 부모 컴포넌트에 변경사항 전달
       if (slot.onFormDataChange) {
         slot.onFormDataChange(slot.id, newData);
       }
@@ -122,6 +171,7 @@ export function CombinedSlotRow({
     const pasteData = e.clipboardData.getData('text/plain');
     if (!pasteData) return;
     
+    console.log('[붙여넣기] 데이터:', pasteData, '필드:', fieldKey);
     
     // 여러 줄의 데이터가 있는지 먼저 확인
     const lines = pasteData.split(/[\r\n]+/).filter(line => line.trim().length > 0);
@@ -229,12 +279,10 @@ export function CombinedSlotRow({
       let dataIndex = 0;
       
       while (nextRow && dataIndex < remainingData.length) {
-        // 빈 슬롯인지 확인 (저장 버튼이 있거나 입력 필드가 있는지 체크)
-        const saveButton = nextRow.querySelector('button') as HTMLButtonElement;
+        // 입력 필드가 있는지 확인 (완료된 슬롯 제외)
         const hasInputFields = nextRow.querySelectorAll('input[type="text"]').length > 0;
-        const isEmptySlot = saveButton && (saveButton.textContent?.includes('저장') || saveButton.className.includes('bg-green'));
         
-        if (isEmptySlot && hasInputFields) {
+        if (hasInputFields) {
           
           // 이 행의 입력 필드들에 데이터 적용
           const rowData = remainingData[dataIndex];
@@ -281,11 +329,9 @@ export function CombinedSlotRow({
       let valueIndex = 0;
       
       while (nextRow && valueIndex < values.length) {
-        const saveButton = nextRow.querySelector('button') as HTMLButtonElement;
         const hasInputFields = nextRow.querySelectorAll('input[type="text"]').length > 0;
-        const isEmptySlot = saveButton && (saveButton.textContent?.includes('저장') || saveButton.className.includes('bg-green'));
         
-        if (isEmptySlot && hasInputFields) {
+        if (hasInputFields) {
           
           // 해당 필드의 input 찾기
           const inputFields = nextRow.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>;
@@ -358,19 +404,6 @@ export function CombinedSlotRow({
 
   return (
     <tr className={`hover:bg-gray-50 ${isEmptySlot ? 'bg-blue-50/30' : ''}`}>
-      {/* 체크박스 (빈 슬롯만) */}
-      <td className="px-1 py-4 text-center border-r">
-        {isEmptySlot ? (
-          <input
-            type="checkbox"
-            checked={isSelected || false}
-            onChange={(e) => onSelectionChange?.(slot.id, e.target.checked)}
-            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-        ) : (
-          <span className="text-gray-400 text-xs">-</span>
-        )}
-      </td>
       
       {/* 번호 */}
       <td className="px-1 py-4 border-r font-medium text-center text-sm">
@@ -381,7 +414,7 @@ export function CombinedSlotRow({
       {fieldConfigs.map((field, fieldIndex) => {
         // URL 파싱 필드들은 읽기 전용
         const isReadOnlyField = ['url_product_id', 'url_item_id', 'url_vendor_item_id'].includes(field.field_key);
-        
+        const isUrlField = field.field_key === 'url' || field.field_key === 'landingUrl';
         
         return (
           <td key={field.field_key} className={`${isReadOnlyField ? 'px-1 py-2' : 'px-3 py-2'} ${fieldIndex < fieldConfigs.length - 1 ? 'border-r' : ''}`}>
@@ -404,9 +437,30 @@ export function CombinedSlotRow({
                   </div>
                 )}
               </div>
+            ) : isUrlField && getFieldValue(field.field_key) ? (
+              // URL 필드는 아이콘으로 표시
+              <div className="flex justify-center">
+                <button
+                  onClick={() => {
+                    const url = getFieldValue(field.field_key);
+                    if (url) {
+                      // URL이 http/https로 시작하지 않으면 추가
+                      const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+                      window.open(fullUrl, '_blank', 'width=700,height=800');
+                    }
+                  }}
+                  className="text-blue-600 hover:text-blue-800 transition-colors"
+                  title={getFieldValue(field.field_key)}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
             ) : (
-              <div className={`text-gray-900 truncate ${isReadOnlyField ? 'text-xs' : 'text-sm'}`} title={getFieldValue(field.field_key) || formData[field.field_key] || ''}>
-                {getFieldValue(field.field_key) || formData[field.field_key] || '-'}
+              <div className={`text-gray-900 truncate ${isReadOnlyField ? 'text-xs' : 'text-sm'}`} title={getFieldValue(field.field_key) || ''}>
+                {getFieldValue(field.field_key) || '-'}
               </div>
             )}
           </td>
@@ -432,94 +486,80 @@ export function CombinedSlotRow({
         }).replace(/\./g, '-').replace(/-$/, '') : '-'}
       </td>
       
-      {/* 통합된 상태 컬럼 (상태 + 토글 스위치) */}
-      <td className="px-3 py-4 text-center border-r">
+      {/* 통합된 상태 컬럼 (상태 + 저장 버튼) */}
+      <td className="px-3 py-4 text-center">
         <div className="flex flex-col items-center gap-2">
-          {/* 상태 표시 */}
+          {/* 상태 표시 - 날짜 기반 */}
           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-            isEmptySlot ? 'bg-orange-100 text-orange-800' :
-            slot.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-            slot.status === 'active' ? 'bg-green-100 text-green-800' :
-            slot.status === 'paused' ? 'bg-gray-100 text-gray-800' :
-            slot.status === 'rejected' ? 'bg-red-100 text-red-800' :
-            'bg-gray-100 text-gray-800'
+            (() => {
+              if (isEmptySlot) return 'bg-orange-100 text-orange-800';
+              if (slot.status === 'pending') return 'bg-yellow-100 text-yellow-800';
+              if (slot.status === 'paused') return 'bg-gray-100 text-gray-800';
+              if (slot.status === 'rejected') return 'bg-red-100 text-red-800';
+              if (slot.status === 'active') {
+                const now = new Date();
+                const start = slot.startDate ? new Date(slot.startDate) : null;
+                const end = slot.endDate ? new Date(slot.endDate) : null;
+                if (start && now < start) return 'bg-blue-100 text-blue-800';
+                if (end && now > end) return 'bg-gray-100 text-gray-800';
+                return 'bg-green-100 text-green-800';
+              }
+              return 'bg-gray-100 text-gray-800';
+            })()
           }`}>
-            {isEmptySlot ? '입력 대기' :
-             slot.status === 'pending' ? '승인 대기' :
-             slot.status === 'active' ? '활성' :
-             slot.status === 'paused' ? '일시정지' :
-             slot.status === 'rejected' ? '거절됨' :
-             slot.status}
+            {(() => {
+              if (isEmptySlot) return '입력 대기';
+              if (slot.status === 'pending') return '승인 대기';
+              if (slot.status === 'paused') return '일시정지';
+              if (slot.status === 'rejected') return '거절됨';
+              if (slot.status === 'active') {
+                const now = new Date();
+                const start = slot.startDate ? new Date(slot.startDate) : null;
+                const end = slot.endDate ? new Date(slot.endDate) : null;
+                if (start && now < start) return '대기중';
+                if (end && now > end) return '완료';
+                return '활성';
+              }
+              return slot.status;
+            })()}
           </span>
           
-          {/* 토글 스위치 (active/paused 상태에서만) */}
-          {(slot.status === 'active' || slot.status === 'paused') && (
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-500">활성</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={slot.status === 'paused'}
-                  onChange={slot.status === 'active' ? onPause : onResume}
-                />
-                <div className={`w-6 h-3 rounded-full peer peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-blue-300 ${
-                  slot.status === 'active' ? 'bg-green-500' : 'bg-orange-500'
-                } peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-2.5 after:w-2.5 after:transition-all`}></div>
-              </label>
-              <span className="text-xs text-gray-500">정지</span>
-            </div>
-          )}
+          {/* 토글 스위치 - 대기중, 활성, 일시정지 상태에서 표시 */}
+          {(() => {
+            const now = new Date();
+            const start = slot.startDate ? new Date(slot.startDate) : null;
+            const end = slot.endDate ? new Date(slot.endDate) : null;
+            const isWaiting = slot.status === 'active' && start && now < start;
+            const isActive = slot.status === 'active' && (!start || now >= start) && (!end || now <= end);
+            const isPaused = slot.status === 'paused';
+            
+            // 대기중, 활성, 일시정지 상태에서만 토글 표시
+            if (isWaiting || isActive || isPaused) {
+              return (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500">활성</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={isPaused}
+                      onChange={isPaused ? onResume : onPause}
+                    />
+                    <div className={`w-6 h-3 rounded-full peer peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-blue-300 ${
+                      isPaused ? 'bg-orange-500' : 'bg-green-500'
+                    } peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-2.5 after:w-2.5 after:transition-all`}></div>
+                  </label>
+                  <span className="text-xs text-gray-500">정지</span>
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
       </td>
       
-      {/* 액션 버튼 */}
-      <td className="px-1 py-4 text-center">
-        {isEmptySlot ? (
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className={`px-2 py-1 text-xs font-medium rounded ${
-              isSaving 
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-green-600 text-white hover:bg-green-700'
-            }`}
-          >
-            {isSaving ? '저장 중...' : '저장'}
-          </button>
-        ) : canEdit && onSave ? (
-          // 선슬롯발행 모드에서 active/pending 상태도 수정 가능
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className={`px-2 py-1 text-xs font-medium rounded ${
-              isSaving 
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
-          >
-            {isSaving ? '저장 중...' : '수정'}
-          </button>
-        ) : (
-          <div className="flex justify-center gap-1 items-center">
-            {/* 수정 버튼 */}
-            {((slot.status === 'active' && isPreAllocationMode) || 
-              (slot.status === 'pending' || slot.status === 'rejected')) && (
-              <button
-                onClick={isPreAllocationMode && canEdit ? handleSave : onEdit}
-                disabled={isPreAllocationMode && isSaving}
-                className={`px-2 py-1 text-white rounded text-xs font-medium ${
-                  isPreAllocationMode && isSaving 
-                    ? 'bg-gray-300 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {isPreAllocationMode && isSaving ? '저장 중...' : '수정'}
-              </button>
-            )}
-          </div>
-        )}
-      </td>
     </tr>
   );
 }
+
+export const CombinedSlotRow = CombinedSlotRowComponent;

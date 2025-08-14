@@ -49,9 +49,10 @@ function parseUrl(url: string): Record<string, string> {
 // 슬롯 목록 조회
 export async function getSlots(req: AuthRequest, res: Response) {
   try {
-    const userId = req.user?.id;
     const userRole = req.user?.role;
-    const { page = 1, limit = 10, search = '', status = '' } = req.query;
+    // 쿼리 파라미터에서 userId가 있으면 사용, 없으면 현재 로그인한 사용자 ID 사용
+    const { userId: queryUserId, page = 1, limit = 10, search = '', status = '' } = req.query;
+    const userId = queryUserId || req.user?.id;
 
     const offset = (Number(page) - 1) * Number(limit);
     let query = '';
@@ -59,8 +60,20 @@ export async function getSlots(req: AuthRequest, res: Response) {
     const params: any[] = [];
     const countParams: any[] = [];
 
-    // 관리자는 모든 슬롯 조회, 일반 사용자는 자신의 슬롯만 조회
-    if (userRole === 'operator') {
+    // 관리자가 특정 사용자의 슬롯을 조회하는 경우
+    if (userRole === 'operator' && queryUserId) {
+      params.push(queryUserId);
+      countParams.push(queryUserId);
+      query = `
+        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price
+        FROM slots s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.user_id = $1
+      `;
+      countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
+    }
+    // 관리자가 모든 슬롯 조회
+    else if (userRole === 'operator') {
       query = `
         SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price
         FROM slots s
@@ -68,7 +81,9 @@ export async function getSlots(req: AuthRequest, res: Response) {
         WHERE 1=1
       `;
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE 1=1';
-    } else {
+    } 
+    // 일반 사용자는 자신의 슬롯만 조회
+    else {
       params.push(userId);
       countParams.push(userId);
       query = `

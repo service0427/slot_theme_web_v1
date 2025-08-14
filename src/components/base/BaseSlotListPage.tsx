@@ -424,7 +424,8 @@ export function BaseSlotListPage({
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [fieldConfigsLoading, setFieldConfigsLoading] = useState(true);
   const [emptySlotsForms, setEmptySlotsForms] = useState<Record<string, Record<string, string>>>({});
-  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  // 선슬롯발행 모드에서는 개별 저장으로 변경 - 체크박스 제거
+  // const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [editingSlot, setEditingSlot] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPreAllocationForm, setShowPreAllocationForm] = useState(false);
@@ -514,17 +515,11 @@ export function BaseSlotListPage({
       return true;
     });
 
-    // 정렬: 빈 슬롯(empty)이 먼저 나오도록
+    // 정렬: 슬롯 번호 순으로 정렬
     return filtered.sort((a, b) => {
-      // empty 상태인 슬롯을 먼저
-      if (a.status === 'empty' && b.status !== 'empty') return -1;
-      if (a.status !== 'empty' && b.status === 'empty') return 1;
-      
-      // 같은 상태면 슬롯 번호나 생성일 기준 정렬
-      if (a.slot_number && b.slot_number) {
-        return a.slot_number - b.slot_number;
-      }
-      return 0;
+      const aNumber = a.slot_number || a.seq || 0;
+      const bNumber = b.slot_number || b.seq || 0;
+      return aNumber - bNumber;
     });
   }, [slots, searchQuery, statusFilter]);
   
@@ -630,7 +625,8 @@ export function BaseSlotListPage({
     }
   };
 
-  // 선택한 슬롯들 일괄 저장
+  // 선택한 슬롯들 일괄 저장 - 체크박스 제거로 사용 안 함
+  /*
   const handleBulkSave = async () => {
     const selectedSlotIds = Array.from(selectedSlots);
     if (selectedSlotIds.length === 0) return;
@@ -692,6 +688,7 @@ export function BaseSlotListPage({
       loadUserSlots();
     }
   };
+  */
 
   // 여러 슬롯에 대량 붙여넣기 처리 (입력 필드에만 값 설정, 저장하지 않음)
   const handleBulkPaste = (startEmptySlotIndex: number, fieldKey: string, values: string[] | Array<{[key: string]: string}>) => {
@@ -893,6 +890,76 @@ export function BaseSlotListPage({
               className={styles.searchInput}
             />
           </div>
+          
+          {/* 선슬롯발행 모드에서 전체 저장 버튼 */}
+          {slotOperationMode === 'pre-allocation' && (
+            <button
+              onClick={async () => {
+                // 완료가 아닌 모든 슬롯 찾기 (input이 있는 슬롯)
+                const editableSlots = [];
+                const rows = document.querySelectorAll('tbody tr');
+                
+                for (const row of rows) {
+                  const inputs = row.querySelectorAll('input[type="text"]');
+                  if (inputs.length > 0) {
+                    // input이 있으면 편집 가능한 슬롯
+                    const firstCell = row.querySelector('td:first-child');
+                    const slotNumberText = firstCell?.textContent || '';
+                    const slotNumber = parseInt(slotNumberText.replace('#', '')) || 0;
+                    
+                    // 해당 번호의 슬롯 찾기
+                    const slot = paginatedSlots.find(s => 
+                      (s.slot_number === slotNumber) || 
+                      (s.seq === slotNumber)
+                    );
+                    
+                    if (slot) {
+                      const formData = {};
+                      inputs.forEach((input: HTMLInputElement, index) => {
+                        if (fieldConfigs[index]) {
+                          formData[fieldConfigs[index].field_key] = input.value || '';
+                        }
+                      });
+                      editableSlots.push({ slot, formData });
+                    }
+                  }
+                }
+                
+                if (editableSlots.length === 0) {
+                  alert('저장할 슬롯이 없습니다.');
+                  return;
+                }
+                
+                let successCount = 0;
+                let failCount = 0;
+                
+                for (const { slot, formData } of editableSlots) {
+                  let success = false;
+                  
+                  if (slot.status === 'empty') {
+                    // 빈 슬롯은 fillEmptySlot 사용
+                    success = await fillEmptySlot(slot.id, { customFields: formData });
+                  } else {
+                    // 나머지는 updateSlot 사용
+                    success = await updateSlot(slot.id, { customFields: formData });
+                  }
+                  
+                  if (success) {
+                    successCount++;
+                  } else {
+                    failCount++;
+                  }
+                }
+                
+                alert('저장되었습니다.');
+                loadUserSlots();
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
+            >
+              저장
+            </button>
+          )}
+          
           <select
             value={statusFilter}
             onChange={(e) => {
@@ -932,24 +999,6 @@ export function BaseSlotListPage({
                   <table className="w-full table-fixed">
                     <thead className="bg-blue-50 border-b">
                       <tr>
-                        <th className="w-8 px-1 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
-                          <input
-                            type="checkbox"
-                            checked={(() => {
-                              const emptySlotIds = filteredSlots.filter(s => s.status === 'empty').map(s => s.id);
-                              return emptySlotIds.length > 0 && emptySlotIds.every(id => selectedSlots.has(id));
-                            })()}
-                            onChange={(e) => {
-                              const emptySlotIds = filteredSlots.filter(s => s.status === 'empty').map(s => s.id);
-                              if (e.target.checked) {
-                                setSelectedSlots(new Set(emptySlotIds));
-                              } else {
-                                setSelectedSlots(new Set());
-                              }
-                            }}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                        </th>
                         <th className="w-12 px-1 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           번호
                         </th>
@@ -978,32 +1027,20 @@ export function BaseSlotListPage({
                         <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           종료일
                         </th>
-                        <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                        <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
                           상태/활성화
-                        </th>
-                        <th className="w-20 px-1 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
-                          액션
                         </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredSlots.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((slot, slotIndex) => {
+                      {paginatedSlots.map((slot, slotIndex) => {
                         // 현재 슬롯이 빈 슬롯 배열에서 몇 번째 인덱스인지 계산
                         const emptySlotIndex = slot.status === 'empty' ? emptySlots.findIndex(es => es.id === slot.id) : -1;
                         
                         return (
                           <CombinedSlotRow
                             key={slot.id}
-                            slot={{
-                              ...slot,
-                              formData: slot.status === 'empty' ? (emptySlotsForms[slot.id] || {}) : undefined,
-                              onFormDataChange: slot.status === 'empty' ? (slotId: string, data: Record<string, string>) => {
-                                setEmptySlotsForms(prev => ({
-                                  ...prev,
-                                  [slotId]: data
-                                }));
-                              } : undefined
-                            }}
+                            slot={slot}
                             slotIndex={emptySlotIndex >= 0 ? emptySlotIndex : slotIndex}
                             fieldConfigs={fieldConfigs}
                             onSave={
@@ -1026,16 +1063,6 @@ export function BaseSlotListPage({
                               loadUserSlots();
                             } : undefined}
                             onBulkPaste={handleBulkPaste}
-                            isSelected={selectedSlots.has(slot.id)}
-                            onSelectionChange={(slotId, checked) => {
-                              const newSelected = new Set(selectedSlots);
-                              if (checked) {
-                                newSelected.add(slotId);
-                              } else {
-                                newSelected.delete(slotId);
-                              }
-                              setSelectedSlots(newSelected);
-                            }}
                           />
                         );
                       })}
@@ -1043,23 +1070,14 @@ export function BaseSlotListPage({
                   </table>
                 </div>
                 <div className="bg-gray-50 px-4 py-3 border-t">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span className="flex items-center gap-2">
-                        <span className="text-red-500">*</span>
-                        <span>필수 필드</span>
-                      </span>
-                      <span>• Excel에서 여러 셀을 복사하여 Ctrl+V로 한 번에 붙여넣기 가능</span>
-                      <span>• Tab/Enter로 다음 필드 이동</span>
-                    </div>
-                    {selectedSlots.size > 0 && (
-                      <button
-                        onClick={handleBulkSave}
-                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium text-sm"
-                      >
-                        선택한 {selectedSlots.size}개 슬롯 일괄 저장
-                      </button>
-                    )}
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <span className="flex items-center gap-2">
+                      <span className="text-red-500">*</span>
+                      <span>필수 필드</span>
+                    </span>
+                    <span>• Excel에서 여러 셀을 복사하여 Ctrl+V로 한 번에 붙여넣기 가능</span>
+                    <span>• Tab/Enter로 다음 필드 이동</span>
+                    <span>• 각 슬롯의 상태 옆 저장 버튼으로 개별 저장</span>
                   </div>
                 </div>
               </div>
