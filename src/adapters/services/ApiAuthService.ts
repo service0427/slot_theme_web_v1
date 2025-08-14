@@ -41,7 +41,47 @@ export class ApiAuthService implements IAuthService {
   }
 
   private async validateAndRestoreSession() {
-    // 세션 복원 로직
+    try {
+      const userStr = localStorage.getItem('user');
+      const accessToken = localStorage.getItem('accessToken');
+      const refreshToken = localStorage.getItem('refreshToken');
+      
+      if (!userStr || !accessToken) {
+        return;
+      }
+      
+      const userData = JSON.parse(userStr);
+      
+      // UserModel 생성 - 생성자 매개변수 순서 수정
+      const userModel = new UserModel(
+        userData.id,
+        userData.email,
+        userData.role,
+        'active',
+        new Date(),
+        new Date(),
+        userData.fullName
+      );
+      
+      // 토큰과 함께 상태 복원
+      const tokens = { accessToken, refreshToken };
+      this.setAuthState(userModel, tokens);
+      
+      // Socket.IO 연결
+      if (this.socketService && userModel.id) {
+        await this.socketService.connect(userModel.id);
+      }
+      
+      // 운영자가 아닌 경우 알림 서비스 시작
+      if (userModel.role !== 'operator') {
+        const notificationService = ApiNotificationService.getInstance();
+        notificationService.startPolling();
+      }
+    } catch (error) {
+      console.error('Session restore error:', error);
+      // 복원 실패시 로그아웃 처리
+      this.logout();
+    }
   }
 
   private setAuthState(user: UserModel | null, tokens: any | null) {
@@ -90,12 +130,15 @@ export class ApiAuthService implements IAuthService {
 
       const { user, tokens } = result.data;
       
-      // UserModel 생성
+      // UserModel 생성 - 생성자 매개변수 순서 수정
       const userModel = new UserModel(
         user.id,
         user.email,
-        user.fullName,
-        user.role
+        user.role,
+        'active', // status
+        new Date(), // createdAt
+        new Date(), // updatedAt
+        user.fullName
       );
       
       // permissions는 UserModel에 없으므로 별도로 추가
@@ -221,12 +264,15 @@ export class ApiAuthService implements IAuthService {
 
       const { user, tokens } = result.data;
       
-      // UserModel 생성
+      // UserModel 생성 - 생성자 매개변수 순서 수정
       const userModel = new UserModel(
         user.id,
         user.email,
-        user.fullName,
-        user.role
+        user.role,
+        'active', // status
+        new Date(), // createdAt
+        new Date(), // updatedAt
+        user.fullName
       );
       
       // 토큰 업데이트
