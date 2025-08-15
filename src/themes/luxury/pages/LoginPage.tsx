@@ -7,7 +7,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const { login, isLoading, error, isAuthenticated, user } = useAuthContext();
   const { getSetting } = useSystemSettings();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   // 로그인 성공시 리다이렉트
@@ -20,7 +20,7 @@ export function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await login({ email, password });
+    await login({ email: username, password });
   };
 
   return (
@@ -78,11 +78,11 @@ export function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-6 py-4 bg-gray-900/50 border-2 border-amber-500/30 rounded-xl text-white placeholder-amber-300/50 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition-all duration-300 text-center"
-                  placeholder="이메일 주소"
+                  placeholder="아이디"
                   required
                 />
               </div>
