@@ -193,7 +193,11 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
     }
 
     try {
-      const result = await userService.createUser(newUser);
+      // role을 항상 'user'로 강제 설정
+      const result = await userService.createUser({
+        ...newUser,
+        role: 'user'  // 운영자는 일반 사용자만 추가 가능
+      });
       
       if (result.success) {
         alert('사용자가 추가되었습니다.');
@@ -421,7 +425,7 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
         <div className="flex-1 flex gap-2">
           <input
             type="text"
-            placeholder="이메일 또는 이름으로 검색..."
+            placeholder="아이디 또는 이름으로 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -448,7 +452,7 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
           <thead className={mergedTheme.tableHeaderClass}>
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">가입일</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">이메일</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">아이디</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">이름</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">역할</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
@@ -550,14 +554,14 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
             }} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  이메일 <span className="text-red-500">*</span>
+                  아이디 <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="email"
+                  type="text"
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   className={mergedTheme.modalInputClass}
-                  placeholder="user@example.com"
+                  placeholder="사용자 아이디"
                   required
                 />
               </div>
@@ -571,7 +575,8 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                   className={mergedTheme.modalInputClass}
-                  placeholder="••••••••"
+                  placeholder="최소 4자리"
+                  minLength={4}
                   required
                 />
               </div>
@@ -590,19 +595,8 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
                 />
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  역할 <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={newUser.role}
-                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-                  className={mergedTheme.modalInputClass}
-                >
-                  <option value="user">일반 사용자</option>
-                  <option value="operator">운영자</option>
-                </select>
-              </div>
+              {/* 역할은 자동으로 일반 사용자로 설정, 드롭다운 제거 */}
+              <input type="hidden" value="user" />
               
               <div className="mt-6 flex justify-end gap-2">
                 <button
@@ -643,10 +637,10 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
             }} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  이메일
+                  아이디
                 </label>
                 <input
-                  type="email"
+                  type="text"
                   value={selectedUser.email}
                   disabled
                   className={`${mergedTheme.modalInputClass} bg-gray-100`}

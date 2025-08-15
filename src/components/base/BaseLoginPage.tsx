@@ -32,7 +32,7 @@ export function BaseLoginPage({
   const navigate = useNavigate();
   const { login, isLoading, error, isAuthenticated, user } = useAuthContext();
   const { companyName } = useSystemSettings();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   // 로그인 성공시 리다이렉트
@@ -45,7 +45,12 @@ export function BaseLoginPage({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await login({ email, password });
+    // 비밀번호 최소 4자리 체크
+    if (password.length < 4) {
+      alert('비밀번호는 최소 4자리 이상이어야 합니다.');
+      return;
+    }
+    await login({ email: username, password });
   };
 
   return (
@@ -66,13 +71,14 @@ export function BaseLoginPage({
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.inputGroup}>
           <label className={styles.label}>
-            이메일
+            아이디
           </label>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             className={styles.input}
+            placeholder="아이디를 입력하세요"
             required
           />
         </div>
@@ -86,6 +92,8 @@ export function BaseLoginPage({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className={styles.input}
+            placeholder="비밀번호 (최소 4자리)"
+            minLength={4}
             required
           />
         </div>

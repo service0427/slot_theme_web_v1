@@ -23,6 +23,7 @@ export function BaseUserSlotCard({ slot, onPause, onResume }: BaseUserSlotCardPr
       paused: 'bg-gray-100 text-gray-800',
       rejected: 'bg-red-100 text-red-800',
       expired: 'bg-red-100 text-red-800',
+      refunded: 'bg-purple-100 text-purple-800',
     };
 
     const labels = {
@@ -31,6 +32,7 @@ export function BaseUserSlotCard({ slot, onPause, onResume }: BaseUserSlotCardPr
       paused: '일시정지',
       rejected: '거절됨',
       expired: '만료됨',
+      refunded: '환불완료',
     };
 
     return (

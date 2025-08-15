@@ -22,9 +22,9 @@ export const dbConfig = {
 
 export const pool = new Pool(dbConfig);
 
-// 연결 풀 워밍업
+// 연결 풀 워밍업 - 디버그 모드에서만 로그
 pool.on('connect', (client) => {
-  console.log('New client connected to database');
+  // console.log('New client connected to database'); // 성능 개선을 위해 비활성화
 });
 
 pool.on('error', (err) => {

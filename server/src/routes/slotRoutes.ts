@@ -11,7 +11,9 @@ import {
   getUserSlotAllocation,
   fillEmptySlot,
   getSlotFieldValues,
-  updateSlotFields
+  updateSlotFields,
+  getSlotChangeLogs,
+  getUserSlotChangeLogs
 } from '../controllers/slotController';
 import { authenticateToken } from '../middleware/auth';
 
@@ -55,5 +57,11 @@ router.get('/:id/field-values', getSlotFieldValues);
 
 // 슬롯 필드 업데이트 (수정용)
 router.put('/:id/update-fields', updateSlotFields);
+
+// 특정 슬롯의 변경 로그 조회
+router.get('/:id/logs', getSlotChangeLogs);
+
+// 사용자의 모든 슬롯 변경 로그 조회
+router.get('/user/:userId/logs', getUserSlotChangeLogs);
 
 export { router as slotRoutes };

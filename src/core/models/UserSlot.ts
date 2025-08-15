@@ -25,7 +25,7 @@ export interface UserSlot {
   fieldValues?: any[];
 }
 
-export type SlotStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'expired' | 'empty';
+export type SlotStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'expired' | 'empty' | 'refunded';
 
 export class UserSlotModel implements UserSlot {
   constructor(
@@ -64,7 +64,11 @@ export class UserSlotModel implements UserSlot {
   }
 
   canDelete(): boolean {
-    return this.status === 'rejected' || this.status === 'expired';
+    return this.status === 'rejected' || this.status === 'expired' || this.status === 'refunded';
+  }
+
+  canRefund(): boolean {
+    return this.status === 'active' || this.status === 'paused';
   }
 
   isExpired(): boolean {

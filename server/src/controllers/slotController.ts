@@ -2,6 +2,38 @@ import { Response } from 'express';
 import { pool } from '../config/database';
 import { AuthRequest } from '../middleware/auth';
 
+// 슬롯 변경 로그 기록 헬퍼 함수
+async function logSlotChange(
+  slotId: string,
+  userId: string,
+  changeType: 'field_update' | 'status_change' | 'fill_empty' | 'approve' | 'reject' | 'refund',
+  fieldKey?: string,
+  oldValue?: any,
+  newValue?: any,
+  description?: string,
+  req?: AuthRequest
+) {
+  try {
+    await pool.query(`
+      INSERT INTO slot_change_logs (slot_id, user_id, change_type, field_key, old_value, new_value, description, ip_address, user_agent)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `, [
+      slotId,
+      userId,
+      changeType,
+      fieldKey || null,
+      oldValue ? JSON.stringify(oldValue) : null,
+      newValue ? JSON.stringify(newValue) : null,
+      description || null,
+      req?.ip || null,
+      req?.get('User-Agent') || null
+    ]);
+  } catch (error) {
+    console.error('로그 기록 실패:', error);
+    // 로그 기록 실패가 주요 기능을 방해하지 않도록 에러를 던지지 않음
+  }
+}
+
 // URL 파싱 함수
 function parseUrl(url: string): Record<string, string> {
   const parsed: Record<string, string> = {};
@@ -124,14 +156,34 @@ export async function getSlots(req: AuthRequest, res: Response) {
       pool.query(countQuery, countParams)
     ]);
 
-    // 각 슬롯의 field_values도 함께 조회
     const slots = dataResult.rows;
-    for (const slot of slots) {
+    
+    // 슬롯 ID 목록 추출
+    const slotIds = slots.map(slot => slot.id);
+    
+    if (slotIds.length > 0) {
+      // 모든 field_values를 한 번에 조회
       const fieldValuesResult = await pool.query(
-        'SELECT field_key, value FROM slot_field_values WHERE slot_id = $1',
-        [slot.id]
+        'SELECT slot_id, field_key, value FROM slot_field_values WHERE slot_id = ANY($1)',
+        [slotIds]
       );
-      slot.fieldValues = fieldValuesResult.rows;
+      
+      // 슬롯별로 field_values 그룹화
+      const fieldValuesBySlot: Record<string, any[]> = {};
+      fieldValuesResult.rows.forEach(fv => {
+        if (!fieldValuesBySlot[fv.slot_id]) {
+          fieldValuesBySlot[fv.slot_id] = [];
+        }
+        fieldValuesBySlot[fv.slot_id].push({
+          field_key: fv.field_key,
+          value: fv.value
+        });
+      });
+      
+      // 각 슬롯에 field_values 할당
+      slots.forEach(slot => {
+        slot.fieldValues = fieldValuesBySlot[slot.id] || [];
+      });
     }
 
     const totalCount = parseInt(countResult.rows[0].count);
@@ -203,12 +255,12 @@ export async function createSlot(req: AuthRequest, res: Response) {
 export async function updateSlotStatus(req: AuthRequest, res: Response) {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, refundReason } = req.body;
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
     // 유효한 상태값 체크
-    const validStatuses = ['active', 'paused', 'deleted'];
+    const validStatuses = ['active', 'paused', 'deleted', 'refunded'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -227,6 +279,14 @@ export async function updateSlotStatus(req: AuthRequest, res: Response) {
 
     const slot = slotResult.rows[0];
 
+    // 환불은 관리자만 처리 가능
+    if (status === 'refunded' && userRole !== 'operator') {
+      return res.status(403).json({
+        success: false,
+        error: '환불 처리는 관리자만 가능합니다.'
+      });
+    }
+
     // 권한 확인 (관리자 또는 슬롯 소유자만 가능)
     if (userRole !== 'operator' && slot.user_id !== userId) {
       return res.status(403).json({
@@ -235,10 +295,30 @@ export async function updateSlotStatus(req: AuthRequest, res: Response) {
       });
     }
 
-    // 상태 업데이트
-    const updateResult = await pool.query(
-      'UPDATE slots SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
-      [status, id]
+    // 상태 업데이트 (환불일 경우 환불 사유도 함께 저장)
+    let updateResult;
+    if (status === 'refunded') {
+      updateResult = await pool.query(
+        'UPDATE slots SET status = $1, refund_reason = $2, refunded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+        [status, refundReason, id]
+      );
+    } else {
+      updateResult = await pool.query(
+        'UPDATE slots SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        [status, id]
+      );
+    }
+
+    // 상태 변경 로그 기록
+    await logSlotChange(
+      id,
+      userId!,
+      status === 'refunded' ? 'refund' : 'status_change',
+      'status',
+      slot.status, // 이전 상태
+      status, // 새로운 상태
+      status === 'refunded' ? `환불 처리: ${refundReason}` : `상태 변경: ${slot.status} → ${status}`,
+      req
     );
 
     res.json({
@@ -270,6 +350,16 @@ export async function approveSlot(req: AuthRequest, res: Response) {
       });
     }
 
+    // 변경 전 슬롯 정보 조회
+    const slotResult = await pool.query('SELECT * FROM slots WHERE id = $1', [id]);
+    if (slotResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '슬롯을 찾을 수 없습니다.'
+      });
+    }
+    const oldSlot = slotResult.rows[0];
+
     const status = approved ? 'active' : 'rejected';
     const query = approved
       ? `UPDATE slots 
@@ -288,6 +378,20 @@ export async function approveSlot(req: AuthRequest, res: Response) {
         error: '슬롯을 찾을 수 없습니다.'
       });
     }
+
+    // 승인/거절 로그 기록
+    await logSlotChange(
+      id,
+      userId!,
+      approved ? 'approve' : 'reject',
+      'status',
+      oldSlot.status, // 이전 상태
+      status, // 새로운 상태
+      approved 
+        ? `슬롯 승인${approvedPrice ? ` (가격: ${approvedPrice}원)` : ''}` 
+        : `슬롯 거절: ${rejectionReason}`,
+      req
+    );
 
     res.json({
       success: true,
@@ -693,6 +797,16 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
       });
     }
 
+    // 변경 전 필드 값들을 조회하여 로그 기록 준비
+    const existingFieldsResult = await pool.query(
+      'SELECT field_key, value FROM slot_field_values WHERE slot_id = $1',
+      [id]
+    );
+    const existingFields: Record<string, any> = {};
+    existingFieldsResult.rows.forEach(row => {
+      existingFields[row.field_key] = row.value;
+    });
+
     // 트랜잭션 시작
     const client = await pool.connect();
     try {
@@ -705,6 +819,9 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
         // 파싱된 필드를 customFields에 추가
         Object.assign(finalFields, parsedUrlFields);
       }
+
+      // 실제로 변경된 필드들을 추적
+      const changes: Array<{field: string, oldValue: any, newValue: any}> = [];
       
       // slot_field_values 업데이트
       let urlValue = '';
@@ -713,6 +830,18 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
       
       for (const [fieldKey, value] of Object.entries(finalFields)) {
         if (value !== undefined && value !== null) {
+          const oldValue = existingFields[fieldKey];
+          const newValue = String(value);
+          
+          // 값이 실제로 변경된 경우에만 변경 로그에 추가
+          if (oldValue !== newValue) {
+            changes.push({
+              field: fieldKey,
+              oldValue: oldValue,
+              newValue: newValue
+            });
+          }
+
           await client.query(
             `INSERT INTO slot_field_values (slot_id, field_key, value)
              VALUES ($1, $2, $3)
@@ -740,6 +869,24 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
       );
 
       await client.query('COMMIT');
+
+      // 변경 사항이 있을 경우에만 로그 기록
+      if (changes.length > 0) {
+        const fieldKeys = changes.map(c => c.field);
+        const oldValues = changes.reduce((acc, c) => ({ ...acc, [c.field]: c.oldValue }), {});
+        const newValues = changes.reduce((acc, c) => ({ ...acc, [c.field]: c.newValue }), {});
+        
+        await logSlotChange(
+          id,
+          userId!,
+          'field_update',
+          JSON.stringify(fieldKeys), // 여러 필드 변경시 JSON 배열로 저장
+          oldValues,
+          newValues,
+          `${changes.length}개 필드 수정: ${fieldKeys.join(', ')}`,
+          req
+        );
+      }
 
       res.json({
         success: true,
@@ -923,6 +1070,18 @@ export async function fillEmptySlot(req: AuthRequest, res: Response) {
       [id, userId, urlValue, keywordValue, midValue, newStatus, newStatus]
     );
 
+    // 빈 슬롯 채우기 로그 기록
+    await logSlotChange(
+      id,
+      userId!,
+      'fill_empty',
+      'slot_filled', // 빈 슬롯 채우기는 특별한 액션이므로 별도 field_key
+      { is_empty: true, status: 'empty' }, // 이전 상태
+      { is_empty: false, status: newStatus, ...allFields }, // 새로운 상태
+      `빈 슬롯 채우기: ${Object.keys(allFields).length}개 필드 추가`,
+      req
+    );
+
     res.json({
       success: true,
       data: updateResult.rows[0]
@@ -979,6 +1138,163 @@ export async function getSlotCount(req: AuthRequest, res: Response) {
     res.status(500).json({
       success: false,
       error: '슬롯 개수 조회 중 오류가 발생했습니다.'
+    });
+  }
+}
+
+// 슬롯 변경 로그 조회 API
+export async function getSlotChangeLogs(req: AuthRequest, res: Response) {
+  try {
+    const { id: slotId } = req.params;  // 라우트에서 :id로 받음
+    const { page = 1, limit = 20 } = req.query;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+
+    // 슬롯 존재 여부 및 권한 확인
+    const slotResult = await pool.query(
+      'SELECT user_id FROM slots WHERE id = $1',
+      [slotId]
+    );
+
+    if (slotResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '슬롯을 찾을 수 없습니다.'
+      });
+    }
+
+    const slotOwner = slotResult.rows[0].user_id;
+    
+    // 권한 확인 (관리자 또는 슬롯 소유자만 가능)
+    if (userRole !== 'operator' && slotOwner !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: '권한이 없습니다.'
+      });
+    }
+
+    const offset = (Number(page) - 1) * Number(limit);
+
+    // 변경 로그 조회 (사용자 정보 포함)
+    const logsResult = await pool.query(`
+      SELECT 
+        scl.*,
+        u.full_name,
+        u.email
+      FROM slot_change_logs scl
+      LEFT JOIN users u ON scl.user_id = u.id
+      WHERE scl.slot_id = $1
+      ORDER BY scl.created_at DESC
+      LIMIT $2 OFFSET $3
+    `, [slotId, Number(limit), offset]);
+
+    // 총 개수 조회
+    const countResult = await pool.query(
+      'SELECT COUNT(*) FROM slot_change_logs WHERE slot_id = $1',
+      [slotId]
+    );
+
+    const totalCount = parseInt(countResult.rows[0].count);
+    const totalPages = Math.ceil(totalCount / Number(limit));
+
+    // JSON 파싱 처리
+    const logs = logsResult.rows.map(log => ({
+      ...log,
+      field_key: log.field_key ? (log.field_key.startsWith('[') ? JSON.parse(log.field_key) : log.field_key) : null,
+      old_value: log.old_value ? JSON.parse(log.old_value) : null,
+      new_value: log.new_value ? JSON.parse(log.new_value) : null
+    }));
+
+    res.json({
+      success: true,
+      data: logs  // 배열을 직접 반환
+    });
+  } catch (error) {
+    console.error('Get slot change logs error:', error);
+    res.status(500).json({
+      success: false,
+      error: '변경 로그 조회 중 오류가 발생했습니다.'
+    });
+  }
+}
+
+// 사용자별 슬롯 변경 로그 조회 API (관리자 전용)
+export async function getUserSlotChangeLogs(req: AuthRequest, res: Response) {
+  try {
+    const { userId: targetUserId } = req.params;
+    const { page = 1, limit = 20, changeType } = req.query;
+    const userRole = req.user?.role;
+
+    // 관리자 권한 확인
+    if (userRole !== 'operator') {
+      return res.status(403).json({
+        success: false,
+        error: '관리자 권한이 필요합니다.'
+      });
+    }
+
+    const offset = (Number(page) - 1) * Number(limit);
+    let whereClause = 'WHERE scl.user_id = $1';
+    const queryParams: any[] = [targetUserId, Number(limit), offset];
+
+    // 변경 타입 필터 추가
+    if (changeType) {
+      whereClause += ' AND scl.change_type = $4';
+      queryParams.push(changeType);
+    }
+
+    // 변경 로그 조회 (슬롯 정보 포함)
+    const logsResult = await pool.query(`
+      SELECT 
+        scl.*,
+        u.full_name,
+        u.email,
+        s.seq as slot_seq,
+        s.keyword as slot_keyword
+      FROM slot_change_logs scl
+      LEFT JOIN users u ON scl.user_id = u.id
+      LEFT JOIN slots s ON scl.slot_id = s.id
+      ${whereClause}
+      ORDER BY scl.created_at DESC
+      LIMIT $2 OFFSET $3
+    `, queryParams);
+
+    // 총 개수 조회
+    const countParams = changeType ? [targetUserId, changeType] : [targetUserId];
+    const countQuery = changeType 
+      ? 'SELECT COUNT(*) FROM slot_change_logs WHERE user_id = $1 AND change_type = $2'
+      : 'SELECT COUNT(*) FROM slot_change_logs WHERE user_id = $1';
+    
+    const countResult = await pool.query(countQuery, countParams);
+
+    const totalCount = parseInt(countResult.rows[0].count);
+    const totalPages = Math.ceil(totalCount / Number(limit));
+
+    // JSON 파싱 처리
+    const logs = logsResult.rows.map(log => ({
+      ...log,
+      field_key: log.field_key ? (log.field_key.startsWith('[') ? JSON.parse(log.field_key) : log.field_key) : null,
+      old_value: log.old_value ? JSON.parse(log.old_value) : null,
+      new_value: log.new_value ? JSON.parse(log.new_value) : null
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        logs,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: totalCount,
+          totalPages
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get user slot change logs error:', error);
+    res.status(500).json({
+      success: false,
+      error: '사용자 변경 로그 조회 중 오류가 발생했습니다.'
     });
   }
 }

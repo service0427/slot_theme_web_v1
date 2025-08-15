@@ -536,20 +536,17 @@ export function BaseSlotListPage({
         // 키워드 검색 - 여러 필드에서 검색
         const keywordMatch = 
           slot.customFields?.keyword?.toLowerCase().includes(query) ||
-          slot.customFields?.keywords?.toLowerCase().includes(query) ||
-          slot.keyword?.toLowerCase().includes(query);
+          slot.customFields?.keywords?.toLowerCase().includes(query);
           
         // URL 검색 - 여러 URL 필드에서 검색  
         const urlMatch = 
           slot.customFields?.url?.toLowerCase().includes(query) ||
-          slot.customFields?.landingUrl?.toLowerCase().includes(query) ||
-          slot.url?.toLowerCase().includes(query);
+          slot.customFields?.landingUrl?.toLowerCase().includes(query);
           
         // 기타 필드 검색
         const otherMatch = 
           slot.customFields?.description?.toLowerCase().includes(query) ||
-          slot.customFields?.mid?.toLowerCase().includes(query) ||
-          slot.mid?.toLowerCase().includes(query);
+          slot.customFields?.mid?.toLowerCase().includes(query);
         
         if (!keywordMatch && !urlMatch && !otherMatch) {
           return false;
@@ -592,8 +589,8 @@ export function BaseSlotListPage({
 
     // 정렬: 슬롯 번호 순으로 정렬
     return filtered.sort((a, b) => {
-      const aNumber = a.slot_number || a.seq || 0;
-      const bNumber = b.slot_number || b.seq || 0;
+      const aNumber = a.slot_number || (a.customFields?.seq ? parseInt(a.customFields.seq) : 0) || 0;
+      const bNumber = b.slot_number || (b.customFields?.seq ? parseInt(b.customFields.seq) : 0) || 0;
       return aNumber - bNumber;
     });
   }, [slots, searchQuery, statusFilter]);
@@ -949,7 +946,7 @@ export function BaseSlotListPage({
                     // 해당 번호의 슬롯 찾기
                     const slot = paginatedSlots.find(s => 
                       (s.slot_number === slotNumber) || 
-                      (s.seq === slotNumber)
+                      (s.customFields?.seq && parseInt(s.customFields.seq) === slotNumber)
                     );
                     
                     if (slot) {
@@ -975,7 +972,7 @@ export function BaseSlotListPage({
                       if (hasRequiredFields) {
                         editableSlots.push({ slot, formData });
                       } else {
-                        console.log(`슬롯 #${slot.slot_number || slot.seq} 스킵 (필수 필드 누락: ${missingFields.join(', ')})`);
+                        console.log(`슬롯 #${slot.slot_number || (slot.customFields?.seq ? parseInt(slot.customFields.seq) : '')} 스킵 (필수 필드 누락: ${missingFields.join(', ')})`);
                       }
                     }
                   }

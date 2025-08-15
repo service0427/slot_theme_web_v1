@@ -28,11 +28,13 @@ export function BasePreAllocationForm({ isOpen, onClose, onSubmit }: BasePreAllo
   const [formData, setFormData] = useState<PreAllocationData>({
     slotCount: 10,
     startDate: new Date().toISOString().split('T')[0], // 오늘 날짜
-    endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30일 후
+    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7일 후 (기본값)
     workCount: 0,
     amount: 0,
     description: ''
   });
+  
+  const [selectedDuration, setSelectedDuration] = useState<number>(7); // 기본 7일
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -89,11 +91,12 @@ export function BasePreAllocationForm({ isOpen, onClose, onSubmit }: BasePreAllo
       setFormData({
         slotCount: 10,
         startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         workCount: 0,
         amount: 0,
         description: ''
       });
+      setSelectedDuration(7);
     } catch (error) {
       alert('슬롯 생성 중 오류가 발생했습니다.');
       console.error('Pre-allocation creation error:', error);
@@ -103,10 +106,21 @@ export function BasePreAllocationForm({ isOpen, onClose, onSubmit }: BasePreAllo
   };
 
   const handleInputChange = (field: keyof PreAllocationData, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [field]: value
+      };
+      
+      // 시작일이 변경되면 종료일 재계산
+      if (field === 'startDate') {
+        const startDate = new Date(value);
+        startDate.setDate(startDate.getDate() + selectedDuration);
+        newData.endDate = startDate.toISOString().split('T')[0];
+      }
+      
+      return newData;
+    });
     
     // 에러 제거
     if (errors[field]) {
@@ -115,6 +129,21 @@ export function BasePreAllocationForm({ isOpen, onClose, onSubmit }: BasePreAllo
         delete newErrors[field];
         return newErrors;
       });
+    }
+  };
+  
+  // 기간 선택 핸들러
+  const handleDurationChange = (duration: number) => {
+    setSelectedDuration(duration);
+    
+    // 종료일 재계산
+    if (formData.startDate) {
+      const startDate = new Date(formData.startDate);
+      startDate.setDate(startDate.getDate() + duration);
+      setFormData(prev => ({
+        ...prev,
+        endDate: startDate.toISOString().split('T')[0]
+      }));
     }
   };
 
@@ -150,8 +179,9 @@ export function BasePreAllocationForm({ isOpen, onClose, onSubmit }: BasePreAllo
             )}
           </div>
 
-          {/* 기간 - 필수 */}
+          {/* 기간 설정 - 그리드 레이아웃 */}
           <div className="grid grid-cols-2 gap-3">
+            {/* 시작일 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 시작일 <span className="text-red-500">*</span>
@@ -170,66 +200,86 @@ export function BasePreAllocationForm({ isOpen, onClose, onSubmit }: BasePreAllo
               )}
             </div>
 
+            {/* 기간 선택 드롭박스 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                종료일 <span className="text-red-500">*</span>
+                기간 선택 <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
-                value={formData.endDate}
-                onChange={(e) => handleInputChange('endDate', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.endDate ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                }`}
+              <select
+                value={selectedDuration}
+                onChange={(e) => handleDurationChange(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isSubmitting}
-              />
-              {errors.endDate && (
-                <p className="mt-1 text-xs text-red-600">{errors.endDate}</p>
-              )}
+              >
+                <option value={1}>1일</option>
+                <option value={7}>7일</option>
+                <option value={10}>10일</option>
+                <option value={30}>30일</option>
+              </select>
             </div>
           </div>
 
-          {/* 작업 수 - 선택 */}
+          {/* 종료일 자동 표시 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              작업 수 (선택사항)
+              종료일 (자동 계산)
             </label>
-            <input
-              type="number"
-              min="0"
-              value={formData.workCount || ''}
-              onChange={(e) => handleInputChange('workCount', e.target.value ? parseInt(e.target.value) : undefined)}
-              placeholder="예: 30 (작업 예상 개수)"
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.workCount ? 'border-red-500 bg-red-50' : 'border-gray-300'
-              }`}
-              disabled={isSubmitting}
-            />
-            {errors.workCount && (
-              <p className="mt-1 text-xs text-red-600">{errors.workCount}</p>
-            )}
+            <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-700">
+              {formData.endDate ? new Date(formData.endDate).toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              }) : '-'}
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              시작일로부터 {selectedDuration}일 후
+            </p>
           </div>
 
-          {/* 금액 - 선택 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              금액 (선택사항)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="1000"
-              value={formData.amount || ''}
-              onChange={(e) => handleInputChange('amount', e.target.value ? parseInt(e.target.value) : undefined)}
-              placeholder="예: 50000 (원)"
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.amount ? 'border-red-500 bg-red-50' : 'border-gray-300'
-              }`}
-              disabled={isSubmitting}
-            />
-            {errors.amount && (
-              <p className="mt-1 text-xs text-red-600">{errors.amount}</p>
-            )}
+          {/* 작업 수와 금액 - 그리드 레이아웃 */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* 작업 수 - 선택 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                작업 수 (선택)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={formData.workCount || ''}
+                onChange={(e) => handleInputChange('workCount', e.target.value ? parseInt(e.target.value) : undefined)}
+                placeholder="예: 30"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.workCount ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                }`}
+                disabled={isSubmitting}
+              />
+              {errors.workCount && (
+                <p className="mt-1 text-xs text-red-600">{errors.workCount}</p>
+              )}
+            </div>
+
+            {/* 금액 - 선택 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                금액 (선택)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={formData.amount || ''}
+                onChange={(e) => handleInputChange('amount', e.target.value ? parseInt(e.target.value) : undefined)}
+                placeholder="예: 50000"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.amount ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                }`}
+                disabled={isSubmitting}
+              />
+              {errors.amount && (
+                <p className="mt-1 text-xs text-red-600">{errors.amount}</p>
+              )}
+            </div>
           </div>
 
           {/* 설명 - 선택 */}
