@@ -108,8 +108,6 @@ type TabType = 'theme' | 'field' | 'business' | 'feature';
 export function BaseAdminSystemSettingsPageV2() {
   const { user } = useAuthContext();
   
-  console.log('BaseAdminSystemSettingsPageV2 - Current user:', user);
-  console.log('User role:', user?.role);
   const { 
     currentTheme, 
     currentLayout, 
@@ -184,9 +182,9 @@ export function BaseAdminSystemSettingsPageV2() {
   const theme = currentTheme as 'simple' | 'modern' | 'luxury';
   const styles = systemSettingsStyles[theme];
   
-  // 관리자가 아니면 접근 차단
-  if (!isAdmin) {
-    return <Navigate to="/slots" replace />;
+  // developer만 시스템 설정 접근 가능
+  if (user?.role !== 'developer') {
+    return <Navigate to="/admin" replace />;
   }
   
   // 로그인 미리보기 이벤트 리스너

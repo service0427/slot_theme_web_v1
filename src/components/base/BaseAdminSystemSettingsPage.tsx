@@ -141,9 +141,24 @@ export function BaseAdminSystemSettingsPage() {
     }
   }, []);
 
-  // 관리자가 아니면 접근 차단
-  if (!isAdmin) {
-    return <Navigate to="/slots" replace />;
+  // 권한 체크 디버깅
+  console.log('[BaseAdminSystemSettingsPage] Auth check:', {
+    user: user,
+    userRole: user?.role,
+    isAdmin: isAdmin,
+    isDeveloper: user?.role === 'developer'
+  });
+  
+  // user 정보가 아직 로드되지 않았으면 대기
+  if (!user) {
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>;
+  }
+  
+  // 개발자가 아니면 접근 차단 (developer만 시스템 설정 접근 가능)
+  if (user.role !== 'developer') {
+    return <Navigate to="/admin" replace />;
   }
 
   // 컴포넌트가 재렌더링될 때 ref 값으로 상태 복원

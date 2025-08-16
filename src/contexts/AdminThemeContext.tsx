@@ -105,7 +105,7 @@ const availableLayouts = [
 export function AdminThemeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuthContext();
   const location = useLocation();
-  const isAdmin = user?.role === 'developer'; // 개발자만 시스템 설정 접근 가능
+  const isAdmin = user?.role === 'developer'; // 개발자만 시스템 설정 접근 가능 (operator는 제외)
   
   const [currentTheme, setCurrentTheme] = useState<ThemeType>(() => {
     // 관리자가 설정한 전역 테마만 사용

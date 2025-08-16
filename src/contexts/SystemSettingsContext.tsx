@@ -130,7 +130,7 @@ const availableLayouts = [
 export function SystemSettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuthContext();
   const location = useLocation();
-  const isAdmin = user?.role === 'operator';
+  const isAdmin = user?.role === 'operator' || user?.role === 'developer';
   
   const [settings, setSettings] = useState<SystemSettingsResponse>({});
   const [isLoading, setIsLoading] = useState(true);

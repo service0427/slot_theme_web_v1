@@ -115,8 +115,8 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
       {/* 메뉴 */}
       <nav className={styles.nav}>
         <ul className="space-y-2">
-          {/* 사용자 메뉴 (관리자도 접근 가능) */}
-          {config.menus.user
+          {/* 사용자 메뉴 (일반 사용자와 operator만 표시, developer는 제외) */}
+          {user?.role !== 'developer' && config.menus.user
             .filter(menu => {
               // 알림 테스트 메뉴 제거
               if (menu.id === 'notification-test') return false;
