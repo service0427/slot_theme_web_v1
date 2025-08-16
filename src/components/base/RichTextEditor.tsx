@@ -98,7 +98,10 @@ export function RichTextEditor({
   ];
 
   return (
-    <div className="rich-text-editor">
+    <div className="rich-text-editor" style={{ 
+      maxWidth: '100%',
+      overflow: 'hidden'
+    }}>
       <ReactQuill
         ref={quillRef}
         theme="snow"
@@ -109,6 +112,24 @@ export function RichTextEditor({
         formats={formats}
         style={{ height }}
       />
+      <style>{`
+        .rich-text-editor .ql-editor {
+          max-height: ${height};
+          overflow-y: auto;
+        }
+        .rich-text-editor .ql-editor img {
+          max-width: 100%;
+          height: auto;
+          display: block;
+          margin: 10px 0;
+        }
+        .rich-text-editor .ql-container {
+          font-size: 14px;
+        }
+        .rich-text-editor .ql-editor {
+          min-height: 200px;
+        }
+      `}</style>
     </div>
   );
 }

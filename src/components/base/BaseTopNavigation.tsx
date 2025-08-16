@@ -18,7 +18,9 @@ export function BaseTopNavigation() {
   const { user, logout } = useAuthContext();
   const { config } = useConfig();
   const { getSetting } = useSystemSettings();
-  const isAdmin = user?.role === 'operator';
+  const isAdmin = user?.role === 'operator' || user?.role === 'developer';  
+  const isDeveloper = user?.role === 'developer';
+  const chatEnabled = getSetting('chatEnabled', 'feature');
   
   const navLinkClasses = ({ isActive }: { isActive: boolean }) => 
     `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -65,9 +67,15 @@ export function BaseTopNavigation() {
                   </NavLink>
                 ))}
               
-              {/* 관리자 메뉴 */}
+              {/* 관리자/개발자 메뉴 */}
               {isAdmin && config.menus.admin
-                .filter(menu => menu.visible)
+                .filter(menu => {
+                  // 운영자는 시스템 설정 메뉴 제거  
+                  if (user?.role === 'operator' && menu.id === 'system-settings') return false;
+                  // 채팅 기능 비활성화시 채팅 관리 메뉴 제거
+                  if (!chatEnabled && menu.id === 'chat-manage') return false;
+                  return menu.visible;
+                })
                 .map(menu => (
                   <NavLink key={menu.id} to={menu.path!} className={navLinkClasses}>
                     {getMenuIcon(menu.id)}

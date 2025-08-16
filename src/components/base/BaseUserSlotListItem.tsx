@@ -84,6 +84,23 @@ export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResum
       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
         {slotNumber}
       </td>
+      {/* 썸네일 */}
+      <td className="px-4 py-4 text-center">
+        {(slot as any).thumbnail ? (
+          <img 
+            src={(slot as any).thumbnail} 
+            alt="썸네일" 
+            className="w-12 h-12 object-cover rounded mx-auto"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextSibling?.classList.remove('hidden');
+            }}
+          />
+        ) : (
+          <span className="text-gray-400 text-sm">-</span>
+        )}
+        <span className="text-gray-400 text-sm hidden">-</span>
+      </td>
       {/* 관리자가 설정한 필드들 또는 기본 필드들 */}
       {fieldConfigs && fieldConfigs.length > 0 ? fieldConfigs.map(field => {
         const value = getFieldValue(field, slot.customFields);
@@ -148,11 +165,30 @@ export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResum
         </>
       )}
       {/* 시스템 필드들 */}
-      <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-        <span className="font-semibold">-</span>
-      </td>
-      <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-        <span className="font-semibold">-</span>
+      {/* 순위 */}
+      <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
+        {(slot as any).rank ? (
+          <div className="flex items-center justify-center gap-1">
+            <span className="font-semibold text-gray-900">{(slot as any).rank}</span>
+            {(slot as any).first_rank && (
+              <span className={`text-xs ${
+                (slot as any).first_rank > (slot as any).rank 
+                  ? 'text-green-600' 
+                  : (slot as any).first_rank < (slot as any).rank 
+                    ? 'text-red-600' 
+                    : 'text-gray-500'
+              }`}>
+                {(slot as any).first_rank > (slot as any).rank 
+                  ? `(▲${(slot as any).first_rank - (slot as any).rank})` 
+                  : (slot as any).first_rank < (slot as any).rank 
+                    ? `(▼${(slot as any).rank - (slot as any).first_rank})` 
+                    : '(-)'}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )}
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-500">
         {slot.customFields.startDate ? new Date(slot.customFields.startDate).toLocaleDateString() : '-'}

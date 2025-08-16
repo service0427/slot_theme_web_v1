@@ -47,14 +47,15 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentFilter, setCurrentFilter] = useState<UserFilter>({
     page: 1,
-    limit: 20
+    limit: 10
   });
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
+    limit: 10,
     total: 0,
     totalPages: 0
   });
+  const [pageSize, setPageSize] = useState(10);
 
   // 슬롯 할당 관련 상태
   const [showSlotAllocationModal, setShowSlotAllocationModal] = useState(false);
@@ -116,8 +117,8 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
       await Promise.all(
         userList.map(async (user) => {
           try {
-            // 실제 슬롯 목록을 가져와서 개수 세기
-            const response = await fetch(`${API_BASE_URL}/slots?userId=${user.id}`, {
+            // count API를 사용하여 슬롯 개수만 가져오기
+            const response = await fetch(`${API_BASE_URL}/slots/count?userId=${user.id}`, {
               headers: {
                 'Authorization': `Bearer ${token}`
               }
@@ -126,26 +127,21 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
             if (response.ok) {
               const result = await response.json();
               if (result.success && result.data) {
-                // result.data.items에 슬롯 배열이 있음
-                const slots = result.data.items || [];
-                const totalSlots = slots.length;
-                const usedSlots = slots.filter((slot: any) => slot.status !== 'empty').length;
-                
                 allocations[user.id] = {
-                  allocated: totalSlots,
-                  used: usedSlots
+                  allocated: result.data.allocated || 0,
+                  used: result.data.used || 0
                 };
               }
             }
           } catch (error) {
-            console.error(`Failed to load slots for user ${user.id}:`, error);
+            // 에러 무시
           }
         })
       );
       
       setUserAllocations(allocations);
     } catch (error) {
-      console.error('Failed to load user allocations:', error);
+      // 에러 무시
     }
   };
 
@@ -168,7 +164,6 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
         alert(result.error || '사용자 목록을 불러오는데 실패했습니다.');
       }
     } catch (error) {
-      console.error('Load users error:', error);
       alert('사용자 목록을 불러오는데 실패했습니다.');
     } finally {
       setIsLoading(false);
@@ -183,6 +178,16 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
   const handleSearch = () => {
     setCurrentFilter(prev => ({ ...prev, page: 1 }));
     loadUsers();
+  };
+
+  // 페이지 크기 변경
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentFilter(prev => ({ 
+      ...prev, 
+      limit: newSize,
+      page: 1 
+    }));
   };
 
   // 사용자 추가
@@ -213,7 +218,6 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
         alert(result.error || '사용자 추가에 실패했습니다.');
       }
     } catch (error) {
-      console.error('Add user error:', error);
       alert('사용자 추가에 실패했습니다.');
     }
   };
@@ -252,7 +256,6 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
         alert(result.error || '사용자 수정에 실패했습니다.');
       }
     } catch (error) {
-      console.error('Update user error:', error);
       alert('사용자 수정에 실패했습니다.');
     }
   };
@@ -273,7 +276,6 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
         alert(result.error || '사용자 삭제에 실패했습니다.');
       }
     } catch (error) {
-      console.error('Delete user error:', error);
       alert('사용자 삭제에 실패했습니다.');
     }
   };
@@ -304,7 +306,6 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
         }
       }
     } catch (error) {
-      console.error('Failed to load user allocation:', error);
     }
     
     setShowSlotAllocationModal(true);
@@ -356,7 +357,6 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
         alert(result.error || '선슬롯 발행에 실패했습니다.');
       }
     } catch (error) {
-      console.error('선슬롯발행 오류:', error);
       alert('선슬롯 발행 중 오류가 발생했습니다.');
     }
   };
@@ -438,6 +438,15 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
             검색
           </button>
         </div>
+        <select
+          value={pageSize}
+          onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value={10}>10개씩</option>
+          <option value={50}>50개씩</option>
+          <option value={100}>100개씩</option>
+        </select>
         <button
           onClick={() => setShowAddModal(true)}
           className={mergedTheme.addButtonClass}

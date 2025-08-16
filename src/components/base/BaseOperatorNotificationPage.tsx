@@ -41,7 +41,6 @@ export function BaseOperatorNotificationPage() {
           setAllUsers(result.data.users);
         }
       } catch (error) {
-        console.error('Failed to load users:', error);
       } finally {
         setIsLoadingUsers(false);
       }
@@ -74,12 +73,12 @@ export function BaseOperatorNotificationPage() {
   );
 
   // 관리자 권한 체크
-  if (user?.role !== 'operator') {
+  if (user?.role !== 'operator' && user?.role !== 'developer') {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <h2 className="text-lg font-semibold text-red-800">접근 권한 없음</h2>
-          <p className="text-red-600">이 페이지는 운영자만 접근할 수 있습니다.</p>
+          <p className="text-red-600">이 페이지는 운영자와 개발자만 접근할 수 있습니다.</p>
         </div>
       </div>
     );
@@ -112,10 +111,6 @@ export function BaseOperatorNotificationPage() {
 
     setIsLoading(true);
     try {
-      console.log('[OperatorNotificationPage] 알림 발송 시작');
-      console.log('recipientType:', recipientType);
-      console.log('selectedUsers:', selectedUsers);
-      console.log('formData:', formData);
       
       // autoClose를 auto_close로 변환
       const { autoClose, ...restData } = formData;
@@ -125,16 +120,12 @@ export function BaseOperatorNotificationPage() {
         sender: NotificationSender.OPERATOR
       };
       
-      console.log('[OperatorNotificationPage] 발송 데이터:', dataToSend);
-      console.log('[OperatorNotificationPage] auto_close 값:', dataToSend.auto_close, typeof dataToSend.auto_close);
       
       if (recipientType === 'all') {
         const result = await notificationService.send({ ...dataToSend, recipientId: 'all' });
-        console.log('[OperatorNotificationPage] 전체 알림 발송 결과:', result);
       } else {
         // 여러 사용자 선택 시 배열로 한 번에 발송
         const result = await notificationService.send({ ...dataToSend, recipientId: selectedUsers });
-        console.log('[OperatorNotificationPage] 그룹 알림 발송 결과:', result);
       }
 
       alert('알림이 성공적으로 발송되었습니다.');
@@ -151,7 +142,6 @@ export function BaseOperatorNotificationPage() {
       setSelectedUsers([]);
       setRecipientType('all');
     } catch (error) {
-      console.error('Failed to send notification:', error);
       alert('알림 발송에 실패했습니다.');
     } finally {
       setIsLoading(false);
@@ -203,7 +193,6 @@ export function BaseOperatorNotificationPage() {
       await notificationService.send(notification);
       alert(`${notification.title} 알림이 발송되었습니다.`);
     } catch (error) {
-      console.error('Failed to send preset notification:', error);
       alert('알림 발송에 실패했습니다.');
     } finally {
       setIsLoading(false);

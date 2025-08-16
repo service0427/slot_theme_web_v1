@@ -63,7 +63,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [currentPage, setCurrentPage] = useState(1);
   const [viewingHistorySlot, setViewingHistorySlot] = useState<string | null>(null);
   const [slotHistory, setSlotHistory] = useState<any[]>([]);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // 기본 스타일
   const defaultTheme: AdminSlotApprovalThemeProps = {
@@ -95,6 +95,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     const loadFieldConfigs = async () => {
       try {
         const configs = await fieldConfigService.getFieldConfigs();
+        console.log('[DEBUG] Field configs loaded:', configs);
         
         // configs가 배열로 직접 오는 경우와 success/data 구조로 오는 경우 모두 처리
         const configData = Array.isArray(configs) ? configs : 
@@ -127,6 +128,16 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     // 필터링된 슬롯 로드
     loadAllSlots(statusFilter === 'all' ? undefined : statusFilter).then(slots => {
       console.log('[DEBUG] 받아온 슬롯 데이터:', slots.length, '개', slots);
+      if (slots.length > 0) {
+        console.log('[DEBUG] 첫 번째 슬롯 상세:', {
+          id: slots[0].id,
+          thumbnail: (slots[0] as any).thumbnail,
+          rank: (slots[0] as any).rank,
+          first_rank: (slots[0] as any).first_rank,
+          status: slots[0].status,
+          keyword: (slots[0] as any).keyword
+        });
+      }
       
       let filteredSlots = slots;
       const now = new Date();
@@ -640,12 +651,16 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">신청일시</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">광고주</th>
+                {/* 썸네일 */}
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">썸네일</th>
                 {/* 관리자가 설정한 필드들 */}
                 {fieldConfigs.map(field => (
                   <th key={field.field_key} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     {field.label}
                   </th>
                 ))}
+                {/* 순위 */}
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">순위</th>
                 {/* URL 파싱 필드들 */}
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">상품ID</th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">아이템ID</th>
@@ -673,6 +688,23 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       <div className="font-medium text-xs">{slot.userName || '이름 없음'}</div>
                       <div className="text-xs text-gray-500">{slot.userEmail || 'email@example.com'}</div>
                     </div>
+                  </td>
+                  {/* 썸네일 */}
+                  <td className="px-3 py-2 text-center">
+                    {(slot as any).thumbnail ? (
+                      <img 
+                        src={(slot as any).thumbnail} 
+                        alt="썸네일" 
+                        className="w-12 h-12 object-cover rounded mx-auto"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : (
+                      <span className="text-gray-400 text-sm">-</span>
+                    )}
+                    <span className="text-gray-400 text-sm hidden">-</span>
                   </td>
                   {/* 동적 필드들 */}
                   {fieldConfigs.map(field => {
@@ -703,6 +735,31 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       </td>
                     );
                   })}
+                  {/* 순위 */}
+                  <td className="px-3 py-2 text-center text-sm">
+                    {(slot as any).rank ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="font-semibold text-gray-900">{(slot as any).rank}</span>
+                        {(slot as any).first_rank && (
+                          <span className={`text-xs ${
+                            (slot as any).first_rank > (slot as any).rank 
+                              ? 'text-green-600' 
+                              : (slot as any).first_rank < (slot as any).rank 
+                                ? 'text-red-600' 
+                                : 'text-gray-500'
+                          }`}>
+                            {(slot as any).first_rank > (slot as any).rank 
+                              ? `(▲${(slot as any).first_rank - (slot as any).rank})` 
+                              : (slot as any).first_rank < (slot as any).rank 
+                                ? `(▼${(slot as any).rank - (slot as any).first_rank})` 
+                                : '(-)'}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
                   {/* URL 파싱 필드들 */}
                   <td className="px-3 py-2 text-sm text-gray-900">
                     <span className="text-xs">
@@ -852,6 +909,18 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 전체 {pendingSlots.length}개 중 {startIndex + 1}-{Math.min(endIndex, pendingSlots.length)}개 표시
               </div>
               <div className="flex gap-2">
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={10}>10개씩</option>
+                  <option value={50}>50개씩</option>
+                  <option value={100}>100개씩</option>
+                </select>
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}

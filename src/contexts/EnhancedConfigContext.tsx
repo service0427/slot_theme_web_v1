@@ -156,7 +156,7 @@ export function EnhancedConfigProvider({ children }: EnhancedConfigProviderProps
         id: 'slots', 
         label: '광고 슬롯', 
         path: '/slots', 
-        visible: user?.role !== 'operator'  // 운영자는 광고슬롯 메뉴 숨김
+        visible: user?.role !== 'operator' && user?.role !== 'developer'  // 운영자와 개발자는 광고슬롯 메뉴 숨김
       },
       { 
         id: 'cash-history', 

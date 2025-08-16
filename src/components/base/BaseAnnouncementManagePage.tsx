@@ -44,13 +44,13 @@ export function BaseAnnouncementManagePage() {
     images: [] as string[]
   });
 
-  // 관리자 권한 체크
-  if (user?.role !== 'operator') {
+  // 관리자/개발자 권한 체크
+  if (user?.role !== 'operator' && user?.role !== 'developer') {
     return (
       <div className="max-w-6xl mx-auto p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <h2 className="text-lg font-semibold text-red-800">접근 권한 없음</h2>
-          <p className="text-red-600">이 페이지는 운영자만 접근할 수 있습니다.</p>
+          <p className="text-red-600">이 페이지는 운영자와 개발자만 접근할 수 있습니다.</p>
         </div>
       </div>
     );
@@ -72,7 +72,19 @@ export function BaseAnnouncementManagePage() {
 
       if (response.ok) {
         const result = await response.json();
-        setAnnouncements(result.data.announcements);
+        console.log('Loaded announcements:', result.data);
+        // data가 배열인지 확인하고 announcements 키가 있는지 체크
+        if (result.data) {
+          if (Array.isArray(result.data)) {
+            setAnnouncements(result.data);
+          } else if (result.data.announcements) {
+            setAnnouncements(result.data.announcements);
+          } else {
+            setAnnouncements([]);
+          }
+        } else {
+          setAnnouncements([]);
+        }
       } else {
         // 에러 응답 확인
         const errorData = await response.json();
@@ -81,6 +93,7 @@ export function BaseAnnouncementManagePage() {
       }
     } catch (error) {
       console.error('Failed to load announcements:', error);
+      alert('공지사항을 불러오는데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -322,7 +335,7 @@ export function BaseAnnouncementManagePage() {
               </h2>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

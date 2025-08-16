@@ -92,8 +92,8 @@ export async function getSlots(req: AuthRequest, res: Response) {
     const params: any[] = [];
     const countParams: any[] = [];
 
-    // 관리자가 특정 사용자의 슬롯을 조회하는 경우
-    if (userRole === 'operator' && queryUserId) {
+    // 관리자/개발자가 특정 사용자의 슬롯을 조회하는 경우
+    if ((userRole === 'operator' || userRole === 'developer') && queryUserId) {
       params.push(queryUserId);
       countParams.push(queryUserId);
       query = `
@@ -104,8 +104,8 @@ export async function getSlots(req: AuthRequest, res: Response) {
       `;
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
     }
-    // 관리자가 모든 슬롯 조회
-    else if (userRole === 'operator') {
+    // 관리자/개발자가 모든 슬롯 조회
+    else if (userRole === 'operator' || userRole === 'developer') {
       query = `
         SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price
         FROM slots s
@@ -150,6 +150,10 @@ export async function getSlots(req: AuthRequest, res: Response) {
     params.push(limit, offset);
     query += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
 
+    // 디버그: 실행할 쿼리 출력
+    console.log('[DEBUG] Query:', query);
+    console.log('[DEBUG] Params:', params);
+    
     // 데이터 조회
     const [dataResult, countResult] = await Promise.all([
       pool.query(query, params),
@@ -157,6 +161,33 @@ export async function getSlots(req: AuthRequest, res: Response) {
     ]);
 
     const slots = dataResult.rows;
+    
+    // 디버그: 모든 슬롯 데이터 확인
+    console.log('[DEBUG] Total slots found:', slots.length);
+    if (slots.length > 0) {
+      console.log('[DEBUG] First 3 slots:', slots.slice(0, 3).map(s => ({
+        id: s.id,
+        thumbnail: s.thumbnail,
+        rank: s.rank,
+        first_rank: s.first_rank,
+        keyword: s.keyword,
+        status: s.status,
+        created_at: s.created_at
+      })));
+      
+      // fc5726f1로 시작하는 슬롯 찾기
+      const targetSlot = slots.find(s => s.id.startsWith('fc5726f1'));
+      if (targetSlot) {
+        console.log('[DEBUG] Found target slot fc5726f1:', {
+          id: targetSlot.id,
+          thumbnail: targetSlot.thumbnail,
+          rank: targetSlot.rank,
+          first_rank: targetSlot.first_rank
+        });
+      } else {
+        console.log('[DEBUG] Target slot fc5726f1 NOT FOUND in results');
+      }
+    }
     
     // 슬롯 ID 목록 추출
     const slotIds = slots.map(slot => slot.id);
@@ -279,16 +310,16 @@ export async function updateSlotStatus(req: AuthRequest, res: Response) {
 
     const slot = slotResult.rows[0];
 
-    // 환불은 관리자만 처리 가능
-    if (status === 'refunded' && userRole !== 'operator') {
+    // 환불은 관리자/개발자만 처리 가능
+    if (status === 'refunded' && userRole !== 'operator' && userRole !== 'developer') {
       return res.status(403).json({
         success: false,
         error: '환불 처리는 관리자만 가능합니다.'
       });
     }
 
-    // 권한 확인 (관리자 또는 슬롯 소유자만 가능)
-    if (userRole !== 'operator' && slot.user_id !== userId) {
+    // 권한 확인 (관리자/개발자 또는 슬롯 소유자만 가능)
+    if (userRole !== 'operator' && userRole !== 'developer' && slot.user_id !== userId) {
       return res.status(403).json({
         success: false,
         error: '권한이 없습니다.'
@@ -342,11 +373,11 @@ export async function approveSlot(req: AuthRequest, res: Response) {
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
-    // 관리자 권한 확인
-    if (userRole !== 'operator') {
+    // 관리자/개발자 권한 확인
+    if (userRole !== 'operator' && userRole !== 'developer') {
       return res.status(403).json({
         success: false,
-        error: '관리자 권한이 필요합니다.'
+        error: '관리자/개발자 권한이 필요합니다.'
       });
     }
 
@@ -430,8 +461,8 @@ export async function getSlotById(req: AuthRequest, res: Response) {
 
     const slot = result.rows[0];
 
-    // 권한 확인 (관리자 또는 슬롯 소유자만 가능)
-    if (userRole !== 'operator' && slot.user_id !== userId) {
+    // 권한 확인 (관리자/개발자 또는 슬롯 소유자만 가능)
+    if (userRole !== 'operator' && userRole !== 'developer' && slot.user_id !== userId) {
       return res.status(403).json({
         success: false,
         error: '권한이 없습니다.'
@@ -470,8 +501,8 @@ export async function updateSlot(req: AuthRequest, res: Response) {
 
     const slot = slotResult.rows[0];
 
-    // 권한 확인 (관리자 또는 슬롯 소유자만 가능)
-    if (userRole !== 'operator' && slot.user_id !== userId) {
+    // 권한 확인 (관리자/개발자 또는 슬롯 소유자만 가능)
+    if (userRole !== 'operator' && userRole !== 'developer' && slot.user_id !== userId) {
       return res.status(403).json({
         success: false,
         error: '권한이 없습니다.'
@@ -533,11 +564,11 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
     const { slotCount, startDate, endDate, workCount, amount, description } = req.body;
     const adminRole = req.user?.role;
 
-    // 관리자 권한 확인
-    if (adminRole !== 'operator') {
+    // 관리자/개발자 권한 확인
+    if (adminRole !== 'operator' && adminRole !== 'developer') {
       return res.status(403).json({
         success: false,
-        error: '관리자 권한이 필요합니다.'
+        error: '관리자/개발자 권한이 필요합니다.'
       });
     }
 
@@ -669,8 +700,8 @@ export async function getUserSlotAllocation(req: AuthRequest, res: Response) {
     const requestUserId = req.user?.id;
     const userRole = req.user?.role;
 
-    // 권한 확인 (관리자 또는 본인만 가능)
-    if (userRole !== 'operator' && userId !== requestUserId) {
+    // 권한 확인 (관리자/개발자 또는 본인만 가능)
+    if (userRole !== 'operator' && userRole !== 'developer' && userId !== requestUserId) {
       return res.status(403).json({
         success: false,
         error: '권한이 없습니다.'
@@ -725,8 +756,8 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
 
     const slot = slotResult.rows[0];
 
-    // 권한 확인 (관리자 또는 슬롯 소유자만 가능)
-    if (userRole !== 'operator' && slot.user_id !== userId) {
+    // 권한 확인 (관리자/개발자 또는 슬롯 소유자만 가능)
+    if (userRole !== 'operator' && userRole !== 'developer' && slot.user_id !== userId) {
       return res.status(403).json({
         success: false,
         error: '권한이 없습니다.'
@@ -929,8 +960,8 @@ export async function getSlotFieldValues(req: AuthRequest, res: Response) {
 
     const slot = slotResult.rows[0];
 
-    // 권한 확인 (관리자 또는 슬롯 소유자만 가능)
-    if (userRole !== 'operator' && slot.user_id !== userId) {
+    // 권한 확인 (관리자/개발자 또는 슬롯 소유자만 가능)
+    if (userRole !== 'operator' && userRole !== 'developer' && slot.user_id !== userId) {
       return res.status(403).json({
         success: false,
         error: '권한이 없습니다.'
@@ -1107,13 +1138,33 @@ export async function fillEmptySlot(req: AuthRequest, res: Response) {
 export async function getSlotCount(req: AuthRequest, res: Response) {
   try {
     const userRole = req.user?.role;
-    const { status = '' } = req.query;
+    const { status = '', userId: queryUserId } = req.query;
 
     let countQuery = '';
     const countParams: any[] = [];
-
-    // 관리자는 모든 슬롯 개수, 일반 사용자는 자신의 슬롯 개수만
-    if (userRole === 'operator') {
+    
+    // 관리자/개발자가 특정 사용자의 슬롯 개수를 조회하는 경우
+    if ((userRole === 'operator' || userRole === 'developer') && queryUserId) {
+      // 전체 슬롯 개수와 사용중인 슬롯 개수를 한 번에 조회
+      const query = `
+        SELECT 
+          COUNT(*) as total,
+          COUNT(CASE WHEN status != 'empty' THEN 1 END) as used
+        FROM slots 
+        WHERE user_id = $1
+      `;
+      const result = await pool.query(query, [queryUserId]);
+      
+      return res.json({
+        success: true,
+        data: { 
+          allocated: parseInt(result.rows[0].total),
+          used: parseInt(result.rows[0].used)
+        }
+      });
+    }
+    // 관리자/개발자는 모든 슬롯 개수, 일반 사용자는 자신의 슬롯 개수만
+    else if (userRole === 'operator' || userRole === 'developer') {
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE 1=1';
     } else {
       countParams.push(req.user?.id);
@@ -1134,7 +1185,6 @@ export async function getSlotCount(req: AuthRequest, res: Response) {
       data: { count }
     });
   } catch (error) {
-    console.error('[ERROR] Get slot count error:', error);
     res.status(500).json({
       success: false,
       error: '슬롯 개수 조회 중 오류가 발생했습니다.'
@@ -1225,11 +1275,11 @@ export async function getUserSlotChangeLogs(req: AuthRequest, res: Response) {
     const { page = 1, limit = 20, changeType } = req.query;
     const userRole = req.user?.role;
 
-    // 관리자 권한 확인
-    if (userRole !== 'operator') {
+    // 관리자/개발자 권한 확인
+    if (userRole !== 'operator' && userRole !== 'developer') {
       return res.status(403).json({
         success: false,
-        error: '관리자 권한이 필요합니다.'
+        error: '관리자/개발자 권한이 필요합니다.'
       });
     }
 

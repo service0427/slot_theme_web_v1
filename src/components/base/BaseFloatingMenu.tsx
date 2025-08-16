@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuthContext } from '@/adapters/react';
+import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 import { 
   HomeIcon, 
   ChartBarIcon,
@@ -17,7 +18,9 @@ import {
 
 export function BaseFloatingMenu() {
   const { user, logout } = useAuthContext();
-  const isAdmin = user?.role === 'operator';
+  const { getSetting } = useSystemSettings();
+  const isAdmin = user?.role === 'operator' || user?.role === 'developer';
+  const chatEnabled = getSetting('chatEnabled', 'feature');
   const [isOpen, setIsOpen] = useState(false);
   
   const navLinkClasses = ({ isActive }: { isActive: boolean }) => 
@@ -67,20 +70,24 @@ export function BaseFloatingMenu() {
                   </NavLink>
                   <NavLink to="/admin/slots" className={navLinkClasses} onClick={() => setIsOpen(false)}>
                     <DocumentTextIcon className="w-4 h-4 inline mr-2" />
-                    광고 승인
+                    슬롯 관리
                   </NavLink>
                   <NavLink to="/admin/cash" className={navLinkClasses} onClick={() => setIsOpen(false)}>
                     <CurrencyDollarIcon className="w-4 h-4 inline mr-2" />
                     캐시 승인
                   </NavLink>
-                  <NavLink to="/admin/chat" className={navLinkClasses} onClick={() => setIsOpen(false)}>
-                    <ChatBubbleLeftIcon className="w-4 h-4 inline mr-2" />
-                    채팅 관리
-                  </NavLink>
-                  <NavLink to="/admin/settings" className={navLinkClasses} onClick={() => setIsOpen(false)}>
-                    <CogIcon className="w-4 h-4 inline mr-2" />
-                    시스템 설정
-                  </NavLink>
+                  {chatEnabled && (
+                    <NavLink to="/admin/chat" className={navLinkClasses} onClick={() => setIsOpen(false)}>
+                      <ChatBubbleLeftIcon className="w-4 h-4 inline mr-2" />
+                      채팅 관리
+                    </NavLink>
+                  )}
+                  {user?.role === 'developer' && (
+                    <NavLink to="/admin/settings" className={navLinkClasses} onClick={() => setIsOpen(false)}>
+                      <CogIcon className="w-4 h-4 inline mr-2" />
+                      시스템 설정
+                    </NavLink>
+                  )}
                 </>
               ) : (
                 <>

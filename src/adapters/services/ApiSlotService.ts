@@ -85,6 +85,11 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).amount = item.pre_allocation_amount;
           (slot as any).description = item.pre_allocation_description;
           
+          // 썸네일과 순위 데이터 추가
+          (slot as any).thumbnail = item.thumbnail;
+          (slot as any).rank = item.rank;
+          (slot as any).first_rank = item.first_rank;
+          
           return slot;
         });
 
@@ -487,6 +492,11 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).workCount = item.pre_allocation_work_count;
           (slot as any).amount = item.pre_allocation_amount;
           (slot as any).description = item.pre_allocation_description;
+          
+          // 썸네일과 순위 데이터 추가
+          (slot as any).thumbnail = item.thumbnail;
+          (slot as any).rank = item.rank;
+          (slot as any).first_rank = item.first_rank;
           
           return slot;
         });

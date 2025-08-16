@@ -4,7 +4,7 @@ import { NotificationModel, NotificationType, NotificationSender } from '@/core/
 import { useAuthContext } from '@/adapters/react';
 import { ApiUserService } from '@/adapters/services/ApiUserService';
 import { User } from '@/core/models/User';
-import { Clock, Users, User as UserIcon, AlertCircle, CheckCircle, Info, XCircle, Sparkles, Megaphone, Calendar, Send, ChevronDown } from 'lucide-react';
+import { Clock, Users, User as UserIcon, AlertCircle, CheckCircle, Info, XCircle, Sparkles, Calendar, ChevronDown } from 'lucide-react';
 
 export function BaseNotificationHistoryPage() {
   const { user } = useAuthContext();
@@ -15,22 +15,15 @@ export function BaseNotificationHistoryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [typeFilter, setTypeFilter] = useState<NotificationType | 'all'>('all');
-  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
-  const [announcementForm, setAnnouncementForm] = useState({
-    title: '',
-    message: '',
-    priority: 'normal' as 'low' | 'normal' | 'high',
-    pinned: false
-  });
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
 
-  // 관리자 권한 체크
-  if (user?.role !== 'operator') {
+  // 관리자/개발자 권한 체크
+  if (user?.role !== 'operator' && user?.role !== 'developer') {
     return (
       <div className="max-w-6xl mx-auto p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <h2 className="text-lg font-semibold text-red-800">접근 권한 없음</h2>
-          <p className="text-red-600">이 페이지는 운영자만 접근할 수 있습니다.</p>
+          <p className="text-red-600">이 페이지는 운영자와 개발자만 접근할 수 있습니다.</p>
         </div>
       </div>
     );
@@ -156,38 +149,6 @@ export function BaseNotificationHistoryPage() {
     return [];
   };
 
-  // 공지사항 발송
-  const handleSendAnnouncement = async () => {
-    if (!announcementForm.title || !announcementForm.message) {
-      alert('제목과 내용을 입력해주세요.');
-      return;
-    }
-
-    try {
-      await notificationService.send({
-        type: announcementForm.priority === 'high' ? NotificationType.WARNING : NotificationType.INFO,
-        title: `📢 ${announcementForm.pinned ? '[중요] ' : ''}${announcementForm.title}`,
-        message: announcementForm.message,
-        recipientId: 'all',
-        sender: NotificationSender.OPERATOR,
-        autoClose: !announcementForm.pinned,
-        duration: announcementForm.pinned ? 0 : 10000,
-        metadata: {
-          isAnnouncement: true,
-          priority: announcementForm.priority,
-          pinned: announcementForm.pinned
-        }
-      });
-      
-      alert('공지사항이 발송되었습니다.');
-      setShowAnnouncementModal(false);
-      setAnnouncementForm({ title: '', message: '', priority: 'normal', pinned: false });
-      loadNotifications();
-    } catch (error) {
-      console.error('Failed to send announcement:', error);
-      alert('공지사항 발송에 실패했습니다.');
-    }
-  };
 
   // 타입별 아이콘 (통계와 일치)
   const getTypeIcon = (type: NotificationType) => {
@@ -240,15 +201,8 @@ export function BaseNotificationHistoryPage() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">알림 발송 내역</h1>
-          <button
-            onClick={() => setShowAnnouncementModal(true)}
-            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all flex items-center gap-2"
-          >
-            <Megaphone className="w-5 h-5" />
-            공지사항 작성
-          </button>
         </div>
         
         {/* 통계 카드 */}
@@ -485,103 +439,6 @@ export function BaseNotificationHistoryPage() {
         </div>
       </div>
 
-      {/* 공지사항 작성 모달 */}
-      {showAnnouncementModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowAnnouncementModal(false)}
-          />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Megaphone className="w-6 h-6 text-purple-600" />
-                공지사항 작성
-              </h2>
-              <button
-                onClick={() => setShowAnnouncementModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <XCircle className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  제목
-                </label>
-                <input
-                  type="text"
-                  value={announcementForm.title}
-                  onChange={(e) => setAnnouncementForm(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="공지사항 제목을 입력하세요"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  내용
-                </label>
-                <textarea
-                  value={announcementForm.message}
-                  onChange={(e) => setAnnouncementForm(prev => ({ ...prev, message: e.target.value }))}
-                  rows={6}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="공지사항 내용을 입력하세요"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    중요도
-                  </label>
-                  <select
-                    value={announcementForm.priority}
-                    onChange={(e) => setAnnouncementForm(prev => ({ ...prev, priority: e.target.value as 'low' | 'normal' | 'high' }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="low">낮음</option>
-                    <option value="normal">보통</option>
-                    <option value="high">높음</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="pinned"
-                    checked={announcementForm.pinned}
-                    onChange={(e) => setAnnouncementForm(prev => ({ ...prev, pinned: e.target.checked }))}
-                    className="mr-2"
-                  />
-                  <label htmlFor="pinned" className="text-sm font-medium text-gray-700">
-                    상단 고정 (자동 닫기 비활성화)
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setShowAnnouncementModal(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleSendAnnouncement}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all flex items-center gap-2"
-              >
-                <Send className="w-4 h-4" />
-                발송
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

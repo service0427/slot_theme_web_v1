@@ -337,6 +337,7 @@ function getPermissionsByRole(role: string): string[] {
   const permissionMap: Record<string, string[]> = {
     admin: ['view_all', 'edit_all', 'delete_all', 'manage_users'],
     operator: ['view_all', 'edit_all', 'manage_users'],
+    developer: ['view_all', 'edit_all', 'manage_users'], // 개발자도 운영자와 동일한 권한
     user: ['view_own', 'edit_own']
   };
 

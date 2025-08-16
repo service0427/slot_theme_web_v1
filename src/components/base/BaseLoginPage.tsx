@@ -38,7 +38,7 @@ export function BaseLoginPage({
   // 로그인 성공시 리다이렉트
   useEffect(() => {
     if (isAuthenticated && user) {
-      const redirectPath = user.role === 'operator' ? '/admin' : '/slots';
+      const redirectPath = (user.role === 'operator' || user.role === 'developer') ? '/admin' : '/slots';
       navigate(redirectPath);
     }
   }, [isAuthenticated, user, navigate]);

@@ -54,8 +54,20 @@ export function BaseAnnouncementPage() {
 
       if (response.ok) {
         const result = await response.json();
-        setAnnouncements(result.data.announcements);
-        setTotalPages(result.data.pagination.totalPages);
+        console.log('Announcements loaded:', result.data);
+        // 데이터 구조에 따라 유연하게 처리
+        if (result.data) {
+          if (Array.isArray(result.data)) {
+            setAnnouncements(result.data);
+            setTotalPages(1);
+          } else if (result.data.announcements) {
+            setAnnouncements(result.data.announcements);
+            setTotalPages(result.data.pagination?.totalPages || 1);
+          } else {
+            setAnnouncements([]);
+            setTotalPages(1);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load announcements:', error);
@@ -318,14 +330,37 @@ export function BaseAnnouncementPage() {
             
             <div className="p-6">
               {selectedAnnouncement.content_type === 'html' ? (
-                <div 
-                  className="prose prose-lg max-w-none"
-                  dangerouslySetInnerHTML={{ __html: selectedAnnouncement.content }}
-                  style={{
-                    wordBreak: 'break-word',
-                    lineHeight: '1.8'
-                  }}
-                />
+                <>
+                  <div 
+                    className="prose prose-lg max-w-none announcement-content"
+                    dangerouslySetInnerHTML={{ __html: selectedAnnouncement.content }}
+                    style={{
+                      wordBreak: 'break-word',
+                      lineHeight: '1.8'
+                    }}
+                  />
+                  <style>{`
+                    .announcement-content img {
+                      max-width: 100% !important;
+                      height: auto !important;
+                      display: block;
+                      margin: 10px auto;
+                    }
+                    .announcement-content table {
+                      max-width: 100% !important;
+                      width: auto !important;
+                      display: block;
+                      overflow-x: auto;
+                    }
+                    .announcement-content iframe {
+                      max-width: 100% !important;
+                    }
+                    .announcement-content * {
+                      max-width: 100% !important;
+                      word-wrap: break-word;
+                    }
+                  `}</style>
+                </>
               ) : (
                 <div className="prose prose-lg max-w-none whitespace-pre-wrap">
                   {selectedAnnouncement.content}

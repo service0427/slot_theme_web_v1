@@ -53,8 +53,8 @@ export function BaseProfilePage({
         setMessage({ type: 'error', text: '새 비밀번호가 일치하지 않습니다.' });
         return;
       }
-      if (formData.newPassword.length < 6) {
-        setMessage({ type: 'error', text: '비밀번호는 최소 6자 이상이어야 합니다.' });
+      if (formData.newPassword.length < 4) {
+        setMessage({ type: 'error', text: '비밀번호는 최소 4자 이상이어야 합니다.' });
         return;
       }
       if (!formData.currentPassword) {
@@ -188,7 +188,7 @@ export function BaseProfilePage({
                   type="password"
                   value={formData.newPassword}
                   onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                  placeholder="최소 6자 이상"
+                  placeholder="최소 4자 이상"
                   className={inputClassName}
                 />
               </div>

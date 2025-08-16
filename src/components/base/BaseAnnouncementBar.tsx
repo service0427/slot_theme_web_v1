@@ -201,10 +201,30 @@ export function BaseAnnouncementBar({
 
             <div className="p-6">
               {selectedAnnouncement.content_type === 'html' ? (
-                <div 
-                  className="prose prose-lg max-w-none"
-                  dangerouslySetInnerHTML={{ __html: selectedAnnouncement.content }}
-                />
+                <>
+                  <div 
+                    className="prose prose-lg max-w-none announcement-modal-content"
+                    dangerouslySetInnerHTML={{ __html: selectedAnnouncement.content }}
+                  />
+                  <style>{`
+                    .announcement-modal-content img {
+                      max-width: 100% !important;
+                      height: auto !important;
+                      display: block;
+                      margin: 10px auto;
+                    }
+                    .announcement-modal-content table {
+                      max-width: 100% !important;
+                      width: auto !important;
+                      display: block;
+                      overflow-x: auto;
+                    }
+                    .announcement-modal-content * {
+                      max-width: 100% !important;
+                      word-wrap: break-word;
+                    }
+                  `}</style>
+                </>
               ) : (
                 <div className="prose prose-lg max-w-none whitespace-pre-wrap">
                   {selectedAnnouncement.content}

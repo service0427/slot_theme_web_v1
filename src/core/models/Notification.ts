@@ -48,7 +48,7 @@ export interface CreateNotificationDto {
   type: NotificationType;
   title: string;
   message: string;
-  recipientId: string | 'all';
+  recipientId: string | string[] | 'all';  // 배열도 허용
   sender?: NotificationSender | string; // 발송자 정보 추가
   autoClose?: boolean;
   duration?: number;

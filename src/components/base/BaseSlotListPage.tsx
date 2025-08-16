@@ -418,7 +418,7 @@ export function BaseSlotListPage({
   const [showBulkRegistrationModal, setShowBulkRegistrationModal] = useState(false);
   const [viewType, setViewType] = useState<ViewType>('list');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(12);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
@@ -1052,6 +1052,9 @@ export function BaseSlotListPage({
                         <th className="w-12 px-1 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           번호
                         </th>
+                        <th className="w-20 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          썸네일
+                        </th>
                         {/* 관리자가 설정한 필드들 */}
                         {fieldConfigs.map((field, index) => (
                           <th 
@@ -1158,6 +1161,7 @@ export function BaseSlotListPage({
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">번호</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">썸네일</th>
                     {/* 관리자가 설정한 필드들 */}
                     {fieldConfigs.map(field => (
                       <th key={field.field_key} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -1196,6 +1200,18 @@ export function BaseSlotListPage({
           {/* 페이징 */}
           {totalPages > 1 && (
             <div className={styles.pagination.container}>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={10}>10개씩</option>
+                <option value={50}>50개씩</option>
+                <option value={100}>100개씩</option>
+              </select>
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}

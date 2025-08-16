@@ -102,9 +102,9 @@ export const createNotification = async (req: Request, res: Response) => {
 
         // 모든 활성 사용자에게 실시간 알림 전송
         if (io) {
-          // 모든 사용자 조회하여 실시간 알림 전송
+          // 모든 사용자 조회하여 실시간 알림 전송 (운영자와 개발자 제외)
           const usersResult = await pool.query(
-            "SELECT id FROM users WHERE role != 'operator'",
+            "SELECT id FROM users WHERE role NOT IN ('operator', 'developer')",
             []
           );
           
@@ -187,9 +187,9 @@ export const getNotifications = async (req: Request, res: Response) => {
     console.log('[getNotifications] userId:', userId);
     const { type, isRead, limit = 50, offset = 0 } = req.query;
 
-    // 운영자는 알림을 받지 않음
+    // 운영자와 개발자는 알림을 받지 않음
     const userRole = (req as any).user?.role;
-    if (userRole === 'operator') {
+    if (userRole === 'operator' || userRole === 'developer') {
       return res.json({
         success: true,
         notifications: []

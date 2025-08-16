@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSlotContext } from '@/adapters/react/hooks/useSlotContext';
 import { useCashContext } from '@/adapters/react/hooks/useCashContext';
+import { useAuthContext } from '@/adapters/react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 
@@ -39,7 +40,7 @@ const defaultStyles: AdminDashboardStyles = {
     title: "text-3xl font-bold mb-2",
     description: "text-gray-600"
   },
-  grid: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+  grid: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4",
   card: {
     container: "bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow",
     iconContainer: "p-3 rounded-lg",
@@ -56,10 +57,13 @@ const defaultStyles: AdminDashboardStyles = {
 };
 
 export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDashboardPageProps) {
+  const { user } = useAuthContext();
   const { config } = useConfig();
   const { loadPendingSlotCount, loadAllSlots } = useSlotContext();
   const cashContext = config.useCashSystem ? useCashContext() : null;
   const { getSetting } = useSystemSettings();
+  const chatEnabled = getSetting('chatEnabled', 'feature');
+  const notificationEnabled = getSetting('notificationEnabled', 'feature');
   const [slotStats, setSlotStats] = useState({
     empty: 0,
     pending: 0,
@@ -163,6 +167,7 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
           <h3 className={styles.card.title}>슬롯 관리</h3>
           <div className={styles.card.description}>
             <div className="space-y-1">
+              <div className="font-semibold text-gray-800">• 총 슬롯: {slotStats.empty + slotStats.pending + slotStats.waiting + slotStats.active + slotStats.completed + slotStats.paused + slotStats.rejected}개</div>
               {slotStats.empty > 0 && <div>• 입력 대기: {slotStats.empty}개</div>}
               {slotStats.pending > 0 && <div>• 승인 대기: {slotStats.pending}개</div>}
               {slotStats.waiting > 0 && <div>• 대기중: {slotStats.waiting}개</div>}
@@ -218,10 +223,11 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
         </Link>
 
         {/* 채팅 관리 카드 */}
-        <Link
-          to="/admin/chat"
-          className={styles.card.container}
-        >
+        {chatEnabled && (
+          <Link
+            to="/admin/chat"
+            className={styles.card.container}
+          >
           <div className="flex items-center justify-between mb-4">
             <div className={`${styles.card.iconContainer} bg-indigo-100`}>
               <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,9 +239,11 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
           <p className={styles.card.description}>
             사용자 1:1 문의 관리
           </p>
-        </Link>
+          </Link>
+        )}
 
         {/* 시스템 설정 카드 */}
+        {user?.role === 'developer' && (
         <Link
           to="/admin/settings"
           className={styles.card.container}
@@ -251,6 +259,45 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
           <p className={styles.card.description}>
             사이트 설정 및 환경 관리
           </p>
+          </Link>
+        )}
+
+        {/* 알림 발송 카드 */}
+        {notificationEnabled && (
+          <Link
+            to="/admin/notifications"
+            className={styles.card.container}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className={`${styles.card.iconContainer} bg-yellow-100`}>
+                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              </div>
+            </div>
+            <h3 className={styles.card.title}>알림 발송</h3>
+            <p className={styles.card.description}>
+              사용자에게 알림 전송
+            </p>
+          </Link>
+        )}
+
+        {/* 공지사항 관리 카드 */}
+        <Link
+          to="/admin/announcements"
+          className={styles.card.container}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className={`${styles.card.iconContainer} bg-teal-100`}>
+              <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+              </svg>
+            </div>
+          </div>
+          <h3 className={styles.card.title}>공지사항 관리</h3>
+          <p className={styles.card.description}>
+            공지사항 등록 및 관리
+          </p>
         </Link>
       </div>
 
@@ -262,7 +309,7 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
             to="/admin/slots"
             className={`${styles.quickActions.button} bg-blue-600 hover:bg-blue-700`}
           >
-            슬롯 승인 관리
+            슬롯 관리
           </Link>
           {config.useCashSystem && (
             <Link
@@ -278,18 +325,36 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
           >
             사용자 관리
           </Link>
+          {chatEnabled && (
+            <Link
+              to="/admin/chat"
+              className={`${styles.quickActions.button} bg-indigo-600 hover:bg-indigo-700`}
+            >
+              채팅 관리
+            </Link>
+          )}
+          {notificationEnabled && (
+            <Link
+              to="/admin/notifications"
+              className={`${styles.quickActions.button} bg-yellow-600 hover:bg-yellow-700`}
+            >
+              알림 발송
+            </Link>
+          )}
           <Link
-            to="/admin/chat"
-            className={`${styles.quickActions.button} bg-indigo-600 hover:bg-indigo-700`}
+            to="/admin/announcements"
+            className={`${styles.quickActions.button} bg-teal-600 hover:bg-teal-700`}
           >
-            채팅 관리
+            공지사항 관리
           </Link>
-          <Link
+          {user?.role === 'developer' && (
+            <Link
             to="/admin/settings"
             className={`${styles.quickActions.button} bg-orange-600 hover:bg-orange-700`}
             >
-            시스템 설정
-          </Link>
+              시스템 설정
+            </Link>
+          )}
         </div>
       </div>
     </div>

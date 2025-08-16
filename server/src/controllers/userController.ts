@@ -24,6 +24,9 @@ export async function getUsers(req: AuthRequest, res: Response) {
     const params: any[] = [];
     let paramIndex = 1;
     
+    // 운영자와 개발자는 리스트에서 제외 (일반 사용자만 표시)
+    query += ` AND role NOT IN ('operator', 'developer')`;
+    
     // 현재 로그인한 관리자 제외
     if (currentUserId) {
       query += ` AND id != $${paramIndex}`;
@@ -69,6 +72,9 @@ export async function getUsers(req: AuthRequest, res: Response) {
     
     const countParams: any[] = [];
     let countParamIndex = 1;
+    
+    // 운영자와 개발자는 카운트에서도 제외 (일반 사용자만 카운트)
+    countQuery += ` AND role NOT IN ('operator', 'developer')`;
     
     // 현재 로그인한 관리자 제외
     if (currentUserId) {

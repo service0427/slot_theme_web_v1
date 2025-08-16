@@ -105,7 +105,7 @@ function AppContent() {
       
       <Route path="/" element={
         auth.isAuthenticated ? 
-          <Navigate to={auth.user?.role === 'operator' ? '/admin' : '/slots'} replace /> :
+          <Navigate to={(auth.user?.role === 'operator' || auth.user?.role === 'developer') ? '/admin' : '/slots'} replace /> :
           <Navigate to="/login" replace />
       } />
     </Routes>

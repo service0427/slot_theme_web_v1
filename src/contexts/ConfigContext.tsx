@@ -58,7 +58,7 @@ const defaultConfig: SiteConfig = {
     ],
     admin: [
       { id: 'admin-dashboard', label: '관리자 대시보드', path: '/admin', visible: true },
-      { id: 'slot-approve', label: '슬롯 승인', path: '/admin/slots', visible: true },
+      { id: 'slot-approve', label: '슬롯 관리', path: '/admin/slots', visible: true },
       { id: 'cash-approve', label: '캐시 승인', path: '/admin/cash', visible: true },
       { id: 'user-manage', label: '사용자 관리', path: '/admin/users', visible: true },
       { id: 'chat-manage', label: '채팅 관리', path: '/admin/chat', visible: loadChatConfig().enabled },

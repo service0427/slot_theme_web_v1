@@ -10,9 +10,9 @@ import { authenticateToken, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-// 모든 사용자 관리 라우트는 인증 필요 + operator 권한 필요
+// 모든 사용자 관리 라우트는 인증 필요 + operator 또는 developer 권한 필요
 router.use(authenticateToken);
-router.use(requireRole(['operator']));
+router.use(requireRole(['operator', 'developer']));
 
 // 사용자 목록 조회 (검색, 필터, 페이지네이션)
 router.get('/', getUsers);

@@ -44,14 +44,14 @@ export function requireRole(roles: string[]) {
   };
 }
 
-// 운영자 권한 체크 미들웨어
+// 운영자 또는 개발자 권한 체크 미들웨어
 export function isOperator(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ error: '인증이 필요합니다.' });
   }
 
-  if (req.user.role !== 'operator') {
-    return res.status(403).json({ error: '운영자 권한이 필요합니다.' });
+  if (req.user.role !== 'operator' && req.user.role !== 'developer') {
+    return res.status(403).json({ error: '운영자 또는 개발자 권한이 필요합니다.' });
   }
 
   next();

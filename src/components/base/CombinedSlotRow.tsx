@@ -341,6 +341,24 @@ function CombinedSlotRowComponent({
         #{slot.slot_number || slot.seq || slotIndex + 1}
       </td>
       
+      {/* 썸네일 */}
+      <td className="px-3 py-4 text-center border-r">
+        {slot.thumbnail ? (
+          <img 
+            src={slot.thumbnail} 
+            alt="썸네일" 
+            className="w-12 h-12 object-cover rounded mx-auto"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextSibling?.classList.remove('hidden');
+            }}
+          />
+        ) : (
+          <span className="text-gray-400 text-sm">-</span>
+        )}
+        <span className="text-gray-400 text-sm hidden">-</span>
+      </td>
+      
       {/* 동적 필드들 */}
       {fieldConfigs.map((field, fieldIndex) => {
         // URL 파싱 필드들은 읽기 전용
@@ -406,8 +424,29 @@ function CombinedSlotRowComponent({
       })}
       
       {/* 시스템 필드들 */}
-      <td className="px-3 py-4 text-center border-r text-gray-400 text-sm">
-        {slot.rank || '-'}
+      <td className="px-3 py-4 text-center border-r text-sm">
+        {slot.rank ? (
+          <div className="flex items-center justify-center gap-1">
+            <span className="font-semibold text-gray-900">{slot.rank}</span>
+            {slot.first_rank && (
+              <span className={`text-xs ${
+                slot.first_rank > slot.rank 
+                  ? 'text-green-600' 
+                  : slot.first_rank < slot.rank 
+                    ? 'text-red-600' 
+                    : 'text-gray-500'
+              }`}>
+                {slot.first_rank > slot.rank 
+                  ? `(▲${slot.first_rank - slot.rank})` 
+                  : slot.first_rank < slot.rank 
+                    ? `(▼${slot.rank - slot.first_rank})` 
+                    : '(-)'}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )}
       </td>
       <td className="px-3 py-4 text-center border-r text-gray-400 text-sm">
         {slot.startDate ? new Date(slot.startDate).toLocaleDateString('ko-KR', {

@@ -53,6 +53,7 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
   const { user, logout } = useAuthContext();
   const { config } = useEnhancedConfig();
   const { currentTheme, getSetting } = useSystemSettings();
+  const chatEnabled = getSetting('chatEnabled', 'feature');
   
   // Hook은 항상 호출되어야 함 - 조건부로 호출하지 않음
   const cashContext = useCashContext();
@@ -119,8 +120,8 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
             .filter(menu => {
               // 알림 테스트 메뉴 제거
               if (menu.id === 'notification-test') return false;
-              // 관리자는 공지사항 메뉴 숨김 (공지사항 관리만 표시)
-              if (user?.role === 'operator' && menu.id === 'announcements') return false;
+              // 관리자/개발자는 공지사항 메뉴 숨김 (공지사항 관리만 표시)
+              if ((user?.role === 'operator' || user?.role === 'developer') && menu.id === 'announcements') return false;
               return menu.visible;
             })
             .map(menu => (
@@ -140,8 +141,8 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
               </li>
             ))}
           
-          {/* 관리자 메뉴 */}
-          {user?.role === 'operator' && (
+          {/* 관리자/개발자 메뉴 */}
+          {(user?.role === 'operator' || user?.role === 'developer') && (
             <>
               <li className="pt-4">
                 <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
@@ -152,6 +153,10 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
                 .filter(menu => {
                   // 알림 테스트 메뉴 제거
                   if (menu.id === 'admin-notification-test') return false;
+                  // 운영자는 시스템 설정 메뉴 제거
+                  if (user?.role === 'operator' && menu.id === 'system-settings') return false;
+                  // 채팅 기능 비활성화시 채팅 관리 메뉴 제거
+                  if (!chatEnabled && menu.id === 'chat-manage') return false;
                   return menu.visible;
                 })
                 .map(menu => (
