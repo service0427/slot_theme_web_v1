@@ -261,11 +261,14 @@ export async function createSlot(req: AuthRequest, res: Response) {
     );
     const nextSeq = seqResult.rows[0].next_seq;
 
+    // keyword에서 모든 공백 제거 (앞, 중간, 뒤)
+    const trimKeyword = keyword.replace(/\s+/g, '');
+
     const result = await pool.query(
-      `INSERT INTO slots (user_id, seq, keyword, url, mid, daily_budget)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO slots (user_id, seq, keyword, trim_keyword, url, mid, daily_budget)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [userId, nextSeq, keyword, url, mid, dailyBudget || 0]
+      [userId, nextSeq, keyword, trimKeyword, url, mid, dailyBudget || 0]
     );
 
     res.status(201).json({
@@ -517,6 +520,10 @@ export async function updateSlot(req: AuthRequest, res: Response) {
     if (keyword !== undefined) {
       updates.push(`keyword = $${paramIndex++}`);
       values.push(keyword);
+      // keyword가 변경되면 trim_keyword도 함께 업데이트
+      const trimKeyword = keyword.replace(/\s+/g, '');
+      updates.push(`trim_keyword = $${paramIndex++}`);
+      values.push(trimKeyword);
     }
     if (url !== undefined) {
       updates.push(`url = $${paramIndex++}`);
@@ -888,15 +895,19 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
         }
       }
 
+      // keyword가 있으면 trim_keyword도 계산
+      const trimKeywordValue = keywordValue ? keywordValue.replace(/\s+/g, '') : '';
+
       // slots 테이블의 기본 필드도 업데이트
       await client.query(
         `UPDATE slots 
          SET url = $2,
              keyword = $3,
-             mid = $4,
+             trim_keyword = $4,
+             mid = $5,
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $1`,
-        [id, urlValue, keywordValue, midValue]
+        [id, urlValue, keywordValue, trimKeywordValue, midValue]
       );
 
       await client.query('COMMIT');
@@ -1085,6 +1096,8 @@ export async function fillEmptySlot(req: AuthRequest, res: Response) {
     // 선슬롯발행 모드에서는 자동 승인 (active), 일반 모드에서는 대기(pending)
     const newStatus = slotOperationMode === 'pre-allocation' ? 'active' : 'pending';
     
+    // keyword에서 모든 공백 제거
+    const trimKeywordValue = keywordValue ? keywordValue.replace(/\s+/g, '') : '';
     
     // 슬롯 상태 및 기본 필드 업데이트
     const updateResult = await pool.query(
@@ -1093,12 +1106,13 @@ export async function fillEmptySlot(req: AuthRequest, res: Response) {
            status = $6::varchar,
            url = $3,
            keyword = $4,
+           trim_keyword = $7,
            mid = $5,
            updated_at = CURRENT_TIMESTAMP,
-           approved_at = CASE WHEN $7::varchar = 'active' THEN CURRENT_TIMESTAMP ELSE approved_at END
+           approved_at = CASE WHEN $8::varchar = 'active' THEN CURRENT_TIMESTAMP ELSE approved_at END
        WHERE id = $1 AND user_id = $2
        RETURNING *`,
-      [id, userId, urlValue, keywordValue, midValue, newStatus, newStatus]
+      [id, userId, urlValue, keywordValue, midValue, newStatus, trimKeywordValue, newStatus]
     );
 
     // 빈 슬롯 채우기 로그 기록
