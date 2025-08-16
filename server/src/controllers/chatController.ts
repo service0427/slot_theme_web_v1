@@ -193,7 +193,7 @@ export const getChatMessages = async (req: AuthRequest, res: Response) => {
       [roomId, userId]
     );
 
-    if (participantCheck.rows.length === 0 && req.user?.role !== 'operator') {
+    if (participantCheck.rows.length === 0 && req.user?.role !== 'operator' && req.user?.role !== 'developer') {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -381,9 +381,9 @@ export const closeChatRoom = async (req: AuthRequest, res: Response) => {
   const userRole = req.user?.role;
 
   try {
-    // 권한 확인 (운영자만 가능)
-    if (userRole !== 'operator') {
-      return res.status(403).json({ error: 'Only operators can close chat rooms' });
+    // 권한 확인 (운영자/개발자만 가능)
+    if (userRole !== 'operator' && userRole !== 'developer') {
+      return res.status(403).json({ error: 'Only operators or developers can close chat rooms' });
     }
 
     await pool.query(

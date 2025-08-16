@@ -13,12 +13,12 @@ export const createNotification = async (req: Request, res: Response) => {
     console.log('[createNotification] Request body:', req.body);
     console.log('[createNotification] User:', (req as any).user);
     
-    // 관리자 권한 체크
+    // 관리자/개발자 권한 체크
     const userRole = (req as any).user?.role;
-    if (userRole !== 'operator') {
+    if (userRole !== 'operator' && userRole !== 'developer') {
       return res.status(403).json({
         success: false,
-        error: '관리자만 알림을 발송할 수 있습니다.'
+        error: '관리자 또는 개발자만 알림을 발송할 수 있습니다.'
       });
     }
     
@@ -523,8 +523,8 @@ export const getAllNotifications = async (req: Request, res: Response) => {
   try {
     const userRole = (req as any).user.role;
     
-    // 관리자만 접근 가능
-    if (userRole !== 'operator') {
+    // 관리자/개발자만 접근 가능
+    if (userRole !== 'operator' && userRole !== 'developer') {
       return res.status(403).json({
         success: false,
         error: '권한이 없습니다.'

@@ -344,7 +344,7 @@ export async function updateSlotStatus(req: AuthRequest, res: Response) {
     await logSlotChange(
       id,
       userId!,
-      status === 'refunded' ? 'refund' : 'status_change',
+      'status_change',
       'status',
       slot.status, // 이전 상태
       status, // 새로운 상태
@@ -1215,8 +1215,8 @@ export async function getSlotChangeLogs(req: AuthRequest, res: Response) {
 
     const slotOwner = slotResult.rows[0].user_id;
     
-    // 권한 확인 (관리자 또는 슬롯 소유자만 가능)
-    if (userRole !== 'operator' && slotOwner !== userId) {
+    // 권한 확인 (관리자/개발자 또는 슬롯 소유자만 가능)
+    if (userRole !== 'operator' && userRole !== 'developer' && slotOwner !== userId) {
       return res.status(403).json({
         success: false,
         error: '권한이 없습니다.'

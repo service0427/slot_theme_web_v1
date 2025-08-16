@@ -164,11 +164,11 @@ export const createAnnouncement = async (req: Request, res: Response) => {
     
     const user = (req as any).user;
     
-    // 관리자 권한 체크
-    if (user?.role !== 'operator') {
+    // 관리자/개발자 권한 체크
+    if (user?.role !== 'operator' && user?.role !== 'developer') {
       return res.status(403).json({
         success: false,
-        error: '관리자만 공지사항을 작성할 수 있습니다.'
+        error: '관리자 또는 개발자만 공지사항을 작성할 수 있습니다.'
       });
     }
     
@@ -241,11 +241,11 @@ export const updateAnnouncement = async (req: Request, res: Response) => {
     const user = (req as any).user;
     const { id } = req.params;
     
-    // 관리자 권한 체크
-    if (user?.role !== 'operator') {
+    // 관리자/개발자 권한 체크
+    if (user?.role !== 'operator' && user?.role !== 'developer') {
       return res.status(403).json({
         success: false,
-        error: '관리자만 공지사항을 수정할 수 있습니다.'
+        error: '관리자 또는 개발자만 공지사항을 수정할 수 있습니다.'
       });
     }
     
@@ -305,11 +305,11 @@ export const deleteAnnouncement = async (req: Request, res: Response) => {
     const user = (req as any).user;
     const { id } = req.params;
     
-    // 관리자 권한 체크
-    if (user?.role !== 'operator') {
+    // 관리자/개발자 권한 체크
+    if (user?.role !== 'operator' && user?.role !== 'developer') {
       return res.status(403).json({
         success: false,
-        error: '관리자만 공지사항을 삭제할 수 있습니다.'
+        error: '관리자 또는 개발자만 공지사항을 삭제할 수 있습니다.'
       });
     }
     

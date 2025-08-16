@@ -46,11 +46,11 @@ export const handleImageUpload = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     
-    // 관리자 권한 체크
-    if (user?.role !== 'operator') {
+    // 관리자/개발자 권한 체크
+    if (user?.role !== 'operator' && user?.role !== 'developer') {
       return res.status(403).json({
         success: false,
-        error: '관리자만 이미지를 업로드할 수 있습니다.'
+        error: '관리자 또는 개발자만 이미지를 업로드할 수 있습니다.'
       });
     }
 
