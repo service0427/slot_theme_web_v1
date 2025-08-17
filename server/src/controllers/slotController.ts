@@ -97,7 +97,7 @@ export async function getSlots(req: AuthRequest, res: Response) {
       params.push(queryUserId);
       countParams.push(queryUserId);
       query = `
-        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price
+        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price, s.product_name, s.thumbnail, s.rank, s.first_rank
         FROM slots s
         JOIN users u ON s.user_id = u.id
         WHERE s.user_id = $1
@@ -107,7 +107,7 @@ export async function getSlots(req: AuthRequest, res: Response) {
     // 관리자/개발자가 모든 슬롯 조회
     else if (userRole === 'operator' || userRole === 'developer') {
       query = `
-        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price
+        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price, s.product_name, s.thumbnail, s.rank, s.first_rank
         FROM slots s
         JOIN users u ON s.user_id = u.id
         WHERE 1=1
@@ -119,7 +119,7 @@ export async function getSlots(req: AuthRequest, res: Response) {
       params.push(userId);
       countParams.push(userId);
       query = `
-        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price
+        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price, s.product_name, s.thumbnail, s.rank, s.first_rank
         FROM slots s
         JOIN users u ON s.user_id = u.id
         WHERE s.user_id = $1
@@ -214,6 +214,16 @@ export async function getSlots(req: AuthRequest, res: Response) {
       // 각 슬롯에 field_values 할당
       slots.forEach(slot => {
         slot.fieldValues = fieldValuesBySlot[slot.id] || [];
+      });
+    }
+
+    // 일반 사용자인 경우 파싱 데이터 제거
+    if (userRole !== 'operator' && userRole !== 'developer') {
+      slots.forEach(slot => {
+        // 파싱된 URL 관련 필드 제거
+        delete slot.url_product_id;
+        delete slot.url_item_id;
+        delete slot.url_vendor_item_id;
       });
     }
 

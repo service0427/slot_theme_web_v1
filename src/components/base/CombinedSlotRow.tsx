@@ -316,6 +316,10 @@ function CombinedSlotRowComponent({
 
   // 슬롯 필드 값 가져오기 (사용 중 슬롯용)
   const getFieldValue = (fieldKey: string) => {
+    // product_name은 slots 테이블에서 직접 가져오기
+    if (fieldKey === 'product_name') {
+      return slot.product_name || '';
+    }
     
     // slot_field_values에서 먼저 찾기
     if (slot.fieldValues) {
@@ -366,7 +370,7 @@ function CombinedSlotRowComponent({
         const isUrlField = field.field_key === 'url' || field.field_key === 'landingUrl';
         
         return (
-          <td key={field.field_key} className={`${isReadOnlyField ? 'px-1 py-2' : 'px-3 py-2'} ${fieldIndex < fieldConfigs.length - 1 ? 'border-r' : ''}`}>
+          <td key={field.field_key} className={`${isReadOnlyField ? 'px-1 py-2' : 'px-3 py-2'} border-r`}>
             {canEdit && !isReadOnlyField ? (
               <div className="relative">
                 <div className="flex items-center gap-1">
@@ -415,13 +419,48 @@ function CombinedSlotRowComponent({
                 )}
               </div>
             ) : (
-              <div className={`text-gray-900 truncate ${isReadOnlyField ? 'text-xs' : 'text-sm'}`} title={getFieldValue(field.field_key) || ''}>
-                {getFieldValue(field.field_key) || '-'}
+              <div className="flex items-center gap-1">
+                <div className={`flex-1 text-gray-900 truncate ${isReadOnlyField ? 'text-xs' : 'text-sm'}`} title={getFieldValue(field.field_key) || ''}>
+                  {getFieldValue(field.field_key) || '-'}
+                </div>
+                {/* URL 필드인 경우 모니터 아이콘 추가 (읽기 전용 상태에서도) */}
+                {isUrlField && getFieldValue(field.field_key)?.trim() && (
+                  <button
+                    onClick={() => {
+                      const url = getFieldValue(field.field_key) || '';
+                      if (url.trim()) {
+                        const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+                        const windowId = 'slot-preview-popup';
+                        
+                        // 기존 창이 있으면 닫고 새로 열기
+                        if (window[windowId] && !window[windowId].closed) {
+                          window[windowId].close();
+                        }
+                        
+                        window[windowId] = window.open(fullUrl, windowId, 'width=700,height=800');
+                      }
+                    }}
+                    className="text-blue-600 hover:text-blue-800 transition-colors p-1"
+                    title={`${getFieldValue(field.field_key)} 새 창에서 열기`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                )}
               </div>
             )}
           </td>
         );
       })}
+      
+      {/* 상품명 (읽기 전용) */}
+      <td className="px-3 py-4 border-r">
+        <div className="text-sm text-gray-900">
+          {slot.product_name || '-'}
+        </div>
+      </td>
       
       {/* 시스템 필드들 */}
       <td className="px-3 py-4 text-center border-r text-sm">

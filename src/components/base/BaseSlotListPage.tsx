@@ -259,27 +259,32 @@ function EmptySlotRow({ slot, slotIndex, fieldConfigs, onSave, onBulkPaste, allE
       
       {/* 동적 필드들 */}
       {fieldConfigs.map((field, fieldIndex) => (
-        <td key={field.field_key} className={`px-3 py-2 ${fieldIndex < fieldConfigs.length - 1 ? 'border-r' : ''}`}>
-          <div className="relative">
-            <input
-              type="text"
-              value={formData[field.field_key] || ''}
-              onChange={(e) => handleFieldChange(field.field_key, e.target.value)}
-              onPaste={(e) => handlePaste(e, field.field_key)}
-              onKeyDown={(e) => handleKeyDown(e, fieldIndex)}
-              placeholder={field.placeholder || `${field.label} 입력`}
-              data-field-index={fieldIndex}
-              className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                errors[field.field_key] ? 'border-red-500 bg-red-50' : 'border-gray-300'
-              }`}
-              title={`${field.label} - Ctrl+V로 Excel 데이터를 붙여넣을 수 있습니다`}
-            />
-            {errors[field.field_key] && (
-              <div className="absolute top-full left-0 mt-1 text-xs text-red-600 whitespace-nowrap z-10">
-                {errors[field.field_key]}
-              </div>
-            )}
-          </div>
+        <td key={field.field_key} className={`px-3 py-2 border-r`}>
+          {/* product_name은 읽기 전용으로 표시 */}
+          {field.field_key === 'product_name' ? (
+            <div className="text-sm text-gray-500">-</div>
+          ) : (
+            <div className="relative">
+              <input
+                type="text"
+                value={formData[field.field_key] || ''}
+                onChange={(e) => handleFieldChange(field.field_key, e.target.value)}
+                onPaste={(e) => handlePaste(e, field.field_key)}
+                onKeyDown={(e) => handleKeyDown(e, fieldIndex)}
+                placeholder={field.placeholder || `${field.label} 입력`}
+                data-field-index={fieldIndex}
+                className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  errors[field.field_key] ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                }`}
+                title={`${field.label} - Ctrl+V로 Excel 데이터를 붙여넣을 수 있습니다`}
+              />
+              {errors[field.field_key] && (
+                <div className="absolute top-full left-0 mt-1 text-xs text-red-600 whitespace-nowrap z-10">
+                  {errors[field.field_key]}
+                </div>
+              )}
+            </div>
+          )}
         </td>
       ))}
       
@@ -479,46 +484,8 @@ export function BaseSlotListPage({
         .filter(field => field.is_enabled && field.show_in_list)
         .sort((a, b) => a.display_order - b.display_order);
       
-      // URL 파싱 필드들을 하드코딩으로 추가 (시스템 자동 생성 필드)
-      const urlParsingFields: FieldConfig[] = [
-        {
-          field_key: 'url_product_id',
-          label: '상품ID',
-          field_type: 'text',
-          is_required: false,
-          is_enabled: true,
-          show_in_list: true,
-          is_searchable: false,
-          display_order: 100,
-          is_system_generated: true
-        },
-        {
-          field_key: 'url_item_id',
-          label: '아이템ID',
-          field_type: 'text',
-          is_required: false,
-          is_enabled: true,
-          show_in_list: true,
-          is_searchable: false,
-          display_order: 101,
-          is_system_generated: true
-        },
-        {
-          field_key: 'url_vendor_item_id',
-          label: '판매자ID',
-          field_type: 'text',
-          is_required: false,
-          is_enabled: true,
-          show_in_list: true,
-          is_searchable: false,
-          display_order: 102,
-          is_system_generated: true
-        }
-      ];
-      
-      // 사용자 설정 필드와 URL 파싱 필드 결합
-      const allFields = [...listFields, ...urlParsingFields].sort((a, b) => a.display_order - b.display_order);
-      setFieldConfigs(allFields);
+      // URL 파싱 필드들은 제거 (사용자에게 보이지 않음)
+      setFieldConfigs(listFields);
     } catch (error) {
       console.error('필드 설정 로드 실패:', error);
     } finally {
@@ -1070,6 +1037,10 @@ export function BaseSlotListPage({
                             {field.is_required && <span className="text-red-500 ml-1">*</span>}
                           </th>
                         ))}
+                        {/* 상품명 */}
+                        <th className="w-32 px-3 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          상품명
+                        </th>
                         {/* 시스템 필드들 */}
                         <th className="w-16 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           순위
@@ -1168,6 +1139,8 @@ export function BaseSlotListPage({
                         {field.label}
                       </th>
                     ))}
+                    {/* 상품명 */}
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">상품명</th>
                     {/* 시스템 필드들 */}
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">순위</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">시작일</th>

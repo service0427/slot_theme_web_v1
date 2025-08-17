@@ -40,6 +40,10 @@ export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResum
 
   // 필드 값 가져오기 (fieldValues와 customFields에서 모두 찾기)
   const getFieldValue = (field: FieldConfig, customFields: any) => {
+    // product_name은 slots 테이블의 컬럼에서 직접 가져오기
+    if (field.field_key === 'product_name') {
+      return slot.product_name;
+    }
     // slot.fieldValues에서 먼저 찾기
     if (slot.fieldValues) {
       const fieldValue = slot.fieldValues.find((fv: any) => fv.field_key === field.field_key);
@@ -105,7 +109,7 @@ export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResum
       {fieldConfigs && fieldConfigs.length > 0 ? fieldConfigs.map(field => {
         const value = getFieldValue(field, slot.customFields);
         return (
-          <td key={field.field_key} className="px-4 py-4">
+          <td key={field.field_key} className="px-4 py-4 border-r">
             <div className="text-sm text-gray-900">
               {renderFieldValue(field, value)}
             </div>

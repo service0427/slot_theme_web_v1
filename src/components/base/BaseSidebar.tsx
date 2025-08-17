@@ -29,10 +29,10 @@ const sidebarStyles = {
     userInfo: "space-y-2 text-sm text-gray-700",
     balance: "text-lg font-bold text-violet-600",
     button: "px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-lg hover:from-violet-700 hover:to-indigo-700 w-full shadow-lg",
-    nav: "flex-1 p-4",
-    navItem: "flex items-center px-4 py-3 rounded-xl hover:bg-violet-50 transition-all",
-    navItemActive: "bg-gradient-to-r from-violet-50 to-indigo-50 text-violet-600 font-medium border-l-4 border-violet-600",
-    navItemInactive: "text-gray-600 hover:text-violet-600"
+    nav: "flex-1 p-4 space-y-2",
+    navItem: "flex items-center px-5 py-3.5 rounded-xl hover:bg-violet-50 transition-all duration-200 transform hover:translate-x-1",
+    navItemActive: "bg-gradient-to-r from-violet-500 to-indigo-500 text-white font-semibold shadow-lg shadow-violet-500/30 scale-105 hover:shadow-xl",
+    navItemInactive: "text-gray-600 hover:text-violet-600 hover:shadow-md"
   },
   luxury: {
     container: "w-80 bg-gradient-to-b from-gray-900 via-gray-800 to-black h-full flex flex-col shadow-2xl border-r border-amber-500/20",
@@ -133,9 +133,18 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
                       isActive
                         ? styles.navItemActive
                         : styles.navItemInactive
-                    }`
+                    } ${isActive && theme === 'modern' ? 'relative' : ''}`
                   }
                 >
+                  {theme === 'modern' && (
+                    <span className="mr-3 text-lg">
+                      {menu.id === 'slots' && '📋'}
+                      {menu.id === 'cash' && '💰'}
+                      {menu.id === 'cash-history' && '📊'}
+                      {menu.id === 'ranking' && '🏆'}
+                      {menu.id === 'profile' && '👤'}
+                    </span>
+                  )}
                   {menu.label}
                 </NavLink>
               </li>
@@ -169,9 +178,19 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
                           isActive
                             ? styles.navItemActive
                             : styles.navItemInactive
-                        }`
+                        } ${isActive && theme === 'modern' ? 'relative' : ''}`
                       }
                     >
+                      {theme === 'modern' && (
+                        <span className="mr-3 text-lg">
+                          {menu.id === 'admin-dashboard' && '📈'}
+                          {menu.id === 'admin-slots' && '🎰'}
+                          {menu.id === 'admin-cash-approval' && '💳'}
+                          {menu.id === 'admin-users' && '👥'}
+                          {menu.id === 'admin-settings' && '⚙️'}
+                          {menu.id === 'admin-chat' && '💬'}
+                        </span>
+                      )}
                       {menu.label}
                     </NavLink>
                   </li>

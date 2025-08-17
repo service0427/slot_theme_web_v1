@@ -90,6 +90,9 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).rank = item.rank;
           (slot as any).first_rank = item.first_rank;
           
+          // product_name 추가
+          (slot as any).product_name = item.product_name;
+          
           return slot;
         });
 
@@ -497,6 +500,9 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).thumbnail = item.thumbnail;
           (slot as any).rank = item.rank;
           (slot as any).first_rank = item.first_rank;
+          
+          // product_name 추가
+          (slot as any).product_name = item.product_name;
           
           return slot;
         });
