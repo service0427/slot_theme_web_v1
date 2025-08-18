@@ -64,6 +64,8 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [viewingHistorySlot, setViewingHistorySlot] = useState<string | null>(null);
   const [slotHistory, setSlotHistory] = useState<any[]>([]);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [editingSlot, setEditingSlot] = useState<UserSlot | null>(null);
+  const [editFormData, setEditFormData] = useState<Record<string, string>>({});
 
   // 기본 스타일
   const defaultTheme: AdminSlotApprovalThemeProps = {
@@ -382,6 +384,57 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
       // 완료 처리 후 리스트에서 제거
       setAllSlots(prev => prev.filter(s => s.id !== slotId));
       setPendingSlots(prev => prev.filter(s => s.id !== slotId));
+    }
+  };
+
+  // 슬롯 수정 핸들러
+  const handleEditSlot = (slot: UserSlot) => {
+    const formData: Record<string, string> = {};
+    
+    // fieldConfigs 기반으로 초기값 설정
+    fieldConfigs.forEach(field => {
+      const value = getSlotFieldValue(slot, field.field_key);
+      formData[field.field_key] = value || '';
+    });
+    
+    setEditFormData(formData);
+    setEditingSlot(slot);
+  };
+
+  // 슬롯 수정 저장
+  const handleSaveEdit = async () => {
+    if (!editingSlot) return;
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      
+      const response = await fetch(`${API_BASE_URL}/slots/${editingSlot.id}/update-fields`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          customFields: editFormData
+        })
+      });
+
+      if (response.ok) {
+        alert('슬롯이 수정되었습니다.');
+        // 수정 후 리스트 새로고침
+        const slots = await loadAllSlots(statusFilter === 'all' ? undefined : statusFilter);
+        setAllSlots(slots);
+        setPendingSlots(slots);
+        setEditingSlot(null);
+        setEditFormData({});
+      } else {
+        const error = await response.json();
+        alert(error.error || '슬롯 수정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('슬롯 수정 오류:', error);
+      alert('슬롯 수정 중 오류가 발생했습니다.');
     }
   };
 
@@ -862,6 +915,13 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       {slot.status === 'pending' && (
                         <>
                           <button
+                            onClick={() => handleEditSlot(slot)}
+                            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                            title="수정"
+                          >
+                            수정
+                          </button>
+                          <button
                             onClick={() => handleApprove(slot.id)}
                             className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
                             title="승인"
@@ -879,6 +939,13 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       )}
                       {(slot.status === 'active' || slot.status === 'paused') && (
                         <>
+                          <button
+                            onClick={() => handleEditSlot(slot)}
+                            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                            title="수정"
+                          >
+                            수정
+                          </button>
                           <button
                             onClick={() => setRefundingSlot(slot.id)}
                             className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
@@ -1455,6 +1522,78 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 className={mergedTheme.modalButtonClass}
               >
                 승인하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 슬롯 수정 모달 */}
+      {editingSlot && (
+        <div className={mergedTheme.modalContainerClass}>
+          <div className={mergedTheme.modalClass}>
+            <h3 className={mergedTheme.modalTitleClass}>
+              슬롯 수정 - #{editingSlot.customFields.seq || editingSlot.id.substring(0, 8)}
+            </h3>
+            
+            {/* 사용자 정보 (읽기 전용) */}
+            <div className="mb-4 p-3 bg-gray-50 rounded">
+              <div className="text-sm text-gray-600">
+                <div>사용자: {editingSlot.userName || '이름 없음'} ({editingSlot.userEmail})</div>
+                <div>생성일: {new Date(editingSlot.createdAt).toLocaleString('ko-KR')}</div>
+              </div>
+            </div>
+            
+            {/* 필드 수정 폼 */}
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {fieldConfigs.map(field => (
+                <div key={field.field_key}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {field.label}
+                    {field.is_required && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                  {field.field_type === 'textarea' ? (
+                    <textarea
+                      value={editFormData[field.field_key] || ''}
+                      onChange={(e) => setEditFormData(prev => ({
+                        ...prev,
+                        [field.field_key]: e.target.value
+                      }))}
+                      className={mergedTheme.modalInputClass}
+                      placeholder={field.placeholder || `${field.label}을(를) 입력하세요`}
+                      rows={3}
+                    />
+                  ) : (
+                    <input
+                      type={field.field_type === 'number' ? 'number' : 'text'}
+                      value={editFormData[field.field_key] || ''}
+                      onChange={(e) => setEditFormData(prev => ({
+                        ...prev,
+                        [field.field_key]: e.target.value
+                      }))}
+                      className={mergedTheme.modalInputClass}
+                      placeholder={field.placeholder || `${field.label}을(를) 입력하세요`}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => {
+                  setEditingSlot(null);
+                  setEditFormData({});
+                }}
+                className={mergedTheme.modalCancelButtonClass}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className={mergedTheme.modalButtonClass}
+              >
+                저장
               </button>
             </div>
           </div>
