@@ -38,13 +38,13 @@ export function BaseSlotAllocationModal({
     userId: userId,
     slotCount: 10,
     startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7일 후 (기본값)
+    endDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 10일 후 (기본값)
     workCount: undefined,
     amount: undefined,
     description: ''
   });
   
-  const [selectedDuration, setSelectedDuration] = useState<number>(7); // 기본 7일
+  const [selectedDuration, setSelectedDuration] = useState<number>(10); // 기본 10일
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
