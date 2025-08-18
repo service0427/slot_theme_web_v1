@@ -31,6 +31,7 @@ export interface ThemeComponents {
   AnnouncementManagePage: React.ComponentType;
   RankingPage: React.ComponentType;
   SlotBulkRegistrationPage: React.ComponentType;
+  SlotAllocationHistoryPage: React.ComponentType;
   
   // Components
   CashChargeForm: React.ComponentType<{ onSubmit: (data: any) => void }>;

@@ -49,7 +49,8 @@ function AppContent() {
     AdminSystemSettingsPage,
     OperatorNotificationPage,
     NotificationHistoryPage,
-    AnnouncementManagePage
+    AnnouncementManagePage,
+    SlotAllocationHistoryPage
   } = theme.components;
 
   return (
@@ -99,6 +100,7 @@ function AppContent() {
         <Route path="/admin/notifications" element={<OperatorNotificationPage />} />
         <Route path="/admin/notification-history" element={<NotificationHistoryPage />} />
         <Route path="/admin/announcements" element={<AnnouncementManagePage />} />
+        <Route path="/admin/slot-allocation-history" element={<SlotAllocationHistoryPage />} />
         
         <Route path="/cash" element={<CashChargePage />} />
       </Route>

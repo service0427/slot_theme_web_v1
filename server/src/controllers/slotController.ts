@@ -567,6 +567,7 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
     const { userId } = req.params;
     const { slotCount, startDate, endDate, workCount, amount, description } = req.body;
     const adminRole = req.user?.role;
+    const adminId = req.user?.id;
 
     // 관리자/개발자 권한 확인
     if (adminRole !== 'operator' && adminRole !== 'developer') {
@@ -671,6 +672,41 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
           ]
         );
       }
+
+      // 선슬롯 발행 내역 기록
+      const userResult = await client.query(
+        'SELECT full_name, email FROM users WHERE id = $1',
+        [userId]
+      );
+      const adminResult = await client.query(
+        'SELECT full_name FROM users WHERE id = $1',
+        [adminId]
+      );
+      
+      await client.query(
+        `INSERT INTO slot_allocation_history (
+          operator_id,
+          operator_name,
+          user_id,
+          user_name,
+          user_email,
+          slot_count,
+          price_per_slot,
+          reason,
+          memo
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          adminId,
+          adminResult.rows[0]?.full_name || 'Admin',
+          userId,
+          userResult.rows[0]?.full_name || '',
+          userResult.rows[0]?.email || '',
+          slotCount,
+          amount || 0,
+          `선슬롯 ${slotCount}개 발행`,
+          description || null
+        ]
+      );
 
       await client.query('COMMIT');
 
@@ -1386,6 +1422,121 @@ export async function getUserSlotChangeLogs(req: AuthRequest, res: Response) {
     res.status(500).json({
       success: false,
       error: '사용자 변경 로그 조회 중 오류가 발생했습니다.'
+    });
+  }
+}
+
+// 슬롯 발급 내역 조회
+export async function getSlotAllocationHistory(req: AuthRequest, res: Response) {
+  try {
+    const { 
+      page = 1, 
+      limit = 20,
+      operatorId,
+      userId,
+      dateFrom,
+      dateTo,
+      sortBy = 'created_at',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // 관리자 권한 체크
+    if (req.user?.role !== 'operator' && req.user?.role !== 'developer') {
+      return res.status(403).json({
+        success: false,
+        error: '권한이 없습니다.'
+      });
+    }
+
+    const client = await pool.connect();
+    
+    try {
+      // WHERE 조건 구성
+      const whereConditions = [];
+      const values = [];
+      let valueIndex = 1;
+
+      if (operatorId) {
+        whereConditions.push(`sah.operator_id = $${valueIndex++}`);
+        values.push(operatorId);
+      }
+
+      if (userId) {
+        whereConditions.push(`sah.user_id = $${valueIndex++}`);
+        values.push(userId);
+      }
+
+      if (dateFrom) {
+        whereConditions.push(`sah.created_at >= $${valueIndex++}`);
+        values.push(dateFrom);
+      }
+
+      if (dateTo) {
+        whereConditions.push(`sah.created_at <= $${valueIndex++}`);
+        values.push(dateTo);
+      }
+
+      const whereClause = whereConditions.length > 0 
+        ? `WHERE ${whereConditions.join(' AND ')}` 
+        : '';
+
+      // 전체 개수 조회
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM slot_allocation_history sah
+        ${whereClause}
+      `;
+      
+      const countResult = await client.query(countQuery, values);
+      const totalCount = parseInt(countResult.rows[0].total);
+      const totalPages = Math.ceil(totalCount / Number(limit));
+
+      // 정렬 검증
+      const allowedSortFields = ['created_at', 'operator_name', 'user_name', 'slot_count', 'price_per_slot'];
+      const sortField = allowedSortFields.includes(String(sortBy)) ? sortBy : 'created_at';
+      const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+      // 데이터 조회
+      const offset = (Number(page) - 1) * Number(limit);
+      const dataQuery = `
+        SELECT 
+          sah.*,
+          op.full_name as current_operator_name,
+          op.email as operator_email,
+          u.full_name as current_user_name,
+          u.email as current_user_email
+        FROM slot_allocation_history sah
+        LEFT JOIN users op ON sah.operator_id = op.id
+        LEFT JOIN users u ON sah.user_id = u.id
+        ${whereClause}
+        ORDER BY sah.${sortField} ${order}
+        LIMIT $${valueIndex} OFFSET $${valueIndex + 1}
+      `;
+      
+      values.push(limit, offset);
+      const result = await client.query(dataQuery, values);
+
+      res.json({
+        success: true,
+        data: {
+          allocations: result.rows,
+          pagination: {
+            page: Number(page),
+            limit: Number(limit),
+            total: totalCount,
+            totalPages
+          }
+        }
+      });
+
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    // Get slot allocation history error: error
+    res.status(500).json({
+      success: false,
+      error: '슬롯 발급 내역 조회 중 오류가 발생했습니다.'
     });
   }
 }

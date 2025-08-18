@@ -13,7 +13,8 @@ import {
   getSlotFieldValues,
   updateSlotFields,
   getSlotChangeLogs,
-  getUserSlotChangeLogs
+  getUserSlotChangeLogs,
+  getSlotAllocationHistory
 } from '../controllers/slotController';
 import { authenticateToken } from '../middleware/auth';
 
@@ -27,6 +28,9 @@ router.get('/', getSlots);
 
 // 슬롯 개수 조회 (관리자 대시보드용)
 router.get('/count', getSlotCount);
+
+// 슬롯 발급 내역 조회 (관리자 전용) - 특정 ID 라우트보다 먼저 와야 함
+router.get('/allocation-history', getSlotAllocationHistory);
 
 // 슬롯 생성
 router.post('/', createSlot);

@@ -20,6 +20,7 @@ import { AnnouncementPage } from './pages/AnnouncementPage';
 import { AnnouncementManagePage } from './pages/AnnouncementManagePage';
 import { RankingPage } from './pages/RankingPage';
 import { SlotBulkRegistrationPage } from './pages/SlotBulkRegistrationPage';
+import { SlotAllocationHistoryPage } from './pages/SlotAllocationHistoryPage';
 import { CashChargeForm } from './components/CashChargeForm';
 import { CashChargeModal } from './components/CashChargeModal';
 import { AdSlotCard } from './components/AdSlotCard';
@@ -57,6 +58,7 @@ export const luxuryTheme: Theme = {
     AnnouncementManagePage,
     RankingPage,
     SlotBulkRegistrationPage,
+    SlotAllocationHistoryPage,
     
     // Components
     CashChargeForm,

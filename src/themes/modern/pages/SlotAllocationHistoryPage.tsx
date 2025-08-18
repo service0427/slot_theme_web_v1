@@ -1,0 +1,1 @@
+export { BaseSlotAllocationHistoryPage as SlotAllocationHistoryPage } from '@/components/base/BaseSlotAllocationHistoryPage';

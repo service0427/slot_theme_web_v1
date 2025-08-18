@@ -199,6 +199,7 @@ export function EnhancedConfigProvider({ children }: EnhancedConfigProviderProps
       { id: 'admin-notifications', label: '알림 발송', path: '/admin/notifications', visible: true },
       { id: 'admin-notification-history', label: '알림 내역', path: '/admin/notification-history', visible: true },
       { id: 'admin-announcements', label: '공지사항 관리', path: '/admin/announcements', visible: true },
+      { id: 'admin-slot-allocation-history', label: '슬롯 발급 내역', path: '/admin/slot-allocation-history', visible: true },
     ];
     
     // 사용자 권한에 따른 메뉴 반환
