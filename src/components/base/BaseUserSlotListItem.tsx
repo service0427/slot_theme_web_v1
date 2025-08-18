@@ -203,12 +203,11 @@ export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResum
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-500">
         {new Date(slot.createdAt).toLocaleDateString()}
       </td>
+      {/* 상태/활성화 컬럼 - 주석처리
       <td className="px-6 py-4 text-sm">
         <div className="flex flex-col items-center gap-2">
-          {/* 상태 배지 */}
           {getStatusBadge(slot.status)}
           
-          {/* 토글 스위치 (active/paused에서만) */}
           {(slot.status === 'active' || slot.status === 'paused') && (
             <div className="flex items-center gap-1">
               <span className="text-xs text-gray-500">활성</span>
@@ -228,13 +227,14 @@ export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResum
           )}
         </div>
       </td>
+      */}
       {/* 액션 버튼 */}
       <td className="px-6 py-4 text-sm">
         <div className="flex items-center justify-center">
-          {(slot.status === 'pending' || slot.status === 'rejected') ? (
+          {onEdit ? (
             <button
               onClick={onEdit}
-              className="text-blue-600 hover:text-blue-800 font-medium"
+              className="px-3 py-1 text-xs font-medium bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
             >
               수정
             </button>

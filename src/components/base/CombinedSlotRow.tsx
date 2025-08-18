@@ -40,8 +40,8 @@ function CombinedSlotRowComponent({
   const isWaiting = slot.status === 'active' && start && now < start;
   const isCompleted = slot.status === 'active' && end && now > end;
   
-  // 선슬롯발행 모드에서는 active/pending/대기중 상태에서도 수정 가능 (완료 제외)
-  const canEdit = isEmptySlot || (isPreAllocationMode && ((slot.status === 'active' && !isCompleted) || slot.status === 'pending'));
+  // 빈 슬롯만 inline 편집 가능
+  const canInlineEdit = isEmptySlot;
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -107,11 +107,6 @@ function CombinedSlotRowComponent({
         });
       }
     }
-    
-    console.log('[CombinedSlotRow] 초기 formData 설정:', { 
-      slotId: slot.id, 
-      initialData 
-    });
     
     return initialData;
   });
@@ -182,7 +177,7 @@ function CombinedSlotRowComponent({
   };
 
   const handlePaste = (e: React.ClipboardEvent, fieldKey: string) => {
-    if (!canEdit) return;
+    if (!canInlineEdit) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -371,7 +366,7 @@ function CombinedSlotRowComponent({
         
         return (
           <td key={field.field_key} className={`${isReadOnlyField ? 'px-1 py-2' : 'px-3 py-2'} border-r`}>
-            {canEdit && !isReadOnlyField ? (
+            {canInlineEdit && !isReadOnlyField ? (
               <div className="relative">
                 <div className="flex items-center gap-1">
                   <input
@@ -383,7 +378,7 @@ function CombinedSlotRowComponent({
                     className={`flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       errors[field.field_key] ? 'border-red-500 bg-red-50' : 'border-gray-300'
                     }`}
-                    title={`${field.label} - ${canEdit ? 'Ctrl+V로 Excel 데이터를 붙여넣을 수 있습니다' : '읽기 전용'}`}
+                    title={`${field.label} - ${canInlineEdit ? 'Ctrl+V로 Excel 데이터를 붙여넣을 수 있습니다' : '읽기 전용'}`}
                   />
                   {/* URL 필드인 경우 모니터 아이콘 추가 */}
                   {isUrlField && (formData[field.field_key] || '').trim() && (
@@ -523,16 +518,16 @@ function CombinedSlotRowComponent({
         })() : <span className="text-gray-400">-</span>}
       </td>
       
-      {/* 통합된 상태 컬럼 (상태 + 저장 버튼) */}
+      {/* 상태 컬럼 - 주석처리 
       <td className="px-3 py-4 text-center">
         <div className="flex flex-col items-center gap-2">
-          {/* 상태 표시 - 날짜 기반 */}
           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
             (() => {
               if (isEmptySlot) return 'bg-orange-100 text-orange-800';
               if (slot.status === 'pending') return 'bg-yellow-100 text-yellow-800';
               if (slot.status === 'paused') return 'bg-gray-100 text-gray-800';
               if (slot.status === 'rejected') return 'bg-red-100 text-red-800';
+              if (slot.status === 'refunded') return 'bg-purple-100 text-purple-800';
               if (slot.status === 'active') {
                 const now = new Date();
                 const start = slot.startDate ? new Date(slot.startDate) : null;
@@ -549,6 +544,7 @@ function CombinedSlotRowComponent({
               if (slot.status === 'pending') return '승인 대기';
               if (slot.status === 'paused') return '일시정지';
               if (slot.status === 'rejected') return '거절됨';
+              if (slot.status === 'refunded') return '환불됨';
               if (slot.status === 'active') {
                 const now = new Date();
                 const start = slot.startDate ? new Date(slot.startDate) : null;
@@ -561,7 +557,6 @@ function CombinedSlotRowComponent({
             })()}
           </span>
           
-          {/* 토글 스위치 - 대기중, 활성, 일시정지 상태에서 표시 */}
           {(() => {
             const now = new Date();
             const start = slot.startDate ? new Date(slot.startDate) : null;
@@ -570,7 +565,6 @@ function CombinedSlotRowComponent({
             const isActive = slot.status === 'active' && (!start || now >= start) && (!end || now <= end);
             const isPaused = slot.status === 'paused';
             
-            // 대기중, 활성, 일시정지 상태에서만 토글 표시
             if (isWaiting || isActive || isPaused) {
               return (
                 <div className="flex items-center gap-1">
@@ -593,6 +587,33 @@ function CombinedSlotRowComponent({
             return null;
           })()}
         </div>
+      </td>
+      */}
+      
+      {/* 액션 컬럼 */}
+      <td className="px-3 py-4 text-center">
+        {canInlineEdit && onSave ? (
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+              isSaving 
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {isSaving ? '저장 중...' : '저장'}
+          </button>
+        ) : onEdit ? (
+          <button
+            onClick={onEdit}
+            className="px-3 py-1 text-xs font-medium bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+          >
+            수정
+          </button>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )}
       </td>
       
     </tr>

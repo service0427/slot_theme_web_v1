@@ -339,12 +339,12 @@ export async function updateSlotStatus(req: AuthRequest, res: Response) {
       });
     }
 
-    // 상태 업데이트 (환불일 경우 환불 사유도 함께 저장)
+    // 상태 업데이트 (환불일 경우 환불 사유와 처리자도 함께 저장)
     let updateResult;
     if (status === 'refunded') {
       updateResult = await pool.query(
-        'UPDATE slots SET status = $1, refund_reason = $2, refunded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-        [status, refundReason, id]
+        'UPDATE slots SET status = $1, refund_reason = $2, refunded_by = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
+        [status, refundReason, userId, id]
       );
     } else {
       updateResult = await pool.query(
@@ -845,6 +845,21 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
       });
     }
 
+    // 기존 슬롯 정보 조회
+    const existingSlotResult = await pool.query(
+      'SELECT * FROM slots WHERE id = $1',
+      [id]
+    );
+    
+    if (existingSlotResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '슬롯을 찾을 수 없습니다.'
+      });
+    }
+    
+    const existingSlot = existingSlotResult.rows[0];
+
     // 변경 전 필드 값들을 조회하여 로그 기록 준비
     const existingFieldsResult = await pool.query(
       'SELECT field_key, value FROM slot_field_values WHERE slot_id = $1',
@@ -907,6 +922,21 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
 
       // keyword가 있으면 trim_keyword도 계산
       const trimKeywordValue = keywordValue ? keywordValue.replace(/\s+/g, '') : '';
+
+      // URL이 변경되었으면 파싱하여 관련 필드 업데이트
+      if (urlValue && urlValue !== existingSlot.url) {
+        const parsedUrlFields = parseUrl(urlValue);
+        
+        for (const [parsedKey, parsedValue] of Object.entries(parsedUrlFields)) {
+          await client.query(
+            `INSERT INTO slot_field_values (slot_id, field_key, value)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (slot_id, field_key) 
+             DO UPDATE SET value = $3, updated_at = CURRENT_TIMESTAMP`,
+            [id, parsedKey, parsedValue]
+          );
+        }
+      }
 
       // slots 테이블의 기본 필드도 업데이트
       await client.query(

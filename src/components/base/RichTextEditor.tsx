@@ -1,5 +1,4 @@
-import { useRef, useMemo, useCallback } from 'react';
-import ReactQuill, { Quill } from 'react-quill';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import 'react-quill/dist/quill.snow.css';
 
 interface RichTextEditorProps {
@@ -9,13 +8,32 @@ interface RichTextEditorProps {
   height?: string;
 }
 
+// 동적으로 ReactQuill 컴포넌트 로드
+const DynamicReactQuill = ({ forwardedRef, ...props }: any) => {
+  const [Quill, setQuill] = useState<any>(null);
+
+  useEffect(() => {
+    import('react-quill').then((module) => {
+      setQuill(() => module.default);
+    });
+  }, []);
+
+  if (!Quill) {
+    return <div className="border border-gray-300 rounded-lg p-4" style={{ height: props.style?.height }}>
+      <p className="text-gray-500">에디터 로딩 중...</p>
+    </div>;
+  }
+
+  return <Quill ref={forwardedRef} {...props} />;
+};
+
 export function RichTextEditor({ 
   value, 
   onChange, 
   placeholder = '내용을 입력하세요...',
   height = '400px' 
 }: RichTextEditorProps) {
-  const quillRef = useRef<ReactQuill>(null);
+  const quillRef = useRef<any>(null);
 
   // 이미지 업로드 핸들러
   const imageHandler = () => {
@@ -102,8 +120,8 @@ export function RichTextEditor({
       maxWidth: '100%',
       overflow: 'hidden'
     }}>
-      <ReactQuill
-        ref={quillRef}
+      <DynamicReactQuill
+        forwardedRef={quillRef}
         theme="snow"
         value={value}
         onChange={onChange}

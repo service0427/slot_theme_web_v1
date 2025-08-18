@@ -59,7 +59,7 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
         
         // slots 테이블의 기본 값들 (fallback)
         if (!values.url && slot.url) values.url = slot.url;
-        if (!values.keywords && slot.keyword) values.keywords = slot.keyword;
+        if (!values.keyword && slot.keyword) values.keyword = slot.keyword;
         if (!values.mid && slot.mid) values.mid = slot.mid;
         
         setFormData(values);
@@ -69,7 +69,7 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
       // fallback으로 slots 테이블의 값 사용
       setFormData({
         url: slot.url || '',
-        keywords: slot.keyword || '',
+        keyword: slot.keyword || '',
         mid: slot.mid || ''
       });
     }

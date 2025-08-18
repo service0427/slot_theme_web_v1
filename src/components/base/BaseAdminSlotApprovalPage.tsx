@@ -97,8 +97,6 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     const loadFieldConfigs = async () => {
       try {
         const configs = await fieldConfigService.getFieldConfigs();
-        console.log('[DEBUG] Field configs loaded:', configs);
-        
         // configs가 배열로 직접 오는 경우와 success/data 구조로 오는 경우 모두 처리
         const configData = Array.isArray(configs) ? configs : 
           ((configs as any).success && (configs as any).data ? (configs as any).data : []);
@@ -109,8 +107,6 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
             !field.is_system_generated && 
             !['url_product_id', 'url_item_id', 'url_vendor_item_id'].includes(field.field_key)
           );
-          console.log('[DEBUG] Loaded field configs:', configData);
-          console.log('[DEBUG] Visible fields after filter:', visibleFields);
           setFieldConfigs(visibleFields);
         }
       } catch (error) {
@@ -129,7 +125,6 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     
     // 필터링된 슬롯 로드
     loadAllSlots(statusFilter === 'all' ? undefined : statusFilter).then(slots => {
-      console.log('[DEBUG] 받아온 슬롯 데이터:', slots.length, '개', slots);
       if (slots.length > 0) {
         console.log('[DEBUG] 첫 번째 슬롯 상세:', {
           id: slots[0].id,
@@ -153,7 +148,6 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
             // 그래서 백엔드에 'active'를 요청했어야 하는데, 현재는 'waiting'을 요청함
             // 이 경우 백엔드에서 모든 슬롯을 받아와서 프론트에서 필터링
             loadAllSlots('active').then(activeSlotsAll => {
-              console.log('[DEBUG] active 슬롯 재로드:', activeSlotsAll.length, '개');
               
               let refiltered = activeSlotsAll;
               if (statusFilter === 'waiting') {
@@ -174,7 +168,6 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 );
               }
               
-              console.log('[DEBUG] 필터링 후:', refiltered.length, '개');
               setAllSlots(refiltered);
               setPendingSlots(refiltered);
             });
@@ -301,7 +294,8 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`/api/slots/${slotId}/status`, {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const response = await fetch(`${API_BASE_URL}/slots/${slotId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -440,46 +434,31 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
 
   // 슬롯 필드 값 가져오기 함수
   const getSlotFieldValue = (slot: UserSlot, fieldKey: string) => {
-    // 디버그용 - 특정 슬롯의 데이터 구조 확인
-    if (fieldKey === 'keyword') {
-      console.log(`[DEBUG] Slot ${slot.id} data structure:`, {
-        fieldValues: (slot as any).fieldValues,
-        customFields: slot.customFields,
-        keyword: (slot as any).keyword,
-        url: (slot as any).url,
-        mid: (slot as any).mid
-      });
-    }
 
     // slot_field_values에서 먼저 찾기
     if ((slot as any).fieldValues) {
       const fieldValue = (slot as any).fieldValues.find((fv: any) => fv.field_key === fieldKey);
       if (fieldValue && fieldValue.value) {
-        console.log(`[DEBUG] Found ${fieldKey} in fieldValues:`, fieldValue.value);
         return fieldValue.value;
       }
     }
     
     // customFields에서 찾기
     if (slot.customFields && slot.customFields[fieldKey]) {
-      console.log(`[DEBUG] Found ${fieldKey} in customFields:`, slot.customFields[fieldKey]);
       return slot.customFields[fieldKey];
     }
     
     // slots 테이블의 기본 필드에서 찾기
     if (fieldKey === 'url') {
       const value = (slot as any).url || '';
-      console.log(`[DEBUG] Found url in basic field:`, value);
       return value;
     }
     if (fieldKey === 'keyword') {
       const value = (slot as any).keyword || '';
-      console.log(`[DEBUG] Found keyword in basic field:`, value);
       return value;
     }
     // MID 필드는 제거됨 - URL 파싱 데이터로 대체
     
-    console.log(`[DEBUG] No value found for ${fieldKey} in slot ${slot.id}`);
     return '';
   };
 
@@ -877,37 +856,61 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                     </div>
                   </td>
                   <td className="px-3 py-2 text-sm">
-                    <span className={`px-2 py-1 text-xs rounded-full ${(() => {
-                      if (slot.status === 'empty') return 'bg-blue-100 text-blue-800';
-                      if (slot.status === 'pending') return 'bg-yellow-100 text-yellow-800';
-                      if (slot.status === 'rejected') return 'bg-red-100 text-red-800';
-                      if (slot.status === 'paused') return 'bg-gray-100 text-gray-800';
-                      if (slot.status === 'active') {
-                        const now = new Date();
-                        const start = slot.startDate ? new Date(slot.startDate) : null;
-                        const end = slot.endDate ? new Date(slot.endDate) : null;
-                        if (start && now < start) return 'bg-blue-100 text-blue-800';
-                        if (end && now > end) return 'bg-gray-100 text-gray-800';
-                        return 'bg-green-100 text-green-800';
-                      }
-                      return 'bg-gray-100 text-gray-800';
-                    })()}`}>
-                      {(() => {
-                        if (slot.status === 'empty') return '입력대기';
-                        if (slot.status === 'pending') return '승인대기';
-                        if (slot.status === 'rejected') return '거부됨';
-                        if (slot.status === 'paused') return '일시정지';
-                        if (slot.status === 'active') {
-                          const now = new Date();
-                          const start = slot.startDate ? new Date(slot.startDate) : null;
-                          const end = slot.endDate ? new Date(slot.endDate) : null;
-                          if (start && now < start) return '대기중';
-                          if (end && now > end) return '완료';
-                          return '활성';
-                        }
-                        return slot.status;
-                      })()}
-                    </span>
+                    <div className="relative inline-block group">
+                      <span 
+                        className={`inline-flex px-2 py-1 text-xs rounded-full ${(() => {
+                          if (slot.status === 'empty') return 'bg-blue-100 text-blue-800';
+                          if (slot.status === 'pending') return 'bg-yellow-100 text-yellow-800';
+                          if (slot.status === 'rejected') return 'bg-red-100 text-red-800';
+                          if (slot.status === 'paused') return 'bg-gray-100 text-gray-800';
+                          if (slot.status === 'refunded') return 'bg-purple-100 text-purple-800';
+                          if (slot.status === 'active') {
+                            const now = new Date();
+                            const start = slot.startDate ? new Date(slot.startDate) : null;
+                            const end = slot.endDate ? new Date(slot.endDate) : null;
+                            if (start && now < start) return 'bg-blue-100 text-blue-800';
+                            if (end && now > end) return 'bg-gray-100 text-gray-800';
+                            return 'bg-green-100 text-green-800';
+                          }
+                          return 'bg-gray-100 text-gray-800';
+                        })()}`}
+                      >
+                        {(() => {
+                          if (slot.status === 'empty') return '입력대기';
+                          if (slot.status === 'pending') return '승인대기';
+                          if (slot.status === 'rejected') return '거부됨';
+                          if (slot.status === 'paused') return '일시정지';
+                          if (slot.status === 'refunded') return '환불됨';
+                          if (slot.status === 'active') {
+                            const now = new Date();
+                            const start = slot.startDate ? new Date(slot.startDate) : null;
+                            const end = slot.endDate ? new Date(slot.endDate) : null;
+                            if (start && now < start) return '대기중';
+                            if (end && now > end) return '완료';
+                            return '활성';
+                          }
+                          return slot.status;
+                        })()}
+                      </span>
+                      {/* 커스텀 툴팁 */}
+                      {((slot.status === 'refunded' && (slot as any).refund_reason) || 
+                        (slot.status === 'rejected' && (slot as any).rejection_reason)) && (
+                        <div 
+                          className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg z-50 pointer-events-none opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-75"
+                          style={{ whiteSpace: 'pre-wrap', minWidth: '200px', maxWidth: '400px' }}
+                        >
+                          {slot.status === 'refunded' && (slot as any).refund_reason && (
+                            <>환불 사유:<br />{(slot as any).refund_reason.replace(/\\n/g, '\n')}</>
+                          )}
+                          {slot.status === 'rejected' && (slot as any).rejection_reason && (
+                            <>거절 사유:<br />{(slot as any).rejection_reason.replace(/\\n/g, '\n')}</>
+                          )}
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                            <div className="border-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </td>
                   {/* 액션 버튼들 */}
                   <td className="px-3 py-2 text-sm">

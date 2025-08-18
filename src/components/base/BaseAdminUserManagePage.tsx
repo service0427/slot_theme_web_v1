@@ -671,20 +671,6 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  역할
-                </label>
-                <select
-                  value={editUser.role}
-                  onChange={(e) => setEditUser({ ...editUser, role: e.target.value })}
-                  className={mergedTheme.modalInputClass}
-                >
-                  <option value="user">일반 사용자</option>
-                  <option value="operator">운영자</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
                   상태
                 </label>
                 <select

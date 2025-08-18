@@ -401,31 +401,6 @@ export function BaseAnnouncementManagePage() {
                 </Suspense>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    게시 시작일 (선택)
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.start_date}
-                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    게시 종료일 (선택)
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              </div>
 
               <div className="flex gap-4">
                 <label className="flex items-center gap-2">

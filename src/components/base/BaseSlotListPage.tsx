@@ -495,7 +495,12 @@ export function BaseSlotListPage({
 
   // 필터링 및 검색
   const filteredSlots = useMemo(() => {
-    const filtered = slots.filter(slot => {      
+    const filtered = slots.filter(slot => {
+      // 환불된 슬롯 제외 (관리자가 아닌 경우)
+      if (slot.status === 'refunded' && user?.role !== 'operator' && user?.role !== 'developer') {
+        return false;
+      }
+      
       // 검색어 필터
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -1051,8 +1056,11 @@ export function BaseSlotListPage({
                         <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           종료일
                         </th>
-                        <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
+                        {/* <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
                           상태/활성화
+                        </th> */}
+                        <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          액션
                         </th>
                       </tr>
                     </thead>
@@ -1074,11 +1082,9 @@ export function BaseSlotListPage({
                             onSave={
                               slot.status === 'empty' 
                                 ? (data) => handleFillEmptySlot(data, slot.id)
-                                : (isPreAllocationMode && (slot.status === 'active' || slot.status === 'pending'))
-                                  ? (data) => handleUpdateSlot(data, slot.id)  // 선슬롯발행 모드에서는 active/pending 업데이트
-                                  : undefined
+                                : undefined
                             }
-                            onEdit={(!isPreAllocationMode && slot.status !== 'empty') ? () => {
+                            onEdit={(slot.status !== 'empty') ? () => {
                               setEditingSlot(slot);
                               setShowEditModal(true);
                             } : undefined}
@@ -1104,8 +1110,6 @@ export function BaseSlotListPage({
                       <span>필수 필드</span>
                     </span>
                     <span>• Excel에서 여러 셀을 복사하여 Ctrl+V로 한 번에 붙여넣기 가능</span>
-                    <span>• Tab/Enter로 다음 필드 이동</span>
-                    <span>• 각 슬롯의 상태 옆 저장 버튼으로 개별 저장</span>
                   </div>
                 </div>
               </div>
@@ -1145,7 +1149,7 @@ export function BaseSlotListPage({
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">순위</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">시작일</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">종료일</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">상태/활성화</th>
+                    {/* <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">상태/활성화</th> */}
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">액션</th>
                   </tr>
                 </thead>
