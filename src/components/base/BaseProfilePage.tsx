@@ -36,7 +36,6 @@ export function BaseProfilePage({
   const [formData, setFormData] = useState({
     fullName: user?.fullName || '',
     email: user?.email || '',
-    phone: user?.phone || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -66,8 +65,7 @@ export function BaseProfilePage({
     try {
       // 사용자 정보 업데이트
       const updateData: any = {
-        fullName: formData.fullName,
-        phone: formData.phone
+        fullName: formData.fullName
       };
 
       if (formData.newPassword) {
@@ -138,29 +136,17 @@ export function BaseProfilePage({
 
               <div>
                 <label className={labelClassName}>
-                  이메일
+                  아이디
                 </label>
                 <input
-                  type="email"
+                  type="text"
                   value={formData.email}
                   disabled
                   className={`${inputClassName} bg-gray-100 cursor-not-allowed`}
                 />
-                <p className="text-xs text-gray-500 mt-1">이메일은 변경할 수 없습니다.</p>
+                <p className="text-xs text-gray-500 mt-1">아이디는 변경할 수 없습니다.</p>
               </div>
 
-              <div>
-                <label className={labelClassName}>
-                  전화번호
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="010-0000-0000"
-                  className={inputClassName}
-                />
-              </div>
             </div>
           </div>
 

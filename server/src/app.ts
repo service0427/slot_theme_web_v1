@@ -80,22 +80,22 @@ app.get('/api/health', (req, res) => {
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
+  // Error stack trace
   res.status(500).json({ error: '서버 오류가 발생했습니다.' });
 });
 
 // Socket.IO 연결 처리
 io.on('connection', (socket) => {
-  console.log('🔗 클라이언트 연결됨:', socket.id);
+  // 클라이언트 연결됨
 
   // 사용자 인증 후 룸 참여
   socket.on('join_user_room', (userId) => {
     socket.join(`user_${userId}`);
-    console.log(`👤 사용자 ${userId}이(가) 룸에 참여함`);
+    // 사용자가 룸에 참여함
   });
 
   socket.on('disconnect', () => {
-    console.log('❌ 클라이언트 연결 해제:', socket.id);
+    // 클라이언트 연결 해제
   });
 });
 

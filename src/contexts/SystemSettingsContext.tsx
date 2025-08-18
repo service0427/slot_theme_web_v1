@@ -166,7 +166,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
         document.title = data.business.siteTitle;
       }
     } catch (err) {
-      console.error('Failed to load system settings:', err);
+      // console.error('Failed to load system settings:', err);
       setError('설정을 불러오는데 실패했습니다.');
       
       // 오류 시 기본값 사용
@@ -208,7 +208,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
           document.title = latestSettings.business.siteTitle;
         }
       } catch (err) {
-        console.error('Failed to check for settings updates:', err);
+        // console.error('Failed to check for settings updates:', err);
       }
     };
     
@@ -237,7 +237,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
       await systemSettingsService.updateSetting('globalTheme', themeName, 'theme');
       // API가 성공하면 systemSettingsChanged 이벤트가 발생해서 자동으로 loadSettings가 호출됨
     } catch (err) {
-      console.error('Failed to update theme:', err);
+      // console.error('Failed to update theme:', err);
       throw err;
     }
   };
@@ -250,7 +250,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
       await systemSettingsService.updateSetting('globalLayout', layout, 'theme');
       // API가 성공하면 systemSettingsChanged 이벤트가 발생해서 자동으로 loadSettings가 호출됨
     } catch (err) {
-      console.error('Failed to update layout:', err);
+      // console.error('Failed to update layout:', err);
       throw err;
     }
   };

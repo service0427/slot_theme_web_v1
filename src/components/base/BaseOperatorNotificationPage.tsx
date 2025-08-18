@@ -311,7 +311,7 @@ export function BaseOperatorNotificationPage() {
                     setShowUserDropdown(true);
                   }}
                   onFocus={() => setShowUserDropdown(true)}
-                  placeholder="이름 또는 이메일로 검색..."
+                  placeholder="이름 또는 아이디로 검색..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 

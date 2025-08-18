@@ -64,7 +64,7 @@ export class ApiNotificationService {
           return;
         }
       } catch (error) {
-        console.error('User data parsing error:', error);
+        // User data parsing error
       }
     }
 
@@ -86,7 +86,7 @@ export class ApiNotificationService {
             return;
           }
         } catch (error) {
-          console.error('User data parsing error:', error);
+          // User data parsing error
         }
       }
 

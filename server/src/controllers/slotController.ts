@@ -29,7 +29,7 @@ async function logSlotChange(
       req?.get('User-Agent') || null
     ]);
   } catch (error) {
-    console.error('로그 기록 실패:', error);
+    // 로그 기록 실패: error
     // 로그 기록 실패가 주요 기능을 방해하지 않도록 에러를 던지지 않음
   }
 }
@@ -151,8 +151,8 @@ export async function getSlots(req: AuthRequest, res: Response) {
     query += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
 
     // 디버그: 실행할 쿼리 출력
-    console.log('[DEBUG] Query:', query);
-    console.log('[DEBUG] Params:', params);
+    // [DEBUG] Query: query
+    // [DEBUG] Params: params
     
     // 데이터 조회
     const [dataResult, countResult] = await Promise.all([
@@ -163,31 +163,18 @@ export async function getSlots(req: AuthRequest, res: Response) {
     const slots = dataResult.rows;
     
     // 디버그: 모든 슬롯 데이터 확인
-    console.log('[DEBUG] Total slots found:', slots.length);
-    if (slots.length > 0) {
-      console.log('[DEBUG] First 3 slots:', slots.slice(0, 3).map(s => ({
-        id: s.id,
-        thumbnail: s.thumbnail,
-        rank: s.rank,
-        first_rank: s.first_rank,
-        keyword: s.keyword,
-        status: s.status,
-        created_at: s.created_at
-      })));
-      
-      // fc5726f1로 시작하는 슬롯 찾기
-      const targetSlot = slots.find(s => s.id.startsWith('fc5726f1'));
-      if (targetSlot) {
-        console.log('[DEBUG] Found target slot fc5726f1:', {
-          id: targetSlot.id,
-          thumbnail: targetSlot.thumbnail,
-          rank: targetSlot.rank,
-          first_rank: targetSlot.first_rank
-        });
-      } else {
-        console.log('[DEBUG] Target slot fc5726f1 NOT FOUND in results');
-      }
-    }
+    // [DEBUG] Total slots found: slots.length
+    // if (slots.length > 0) {
+    //   [DEBUG] First 3 slots: slots.slice(0, 3).map(...)
+    //   
+    //   fc5726f1로 시작하는 슬롯 찾기
+    //   const targetSlot = slots.find(s => s.id.startsWith('fc5726f1'));
+    //   if (targetSlot) {
+    //     [DEBUG] Found target slot fc5726f1: {...}
+    //   } else {
+    //     [DEBUG] Target slot fc5726f1 NOT FOUND in results
+    //   }
+    // }
     
     // 슬롯 ID 목록 추출
     const slotIds = slots.map(slot => slot.id);
@@ -243,7 +230,7 @@ export async function getSlots(req: AuthRequest, res: Response) {
       }
     });
   } catch (error) {
-    console.error('Get slots error:', error);
+    // Get slots error: error
     res.status(500).json({
       success: false,
       error: '슬롯 목록 조회 중 오류가 발생했습니다.'
@@ -286,7 +273,7 @@ export async function createSlot(req: AuthRequest, res: Response) {
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('Create slot error:', error);
+    // Create slot error: error
     res.status(500).json({
       success: false,
       error: '슬롯 생성 중 오류가 발생했습니다.',
@@ -370,7 +357,7 @@ export async function updateSlotStatus(req: AuthRequest, res: Response) {
       data: updateResult.rows[0]
     });
   } catch (error) {
-    console.error('Update slot status error:', error);
+    // Update slot status error: error
     res.status(500).json({
       success: false,
       error: '슬롯 상태 변경 중 오류가 발생했습니다.'
@@ -442,7 +429,7 @@ export async function approveSlot(req: AuthRequest, res: Response) {
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('Approve slot error:', error);
+    // Approve slot error: error
     res.status(500).json({
       success: false,
       error: '슬롯 승인/거절 중 오류가 발생했습니다.'
@@ -487,7 +474,7 @@ export async function getSlotById(req: AuthRequest, res: Response) {
       data: slot
     });
   } catch (error) {
-    console.error('Get slot by id error:', error);
+    // Get slot by id error: error
     res.status(500).json({
       success: false,
       error: '슬롯 조회 중 오류가 발생했습니다.'
@@ -566,7 +553,7 @@ export async function updateSlot(req: AuthRequest, res: Response) {
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('Update slot error:', error);
+    // Update slot error: error
     res.status(500).json({
       success: false,
       error: '슬롯 수정 중 오류가 발생했습니다.'
@@ -702,7 +689,7 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
       client.release();
     }
   } catch (error) {
-    console.error('Allocate slots error:', error);
+    // Allocate slots error: error
     res.status(500).json({
       success: false,
       error: '슬롯 할당 중 오류가 발생했습니다.'
@@ -742,7 +729,7 @@ export async function getUserSlotAllocation(req: AuthRequest, res: Response) {
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('Get user slot allocation error:', error);
+    // Get user slot allocation error: error
     res.status(500).json({
       success: false,
       error: '할당 정보 조회 중 오류가 발생했습니다.'
@@ -981,7 +968,7 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
       client.release();
     }
   } catch (error) {
-    console.error('Update slot fields error:', error);
+    // Update slot fields error: error
     res.status(500).json({
       success: false,
       error: '슬롯 수정 중 오류가 발생했습니다.'
@@ -1031,7 +1018,7 @@ export async function getSlotFieldValues(req: AuthRequest, res: Response) {
       fieldValues: fieldValuesResult.rows
     });
   } catch (error) {
-    console.error('Get slot field values error:', error);
+    // Get slot field values error: error
     res.status(500).json({
       success: false,
       error: '필드 값 조회 중 오류가 발생했습니다.'
@@ -1172,15 +1159,15 @@ export async function fillEmptySlot(req: AuthRequest, res: Response) {
       data: updateResult.rows[0]
     });
   } catch (error) {
-    console.error('[ERROR] Fill empty slot error:', error);
-    console.error('[ERROR] Error details:', {
-      message: error.message,
-      code: error.code,
-      detail: error.detail,
-      constraint: error.constraint,
-      table: error.table,
-      column: error.column
-    });
+    // [ERROR] Fill empty slot error: error
+    // [ERROR] Error details: {
+    //   message: error.message,
+    //   code: error.code,
+    //   detail: error.detail,
+    //   constraint: error.constraint,
+    //   table: error.table,
+    //   column: error.column
+    // }
     res.status(500).json({
       success: false,
       error: '슬롯 채우기 중 오류가 발생했습니다.'
@@ -1314,7 +1301,7 @@ export async function getSlotChangeLogs(req: AuthRequest, res: Response) {
       data: logs  // 배열을 직접 반환
     });
   } catch (error) {
-    console.error('Get slot change logs error:', error);
+    // Get slot change logs error: error
     res.status(500).json({
       success: false,
       error: '변경 로그 조회 중 오류가 발생했습니다.'
@@ -1395,7 +1382,7 @@ export async function getUserSlotChangeLogs(req: AuthRequest, res: Response) {
       }
     });
   } catch (error) {
-    console.error('Get user slot change logs error:', error);
+    // Get user slot change logs error: error
     res.status(500).json({
       success: false,
       error: '사용자 변경 로그 조회 중 오류가 발생했습니다.'

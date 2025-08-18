@@ -142,12 +142,12 @@ export function BaseAdminSystemSettingsPage() {
   }, []);
 
   // 권한 체크 디버깅
-  console.log('[BaseAdminSystemSettingsPage] Auth check:', {
-    user: user,
-    userRole: user?.role,
-    isAdmin: isAdmin,
-    isDeveloper: user?.role === 'developer'
-  });
+  // console.log('[BaseAdminSystemSettingsPage] Auth check:', {
+  //   user: user,
+  //   userRole: user?.role,
+  //   isAdmin: isAdmin,
+  //   isDeveloper: user?.role === 'developer'
+  // });
   
   // user 정보가 아직 로드되지 않았으면 대기
   if (!user) {
@@ -179,7 +179,7 @@ export function BaseAdminSystemSettingsPage() {
   }, [selectedTheme, selectedLayout, actualGlobalTheme, actualGlobalLayout]);
 
   const handleThemeSelect = (theme: 'simple' | 'modern' | 'luxury') => {
-    console.log('handleThemeSelect called with:', theme);
+    // console.log('handleThemeSelect called with:', theme);
     setSelectedTheme(theme);
     // 바로 미리보기 활성화
     setPreviewTheme(theme);
@@ -255,7 +255,7 @@ export function BaseAdminSystemSettingsPage() {
       const filteredConfigs = configs.filter(config => !config.is_system_generated);
       setFieldConfigs(filteredConfigs);
     } catch (error) {
-      console.error('필드 설정 로드 실패:', error);
+      // console.error('필드 설정 로드 실패:', error);
       alert('필드 설정을 불러오는데 실패했습니다.');
     } finally {
       setLoadingFields(false);
@@ -270,7 +270,7 @@ export function BaseAdminSystemSettingsPage() {
       setFieldConfigs(updatedConfigs);
       alert('필드 설정이 저장되었습니다.');
     } catch (error) {
-      console.error('필드 설정 저장 실패:', error);
+      // console.error('필드 설정 저장 실패:', error);
       alert('필드 설정 저장에 실패했습니다.');
     } finally {
       setSavingFields(false);

@@ -6,7 +6,6 @@ export function ProfilePage() {
   const [formData, setFormData] = useState({
     fullName: user?.fullName || '',
     email: user?.email || '',
-    phone: user?.phone || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -37,8 +36,7 @@ export function ProfilePage() {
     try {
       // 사용자 정보 업데이트
       const updateData: any = {
-        fullName: formData.fullName,
-        phone: formData.phone
+        fullName: formData.fullName
       };
 
       if (formData.newPassword) {
@@ -62,7 +60,7 @@ export function ProfilePage() {
         setMessage({ type: 'error', text: result.error || '업데이트 중 오류가 발생했습니다.' });
       }
     } catch (error) {
-      console.error('Profile update error:', error);
+      // Profile update error
       setMessage({ type: 'error', text: '업데이트 중 오류가 발생했습니다.' });
     }
   };
@@ -71,7 +69,6 @@ export function ProfilePage() {
     setFormData({
       fullName: user?.fullName || '',
       email: user?.email || '',
-      phone: user?.phone || '',
       currentPassword: '',
       newPassword: '',
       confirmPassword: ''
@@ -111,28 +108,15 @@ export function ProfilePage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  이메일
+                  아이디
                 </label>
                 <input
-                  type="email"
+                  type="text"
                   value={formData.email}
                   disabled
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
                 />
-                <p className="text-xs text-gray-500 mt-1">이메일은 변경할 수 없습니다.</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  전화번호
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="010-0000-0000"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <p className="text-xs text-gray-500 mt-1">아이디는 변경할 수 없습니다.</p>
               </div>
 
             </div>

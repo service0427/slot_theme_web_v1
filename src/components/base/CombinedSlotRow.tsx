@@ -50,10 +50,10 @@ function CombinedSlotRowComponent({
   const [formData, setFormData] = useState<Record<string, string>>(() => {
     // 부모에서 전달받은 formData가 있으면 사용
     if (slot.formData && Object.keys(slot.formData).length > 0) {
-      console.log('[CombinedSlotRow] 부모 formData 사용:', { 
-        slotId: slot.id, 
-        formData: slot.formData 
-      });
+      // console.log('[CombinedSlotRow] 부모 formData 사용:', { 
+      //   slotId: slot.id, 
+      //   formData: slot.formData 
+      // });
       return slot.formData;
     }
     
@@ -156,7 +156,7 @@ function CombinedSlotRowComponent({
       [fieldKey]: value
     };
     
-    console.log('[CombinedSlotRow] 필드 변경:', { slotId: slot.id, fieldKey, value, newData });
+    // console.log('[CombinedSlotRow] 필드 변경:', { slotId: slot.id, fieldKey, value, newData });
     
     setFormData(newData);
     
@@ -185,7 +185,7 @@ function CombinedSlotRowComponent({
     const pasteData = e.clipboardData.getData('text/plain');
     if (!pasteData) return;
     
-    console.log('[붙여넣기] 데이터:', pasteData, '필드:', fieldKey);
+    // console.log('[붙여넣기] 데이터:', pasteData, '필드:', fieldKey);
     
     // 여러 줄의 데이터가 있는지 먼저 확인
     const lines = pasteData.split(/[\r\n]+/).filter(line => line.trim().length > 0);

@@ -19,13 +19,13 @@ export async function login(req: Request, res: Response) {
     }
 
     // 사용자 조회
-    console.log(`[LOGIN] 1. DB 조회 시작: ${email}`);
+    // [LOGIN] 1. DB 조회 시작: email
     const dbStartTime = Date.now();
     const result = await pool.query(
-      'SELECT id, email, password, full_name, phone, role, is_active FROM users WHERE email = $1',
+      'SELECT id, email, password, full_name, role, is_active FROM users WHERE email = $1',
       [email]
     );
-    console.log(`[LOGIN] 2. DB 조회 완료: ${Date.now() - dbStartTime}ms`);
+    // [LOGIN] 2. DB 조회 완료: Date.now() - dbStartTime ms
 
     if (result.rows.length === 0) {
       return res.status(401).json({
@@ -45,10 +45,10 @@ export async function login(req: Request, res: Response) {
     }
 
     // 비밀번호 검증
-    console.log(`[LOGIN] 3. bcrypt 비교 시작`);
+    // [LOGIN] 3. bcrypt 비교 시작
     const bcryptStartTime = Date.now();
     const isValidPassword = await bcrypt.compare(password, user.password);
-    console.log(`[LOGIN] 4. bcrypt 비교 완료: ${Date.now() - bcryptStartTime}ms`);
+    // [LOGIN] 4. bcrypt 비교 완료: Date.now() - bcryptStartTime ms
     
     if (!isValidPassword) {
       return res.status(401).json({
@@ -75,18 +75,18 @@ export async function login(req: Request, res: Response) {
     );
 
     // 마지막 로그인 시간 업데이트
-    console.log(`[LOGIN] 5. 로그인 시간 업데이트 시작`);
+    // [LOGIN] 5. 로그인 시간 업데이트 시작
     const updateStartTime = Date.now();
     await pool.query(
       'UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
       [user.id]
     );
-    console.log(`[LOGIN] 6. 로그인 시간 업데이트 완료: ${Date.now() - updateStartTime}ms`);
+    // [LOGIN] 6. 로그인 시간 업데이트 완료: Date.now() - updateStartTime ms
 
     // 권한 매핑
     const permissions = getPermissionsByRole(user.role);
 
-    console.log(`[LOGIN] 전체 소요 시간: ${Date.now() - startTime}ms`);
+    // [LOGIN] 전체 소요 시간: Date.now() - startTime ms
     
     res.json({
       success: true,
@@ -95,7 +95,6 @@ export async function login(req: Request, res: Response) {
           id: user.id,
           email: user.email,
           fullName: user.full_name,
-          phone: user.phone,
           role: user.role,
           permissions
         },
@@ -107,7 +106,7 @@ export async function login(req: Request, res: Response) {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    // Login error: error
     res.status(500).json({
       success: false,
       error: '로그인 중 오류가 발생했습니다.'
@@ -176,7 +175,7 @@ export async function refreshToken(req: Request, res: Response) {
       });
     });
   } catch (error) {
-    console.error('Token refresh error:', error);
+    // Token refresh error: error
     res.status(500).json({
       success: false,
       error: '토큰 갱신 중 오류가 발생했습니다.'
@@ -187,7 +186,7 @@ export async function refreshToken(req: Request, res: Response) {
 export async function updateProfile(req: AuthRequest, res: Response) {
   try {
     const userId = req.user?.id;
-    const { fullName, phone, password, currentPassword } = req.body;
+    const { fullName, password, currentPassword } = req.body;
 
     if (!userId) {
       return res.status(401).json({
@@ -204,12 +203,6 @@ export async function updateProfile(req: AuthRequest, res: Response) {
     if (fullName) {
       updates.push(`full_name = $${paramIndex++}`);
       values.push(fullName);
-    }
-
-    // 전화번호 업데이트
-    if (phone) {
-      updates.push(`phone = $${paramIndex++}`);
-      values.push(phone);
     }
 
     // 비밀번호 업데이트
@@ -254,7 +247,7 @@ export async function updateProfile(req: AuthRequest, res: Response) {
       UPDATE users
       SET ${updates.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, email, full_name, phone, role
+      RETURNING id, email, full_name, role
     `;
 
     const result = await pool.query(query, values);
@@ -274,13 +267,12 @@ export async function updateProfile(req: AuthRequest, res: Response) {
         id: updatedUser.id,
         email: updatedUser.email,
         fullName: updatedUser.full_name,
-        phone: updatedUser.phone,
         role: updatedUser.role,
         permissions: getPermissionsByRole(updatedUser.role)
       }
     });
   } catch (error) {
-    console.error('Update profile error:', error);
+    // Update profile error: error
     res.status(500).json({
       success: false,
       error: '프로필 업데이트 중 오류가 발생했습니다.'
@@ -300,7 +292,7 @@ export async function getCurrentUser(req: AuthRequest, res: Response) {
     }
 
     const result = await pool.query(
-      'SELECT id, email, full_name, phone, role FROM users WHERE id = $1',
+      'SELECT id, email, full_name, role FROM users WHERE id = $1',
       [userId]
     );
 
@@ -325,7 +317,7 @@ export async function getCurrentUser(req: AuthRequest, res: Response) {
       }
     });
   } catch (error) {
-    console.error('Get current user error:', error);
+    // Get current user error: error
     res.status(500).json({
       success: false,
       error: '사용자 정보 조회 중 오류가 발생했습니다.'

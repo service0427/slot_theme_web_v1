@@ -28,7 +28,7 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
       const enabledFields = configs.filter(field => field.is_enabled);
       setFieldConfigs(enabledFields);
     } catch (error) {
-      console.error('필드 설정 로드 실패:', error);
+      // console.error('필드 설정 로드 실패:', error);
     } finally {
       setIsLoading(false);
     }
@@ -65,7 +65,7 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
         setFormData(values);
       }
     } catch (error) {
-      console.error('슬롯 데이터 로드 실패:', error);
+      // console.error('슬롯 데이터 로드 실패:', error);
       // fallback으로 slots 테이블의 값 사용
       setFormData({
         url: slot.url || '',

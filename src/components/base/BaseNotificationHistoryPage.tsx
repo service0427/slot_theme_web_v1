@@ -46,7 +46,7 @@ export function BaseNotificationHistoryPage() {
         setUsers(userMap);
       }
     } catch (error) {
-      console.error('Failed to load users:', error);
+      // Failed to load users
     }
   };
 
@@ -78,7 +78,7 @@ export function BaseNotificationHistoryPage() {
       
       setNotifications(result);
     } catch (error) {
-      console.error('Failed to load notifications:', error);
+      // Failed to load notifications
     } finally {
       setIsLoading(false);
     }

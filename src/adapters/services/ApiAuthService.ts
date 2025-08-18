@@ -78,7 +78,6 @@ export class ApiAuthService implements IAuthService {
         notificationService.startPolling();
       }
     } catch (error) {
-      console.error('Session restore error:', error);
       // 복원 실패시 로그아웃 처리
       this.logout();
     }
@@ -160,12 +159,6 @@ export class ApiAuthService implements IAuthService {
       // 인증 상태 설정
       this.setAuthState(userModel, tokens);
       
-      // 디버깅용 로그
-      console.log('Login successful:', {
-        email: userModel.email,
-        role: userModel.role
-      });
-      
       // Socket.IO 연결
       if (this.socketService && userModel.id) {
         await this.socketService.connect(userModel.id);
@@ -184,7 +177,6 @@ export class ApiAuthService implements IAuthService {
         data: authModel
       };
     } catch (error: any) {
-      console.error('Login error:', error);
       
       // 타임아웃 에러 처리
       if (error.name === 'AbortError') {
@@ -225,7 +217,6 @@ export class ApiAuthService implements IAuthService {
         success: true
       };
     } catch (error: any) {
-      console.error('Logout error:', error);
       return {
         success: false,
         error: error.message || '로그아웃 중 오류가 발생했습니다.'
@@ -303,7 +294,6 @@ export class ApiAuthService implements IAuthService {
         success: true
       };
     } catch (error: any) {
-      console.error('Register error:', error);
       
       // 타임아웃 에러 처리
       if (error.name === 'AbortError') {
@@ -357,7 +347,6 @@ export class ApiAuthService implements IAuthService {
         success: true
       };
     } catch (error: any) {
-      console.error('Change password error:', error);
       
       // 타임아웃 에러 처리
       if (error.name === 'AbortError') {
@@ -438,7 +427,6 @@ export class ApiAuthService implements IAuthService {
         data: tokens
       };
     } catch (error: any) {
-      console.error('Refresh token error:', error);
       return {
         success: false,
         error: error.message || '토큰 갱신 중 오류가 발생했습니다.'
@@ -448,7 +436,7 @@ export class ApiAuthService implements IAuthService {
 
   async updateUser(userId: string, updates: Partial<UserModel>): Promise<AuthResult<UserModel>> {
     try {
-      const response = await fetch(`${this.apiUrl}/users/${userId}`, {
+      const response = await fetch(`${this.apiUrl}/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -480,9 +468,20 @@ export class ApiAuthService implements IAuthService {
       const userModel = new UserModel(
         updatedUser.id,
         updatedUser.email,
-        updatedUser.fullName,
-        updatedUser.role
+        updatedUser.role,
+        'active', // status
+        new Date(), // createdAt
+        new Date(), // updatedAt
+        updatedUser.fullName
       );
+      
+      // localStorage에 저장된 사용자 정보도 업데이트
+      localStorage.setItem('user', JSON.stringify({
+        id: userModel.id,
+        email: userModel.email,
+        role: userModel.role,
+        fullName: userModel.fullName
+      }));
       
       // 현재 인증 상태가 있으면 업데이트
       if (this.authState) {
@@ -495,7 +494,6 @@ export class ApiAuthService implements IAuthService {
         data: userModel
       };
     } catch (error: any) {
-      console.error('Update user error:', error);
       return {
         success: false,
         error: error.message || '사용자 정보 업데이트 중 오류가 발생했습니다.'

@@ -91,7 +91,7 @@ export const getOrCreateChatRoom = async (req: AuthRequest, res: Response) => {
     res.json({ room: roomResult.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error creating chat room:', error);
+    // Error creating chat room: error
     res.status(500).json({ error: 'Failed to create chat room' });
   } finally {
     client.release();
@@ -103,7 +103,7 @@ export const getChatRooms = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.id;
   const userRole = req.user?.role;
   
-  console.log('getChatRooms - userId:', userId, 'userRole:', userRole);
+  // getChatRooms - userId: userId, userRole: userRole
   
   if (!userId) {
     return res.status(401).json({ error: 'User not authenticated' });
@@ -169,12 +169,12 @@ export const getChatRooms = async (req: AuthRequest, res: Response) => {
       params = [userId];
     }
 
-    console.log('Executing query:', query);
-    console.log('With params:', params);
+    // Executing query: query
+    // With params: params
     const result = await pool.query(query, params);
     res.json({ rooms: result.rows });
   } catch (error) {
-    console.error('Error fetching chat rooms:', error);
+    // Error fetching chat rooms: error
     res.status(500).json({ error: 'Failed to fetch chat rooms' });
   }
 };
@@ -249,7 +249,7 @@ export const getChatMessages = async (req: AuthRequest, res: Response) => {
 
     res.json({ messages: messages.rows });
   } catch (error) {
-    console.error('Error fetching messages:', error);
+    // Error fetching messages: error
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 };
@@ -338,7 +338,7 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
     res.json({ message: newMessage });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error sending message:', error);
+    // Error sending message: error
     res.status(500).json({ error: 'Failed to send message' });
   } finally {
     client.release();
@@ -369,7 +369,7 @@ export const markMessagesAsRead = async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error marking messages as read:', error);
+    // Error marking messages as read: error
     res.status(500).json({ error: 'Failed to mark messages as read' });
   }
 };
@@ -395,7 +395,7 @@ export const closeChatRoom = async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error closing chat room:', error);
+    // Error closing chat room: error
     res.status(500).json({ error: 'Failed to close chat room' });
   }
 };
@@ -427,7 +427,7 @@ export const getUnreadCount = async (req: AuthRequest, res: Response) => {
 
     res.json({ count });
   } catch (error) {
-    console.error('Error fetching unread count:', error);
+    // Error fetching unread count: error
     res.status(500).json({ error: 'Failed to fetch unread count' });
   }
 };

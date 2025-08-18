@@ -72,7 +72,7 @@ export function BaseAnnouncementManagePage() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Loaded announcements:', result.data);
+        // console.log('Loaded announcements:', result.data);
         // data가 배열인지 확인하고 announcements 키가 있는지 체크
         if (result.data) {
           if (Array.isArray(result.data)) {
@@ -88,11 +88,11 @@ export function BaseAnnouncementManagePage() {
       } else {
         // 에러 응답 확인
         const errorData = await response.json();
-        console.error('Error response:', errorData);
+        // console.error('Error response:', errorData);
         alert(`에러: ${errorData.error}\n상세: ${errorData.details || ''}`);
       }
     } catch (error) {
-      console.error('Failed to load announcements:', error);
+      // console.error('Failed to load announcements:', error);
       alert('공지사항을 불러오는데 실패했습니다.');
     } finally {
       setIsLoading(false);
@@ -127,7 +127,7 @@ export function BaseAnnouncementManagePage() {
         alert(error.error || '작업에 실패했습니다.');
       }
     } catch (error) {
-      console.error('Failed to save announcement:', error);
+      // console.error('Failed to save announcement:', error);
       alert('공지사항 저장에 실패했습니다.');
     }
   };
@@ -149,7 +149,7 @@ export function BaseAnnouncementManagePage() {
         loadAnnouncements();
       }
     } catch (error) {
-      console.error('Failed to delete announcement:', error);
+      // console.error('Failed to delete announcement:', error);
       alert('삭제에 실패했습니다.');
     }
   };

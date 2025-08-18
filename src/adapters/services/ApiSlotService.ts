@@ -111,7 +111,7 @@ export class ApiSlotService extends BaseSlotService {
         error: '슬롯 목록을 가져오는데 실패했습니다.'
       };
     } catch (error) {
-      console.error('Get user slots error:', error);
+      // Get user slots error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -143,7 +143,7 @@ export class ApiSlotService extends BaseSlotService {
       const result = await response.json();
 
       if (!response.ok) {
-        console.error('Slot creation failed:', result);
+        // Slot creation failed
         return {
           success: false,
           error: result.error || '슬롯 생성에 실패했습니다.'
@@ -181,7 +181,7 @@ export class ApiSlotService extends BaseSlotService {
         error: '슬롯 생성에 실패했습니다.'
       };
     } catch (error) {
-      console.error('Create slot error:', error);
+      // Create slot error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -215,7 +215,7 @@ export class ApiSlotService extends BaseSlotService {
         success: true
       };
     } catch (error) {
-      console.error('Pause slot error:', error);
+      // Pause slot error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -249,7 +249,7 @@ export class ApiSlotService extends BaseSlotService {
         success: true
       };
     } catch (error) {
-      console.error('Resume slot error:', error);
+      // Resume slot error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -283,7 +283,7 @@ export class ApiSlotService extends BaseSlotService {
         success: true
       };
     } catch (error) {
-      console.error('Delete slot error:', error);
+      // Delete slot error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -317,7 +317,7 @@ export class ApiSlotService extends BaseSlotService {
         success: true
       };
     } catch (error) {
-      console.error('Approve slot error:', error);
+      // Approve slot error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -351,7 +351,7 @@ export class ApiSlotService extends BaseSlotService {
         success: true
       };
     } catch (error) {
-      console.error('Reject slot error:', error);
+      // Reject slot error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -410,7 +410,7 @@ export class ApiSlotService extends BaseSlotService {
         error: '슬롯 검색에 실패했습니다.'
       };
     } catch (error) {
-      console.error('Search slots error:', error);
+      // Search slots error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -526,7 +526,7 @@ export class ApiSlotService extends BaseSlotService {
         error: '슬롯 목록을 가져오는데 실패했습니다.'
       };
     } catch (error) {
-      console.error('Get all slots error:', error);
+      // Get all slots error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -661,7 +661,7 @@ export class ApiSlotService extends BaseSlotService {
         error: '슬롯 수정에 실패했습니다.'
       };
     } catch (error) {
-      console.error('Update slot error:', error);
+      // Update slot error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'
@@ -735,7 +735,7 @@ export class ApiSlotService extends BaseSlotService {
         error: '빈 슬롯 채우기에 실패했습니다.'
       };
     } catch (error) {
-      console.error('Fill empty slot error:', error);
+      // Fill empty slot error
       return {
         success: false,
         error: '서버와의 통신 중 오류가 발생했습니다.'

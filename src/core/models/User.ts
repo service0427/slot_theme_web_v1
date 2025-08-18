@@ -3,7 +3,6 @@ export interface User {
   email: string;
   password?: string; // 업데이트용
   fullName?: string;
-  phone?: string;
   role: UserRole;
   status: UserStatus;
   bankInfo?: Record<string, any>;
@@ -30,7 +29,6 @@ export class UserModel implements User {
     public createdAt: Date,
     public updatedAt: Date,
     public fullName?: string,
-    public phone?: string,
     public bankInfo?: Record<string, any>,
     public business?: Record<string, any>,
     public lastLoginAt?: Date

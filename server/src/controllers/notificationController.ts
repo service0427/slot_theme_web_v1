@@ -10,8 +10,8 @@ setTimeout(() => {
 // 알림 생성
 export const createNotification = async (req: Request, res: Response) => {
   try {
-    console.log('[createNotification] Request body:', req.body);
-    console.log('[createNotification] User:', (req as any).user);
+    // [createNotification] Request body: req.body
+    // [createNotification] User: (req as any).user
     
     // 관리자/개발자 권한 체크
     const userRole = (req as any).user?.role;
@@ -35,12 +35,12 @@ export const createNotification = async (req: Request, res: Response) => {
       metadata
     } = req.body;
     
-    console.log('[createNotification] auto_close 값:', auto_close, typeof auto_close);
-    console.log('[createNotification] 전체 body:', JSON.stringify(req.body));
+    // [createNotification] auto_close 값: auto_close, typeof auto_close
+    // [createNotification] 전체 body: JSON.stringify(req.body)
 
     // recipientId가 배열인 경우 (여러 명에게 발송 - 하나의 레코드로 저장)
     if (Array.isArray(recipientId)) {
-      console.log('[createNotification] Creating group notification for multiple users:', recipientId);
+      // [createNotification] Creating group notification for multiple users: recipientId
       
       try {
         // 그룹 알림을 하나의 레코드로 저장 (metadata에 실제 수신자 목록 저장)
@@ -60,7 +60,7 @@ export const createNotification = async (req: Request, res: Response) => {
         );
         
         const notification = result.rows[0];
-        console.log('[createNotification] Group notification created:', notification);
+        // [createNotification] Group notification created: notification
         
         // 각 사용자에게 실시간 알림 전송
         if (io) {
@@ -69,7 +69,7 @@ export const createNotification = async (req: Request, res: Response) => {
               ...notification,
               recipient_id: userId // 실시간 알림에는 개별 사용자 ID 포함
             });
-            console.log(`🔔 알림이 사용자 ${userId}에게 실시간 전송됨`);
+            // 알림이 사용자 userId에게 실시간 전송됨
           }
         }
         
@@ -79,13 +79,13 @@ export const createNotification = async (req: Request, res: Response) => {
           message: `${recipientId.length}명의 사용자에게 알림이 발송되었습니다.`
         });
       } catch (queryError) {
-        console.error('[createNotification] Query error:', queryError);
+        // [createNotification] Query error: queryError
         throw queryError;
       }
     }
     // recipientId가 'all'인 경우 하나의 알림으로 저장
     else if (recipientId === 'all') {
-      console.log('[createNotification] Creating notification for all users');
+      // [createNotification] Creating notification for all users
       
       try {
         // 전체 사용자용 알림을 하나의 레코드로 저장
@@ -98,7 +98,7 @@ export const createNotification = async (req: Request, res: Response) => {
         );
         
         const notification = result.rows[0];
-        console.log('[createNotification] Broadcast notification created:', notification);
+        // [createNotification] Broadcast notification created: notification
 
         // 모든 활성 사용자에게 실시간 알림 전송
         if (io) {
@@ -113,10 +113,10 @@ export const createNotification = async (req: Request, res: Response) => {
               ...notification,
               recipient_id: user.id // 실시간 알림에는 사용자 ID 포함
             });
-            console.log(`🔔 알림이 사용자 ${user.id}에게 실시간 전송됨`);
+            // 알림이 사용자 user.id에게 실시간 전송됨
           }
         } else {
-          console.log(`⚠️ Socket.IO가 아직 초기화되지 않음`);
+          // Socket.IO가 아직 초기화되지 않음
         }
 
         res.json({
@@ -125,12 +125,12 @@ export const createNotification = async (req: Request, res: Response) => {
           message: `전체 사용자에게 알림이 발송되었습니다.`
         });
       } catch (queryError) {
-        console.error('[createNotification] Query error:', queryError);
+        // [createNotification] Query error: queryError
         throw queryError;
       }
     } else {
       // 특정 사용자에게만 알림 생성
-      console.log('[createNotification] Creating notification for user:', recipientId);
+      // [createNotification] Creating notification for user: recipientId
       
       try {
         const result = await pool.query(
@@ -142,14 +142,14 @@ export const createNotification = async (req: Request, res: Response) => {
         );
 
         const notification = result.rows[0];
-        console.log('[createNotification] Notification created:', notification);
+        // [createNotification] Notification created: notification
 
         // 실시간으로 해당 사용자에게 알림 전송
         if (io) {
           io.to(`user_${recipientId}`).emit('new_notification', notification);
-          console.log(`🔔 알림이 사용자 ${recipientId}에게 실시간 전송됨`);
+          // 알림이 사용자 recipientId에게 실시간 전송됨
         } else {
-          console.log(`⚠️ Socket.IO가 아직 초기화되지 않음`);
+          // Socket.IO가 아직 초기화되지 않음
         }
 
         res.json({
@@ -157,12 +157,12 @@ export const createNotification = async (req: Request, res: Response) => {
           notification: notification
         });
       } catch (queryError) {
-        console.error('[createNotification] Query error:', queryError);
+        // [createNotification] Query error: queryError
         throw queryError;
       }
     }
   } catch (error) {
-    console.error('Create notification error:', error);
+    // Create notification error: error
     res.status(500).json({
       success: false,
       error: '알림 생성 중 오류가 발생했습니다.'
@@ -173,18 +173,18 @@ export const createNotification = async (req: Request, res: Response) => {
 // 사용자의 알림 목록 조회
 export const getNotifications = async (req: Request, res: Response) => {
   try {
-    console.log('[getNotifications] req.user:', (req as any).user);
+    // [getNotifications] req.user: (req as any).user
     const userId = (req as any).user?.id;
     
     if (!userId) {
-      console.log('[getNotifications] No user ID found');
+      // [getNotifications] No user ID found
       return res.status(401).json({
         success: false,
         error: '인증 정보가 없습니다.'
       });
     }
     
-    console.log('[getNotifications] userId:', userId);
+    // [getNotifications] userId: userId
     const { type, isRead, limit = 50, offset = 0 } = req.query;
 
     // 운영자와 개발자는 알림을 받지 않음
@@ -243,7 +243,7 @@ export const getNotifications = async (req: Request, res: Response) => {
       notifications: result.rows
     });
   } catch (error) {
-    console.error('Get notifications error:', error);
+    // Get notifications error: error
     res.status(500).json({
       success: false,
       error: '알림 조회 중 오류가 발생했습니다.'
@@ -257,23 +257,23 @@ export const markAsRead = async (req: Request, res: Response) => {
     const { id } = req.params;
     const userId = (req as any).user.id;
     
-    console.log(`[markAsRead] START - ID: ${id}, User: ${userId}`);
-    console.log(`[markAsRead] User info:`, (req as any).user);
+    // [markAsRead] START - ID: id, User: userId
+    // [markAsRead] User info: (req as any).user
 
     // 먼저 알림이 존재하는지 확인 (자신의 알림, 전체 알림, 그룹 알림)
     const userIdStr = String(userId);
     
     // 먼저 알림을 가져와서 타입 확인
-    console.log(`[markAsRead] Fetching notification with ID: ${id}`);
+    // [markAsRead] Fetching notification with ID: id
     const notifResult = await pool.query(
       'SELECT * FROM notifications WHERE id = $1',
       [id]
     );
     
-    console.log(`[markAsRead] Query result:`, notifResult.rows.length, 'rows');
+    // [markAsRead] Query result: notifResult.rows.length rows
     
     if (notifResult.rows.length === 0) {
-      console.log(`[markAsRead] ERROR - 알림이 존재하지 않음 - ID: ${id}`);
+      // [markAsRead] ERROR - 알림이 존재하지 않음 - ID: id
       return res.status(404).json({
         success: false,
         error: '알림을 찾을 수 없습니다.'
@@ -281,15 +281,15 @@ export const markAsRead = async (req: Request, res: Response) => {
     }
     
     const notification = notifResult.rows[0];
-    console.log(`[markAsRead] Notification found:`, {
-      id: notification.id,
-      recipient_id: notification.recipient_id,
-      metadata: notification.metadata
-    });
+    // [markAsRead] Notification found: {
+    //   id: notification.id,
+    //   recipient_id: notification.recipient_id,
+    //   metadata: notification.metadata
+    // }
     
     // 사용자가 이 알림을 볼 권한이 있는지 확인
     let hasAccess = false;
-    console.log(`[markAsRead] Checking access for userIdStr: ${userIdStr}`);
+    // [markAsRead] Checking access for userIdStr: userIdStr
     
     if (notification.recipient_id === userIdStr) {
       // 개인 알림
@@ -305,23 +305,23 @@ export const markAsRead = async (req: Request, res: Response) => {
     }
     
     if (!hasAccess) {
-      console.log(`[markAsRead] ERROR - NO ACCESS - ID: ${id}, User: ${userId}`);
-      console.log(`[markAsRead] Access check details:`, {
-        recipient_id: notification.recipient_id,
-        userIdStr: userIdStr,
-        metadata: notification.metadata
-      });
+      // [markAsRead] ERROR - NO ACCESS - ID: id, User: userId
+      // [markAsRead] Access check details: {
+      //   recipient_id: notification.recipient_id,
+      //   userIdStr: userIdStr,
+      //   metadata: notification.metadata
+      // }
       return res.status(404).json({
         success: false,
         error: '알림을 찾을 수 없습니다.'
       });
     }
     
-    console.log(`[markAsRead] Access granted, proceeding with mark as read...`);
+    // [markAsRead] Access granted, proceeding with mark as read...
     
     // 이미 읽은 알림이면 그대로 반환 (개인 알림의 경우)
     if (notification.recipient_id === userIdStr && notification.read_at) {
-      console.log(`[markAsRead] 이미 읽은 개인 알림 - ID: ${id}`);
+      // [markAsRead] 이미 읽은 개인 알림 - ID: id
       return res.json({
         success: true,
         notification: notification,
@@ -346,9 +346,9 @@ export const markAsRead = async (req: Request, res: Response) => {
           'INSERT INTO notification_reads (notification_id, user_id, read_at) VALUES ($1, $2, CURRENT_TIMESTAMP)',
           [id, userId]
         );
-        console.log(`[markAsRead] ${notification.recipient_id} 알림 읽음 처리 완료 - ID: ${id}, User: ${userId}`);
+        // [markAsRead] notification.recipient_id 알림 읽음 처리 완료 - ID: id, User: userId
       } else {
-        console.log(`[markAsRead] 이미 읽은 ${notification.recipient_id} 알림 - ID: ${id}, User: ${userId}`);
+        // [markAsRead] 이미 읽은 notification.recipient_id 알림 - ID: id, User: userId
       }
       
       // 원본 알림 데이터를 반환하되 read_at을 현재 시간으로 설정
@@ -367,17 +367,17 @@ export const markAsRead = async (req: Request, res: Response) => {
          RETURNING *`,
         [id, userIdStr]
       );
-      console.log(`[markAsRead] 개인 알림 읽음 처리 완료 - ID: ${id}`);
+      // [markAsRead] 개인 알림 읽음 처리 완료 - ID: id
     }
     
-    console.log(`[markAsRead] 읽음 처리 완료:`, result.rows?.[0] || '전체 알림 읽음 처리');
+    // [markAsRead] 읽음 처리 완료: result.rows?.[0] || '전체 알림 읽음 처리'
 
     res.json({
       success: true,
       notification: result.rows[0]
     });
   } catch (error) {
-    console.error('Mark as read error:', error);
+    // Mark as read error: error
     res.status(500).json({
       success: false,
       error: '읽음 처리 중 오류가 발생했습니다.'
@@ -391,7 +391,7 @@ export const markAllAsRead = async (req: Request, res: Response) => {
     const userId = (req as any).user.id;
     const userIdStr = String(userId);
     
-    console.log(`[markAllAsRead] START - User: ${userId}`);
+    // [markAllAsRead] START - User: userId
 
     // 트랜잭션 시작
     const client = await pool.connect();
@@ -399,17 +399,17 @@ export const markAllAsRead = async (req: Request, res: Response) => {
       await client.query('BEGIN');
       
       // 1. 개인 알림 읽음 처리
-      console.log(`[markAllAsRead] Processing personal notifications for user: ${userIdStr}`);
+      // [markAllAsRead] Processing personal notifications for user: userIdStr
       const personalResult = await client.query(
         `UPDATE notifications 
          SET read_at = CURRENT_TIMESTAMP 
          WHERE recipient_id = $1 AND read_at IS NULL`,
         [userIdStr]
       );
-      console.log(`[markAllAsRead] Personal notifications updated: ${personalResult.rowCount}`);
+      // [markAllAsRead] Personal notifications updated: personalResult.rowCount
       
       // 2. 전체 알림과 그룹 알림에 대한 읽음 기록 추가
-      console.log(`[markAllAsRead] Processing all/group notifications`);
+      // [markAllAsRead] Processing all/group notifications
       const groupResult = await client.query(
         `INSERT INTO notification_reads (notification_id, user_id, read_at)
          SELECT n.id, $1::uuid, CURRENT_TIMESTAMP
@@ -425,12 +425,12 @@ export const markAllAsRead = async (req: Request, res: Response) => {
          ON CONFLICT (notification_id, user_id) DO NOTHING`,
         [userId, userIdStr]
       );
-      console.log(`[markAllAsRead] All/Group notifications updated: ${groupResult.rowCount}`);
+      // [markAllAsRead] All/Group notifications updated: groupResult.rowCount
       
       await client.query('COMMIT');
       
       const totalUpdated = personalResult.rowCount + (groupResult.rowCount || 0);
-      console.log(`[markAllAsRead] COMPLETE - Total updated: ${totalUpdated}`);
+      // [markAllAsRead] COMPLETE - Total updated: totalUpdated
       
       res.json({
         success: true,
@@ -443,7 +443,7 @@ export const markAllAsRead = async (req: Request, res: Response) => {
       client.release();
     }
   } catch (error) {
-    console.error('Mark all as read error:', error);
+    // Mark all as read error: error
     res.status(500).json({
       success: false,
       error: '모든 알림 읽음 처리 중 오류가 발생했습니다.'
@@ -475,7 +475,7 @@ export const deleteNotification = async (req: Request, res: Response) => {
       message: '알림이 삭제되었습니다.'
     });
   } catch (error) {
-    console.error('Delete notification error:', error);
+    // Delete notification error: error
     res.status(500).json({
       success: false,
       error: '알림 삭제 중 오류가 발생했습니다.'
@@ -510,7 +510,7 @@ export const getUnreadCount = async (req: Request, res: Response) => {
       count: parseInt(result.rows[0].count)
     });
   } catch (error) {
-    console.error('Get unread count error:', error);
+    // Get unread count error: error
     res.status(500).json({
       success: false,
       error: '읽지 않은 알림 개수 조회 중 오류가 발생했습니다.'
@@ -566,7 +566,7 @@ export const getAllNotifications = async (req: Request, res: Response) => {
       notifications: result.rows
     });
   } catch (error) {
-    console.error('Get all notifications error:', error);
+    // Get all notifications error: error
     res.status(500).json({
       success: false,
       error: '알림 내역 조회 중 오류가 발생했습니다.'

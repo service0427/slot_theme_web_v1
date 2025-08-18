@@ -452,14 +452,14 @@ export function BaseSlotListPage({
 
   // 벌크 페이스트 핸들러
   const handleBulkPaste = (startFromSlotIndex: number, fieldKey: string, values: string[]) => {
-    console.log('[handleBulkPaste] 시작:', { startFromSlotIndex, fieldKey, values });
+    // console.log('[handleBulkPaste] 시작:', { startFromSlotIndex, fieldKey, values });
     
     values.forEach((value, valueIndex) => {
       const targetSlotIndex = startFromSlotIndex + valueIndex;
       if (targetSlotIndex < paginatedSlots.length && value?.trim()) {
         const targetSlot = paginatedSlots[targetSlotIndex];
         if (targetSlot) {
-          console.log(`[handleBulkPaste] 슬롯 ${targetSlot.id}(인덱스: ${targetSlotIndex})에 ${fieldKey}=${value} 설정`);
+              // console.log(`[handleBulkPaste] 슬롯 ${targetSlot.id}(인덱스: ${targetSlotIndex})에 ${fieldKey}=${value} 설정`);
           setSlotsFormData(prev => ({
             ...prev,
             [targetSlot.id]: {
@@ -487,7 +487,7 @@ export function BaseSlotListPage({
       // URL 파싱 필드들은 제거 (사용자에게 보이지 않음)
       setFieldConfigs(listFields);
     } catch (error) {
-      console.error('필드 설정 로드 실패:', error);
+      // console.error('필드 설정 로드 실패:', error);
     } finally {
       setFieldConfigsLoading(false);
     }

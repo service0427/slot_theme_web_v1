@@ -110,7 +110,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           setFieldConfigs(visibleFields);
         }
       } catch (error) {
-        console.error('필드 설정 로드 실패:', error);
+        // console.error('필드 설정 로드 실패:', error);
       }
     };
 
@@ -126,14 +126,14 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     // 필터링된 슬롯 로드
     loadAllSlots(statusFilter === 'all' ? undefined : statusFilter).then(slots => {
       if (slots.length > 0) {
-        console.log('[DEBUG] 첫 번째 슬롯 상세:', {
-          id: slots[0].id,
-          thumbnail: (slots[0] as any).thumbnail,
-          rank: (slots[0] as any).rank,
-          first_rank: (slots[0] as any).first_rank,
-          status: slots[0].status,
-          keyword: (slots[0] as any).keyword
-        });
+        // console.log('[DEBUG] 첫 번째 슬롯 상세:', {
+        //   id: slots[0].id,
+        //   thumbnail: (slots[0] as any).thumbnail,
+        //   rank: (slots[0] as any).rank,
+        //   first_rank: (slots[0] as any).first_rank,
+        //   status: slots[0].status,
+        //   keyword: (slots[0] as any).keyword
+        // });
       }
       
       let filteredSlots = slots;
@@ -319,7 +319,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
         alert('환불 처리에 실패했습니다.');
       }
     } catch (error) {
-      console.error('환불 처리 오류:', error);
+      // console.error('환불 처리 오류:', error);
       alert('환불 처리 중 오류가 발생했습니다.');
     }
   };
@@ -344,7 +344,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
         alert('히스토리 조회에 실패했습니다.');
       }
     } catch (error) {
-      console.error('히스토리 조회 오류:', error);
+      // console.error('히스토리 조회 오류:', error);
       alert('히스토리 조회 중 오류가 발생했습니다.');
     }
   };
@@ -427,7 +427,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
         alert(error.error || '슬롯 수정에 실패했습니다.');
       }
     } catch (error) {
-      console.error('슬롯 수정 오류:', error);
+      // console.error('슬롯 수정 오륙:', error);
       alert('슬롯 수정 중 오류가 발생했습니다.');
     }
   };
@@ -652,7 +652,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="키워드, 광고주명, 이메일, URL로 검색..."
+            placeholder="키워드, 광고주명, 아이디, URL로 검색..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -718,7 +718,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                     <div>
                       <div className="font-medium text-xs">{slot.userName || '이름 없음'}</div>
-                      <div className="text-xs text-gray-500">{slot.userEmail || 'email@example.com'}</div>
+                      <div className="text-xs text-gray-500">{slot.userEmail || 'user_id'}</div>
                     </div>
                   </td>
                   {/* 썸네일 */}

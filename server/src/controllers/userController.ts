@@ -130,7 +130,7 @@ export async function getUsers(req: AuthRequest, res: Response) {
       }
     });
   } catch (error) {
-    console.error('Get users error:', error);
+    // Get users error: error
     res.status(500).json({
       success: false,
       error: '사용자 목록 조회 중 오류가 발생했습니다.'
@@ -169,7 +169,7 @@ export async function getUser(req: AuthRequest, res: Response) {
       }
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    // Get user error: error
     res.status(500).json({
       success: false,
       error: '사용자 조회 중 오류가 발생했습니다.'
@@ -226,7 +226,7 @@ export async function createUser(req: AuthRequest, res: Response) {
       }
     });
   } catch (error) {
-    console.error('Create user error:', error);
+    // Create user error: error
     res.status(500).json({
       success: false,
       error: '사용자 생성 중 오류가 발생했습니다.'
@@ -304,7 +304,7 @@ export async function updateUser(req: AuthRequest, res: Response) {
       }
     });
   } catch (error) {
-    console.error('Update user error:', error);
+    // Update user error: error
     res.status(500).json({
       success: false,
       error: '사용자 정보 업데이트 중 오류가 발생했습니다.'
@@ -341,7 +341,7 @@ export async function deleteUser(req: AuthRequest, res: Response) {
       message: '사용자가 삭제되었습니다.'
     });
   } catch (error) {
-    console.error('Delete user error:', error);
+    // Delete user error: error
     res.status(500).json({
       success: false,
       error: '사용자 삭제 중 오류가 발생했습니다.'
