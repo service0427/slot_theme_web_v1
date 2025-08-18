@@ -568,11 +568,22 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
                 <input
                   type="text"
                   value={newUser.email}
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // 영어와 숫자만 허용 (정규식 검증)
+                    const alphanumericRegex = /^[a-zA-Z0-9]*$/;
+                    if (!alphanumericRegex.test(value)) {
+                      return;
+                    }
+                    setNewUser({ ...newUser, email: value });
+                  }}
                   className={mergedTheme.modalInputClass}
-                  placeholder="사용자 아이디"
+                  placeholder="사용자 아이디 (영문, 숫자만)"
                   required
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  아이디는 영문자와 숫자만 사용 가능합니다
+                </p>
               </div>
               
               <div>

@@ -97,9 +97,23 @@ export async function getSlots(req: AuthRequest, res: Response) {
       params.push(queryUserId);
       countParams.push(queryUserId);
       query = `
-        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price, s.product_name, s.thumbnail, s.rank, s.first_rank
+        SELECT s.*, 
+               u.email as user_email, 
+               u.full_name as user_name, 
+               s.approved_price, 
+               s.product_name, 
+               s.thumbnail,
+               COALESCE(rd_today.rank, 0) as current_rank,
+               rd_yesterday.rank as yesterday_rank,
+               rd_today.fail_count as fail_count,
+               CASE 
+                 WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
+                 ELSE false
+               END as is_processing
         FROM slots s
         JOIN users u ON s.user_id = u.id
+        LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
+        LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
         WHERE s.user_id = $1
       `;
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
@@ -107,9 +121,23 @@ export async function getSlots(req: AuthRequest, res: Response) {
     // 관리자/개발자가 모든 슬롯 조회
     else if (userRole === 'operator' || userRole === 'developer') {
       query = `
-        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price, s.product_name, s.thumbnail, s.rank, s.first_rank
+        SELECT s.*, 
+               u.email as user_email, 
+               u.full_name as user_name, 
+               s.approved_price, 
+               s.product_name, 
+               s.thumbnail,
+               COALESCE(rd_today.rank, 0) as current_rank,
+               rd_yesterday.rank as yesterday_rank,
+               rd_today.fail_count as fail_count,
+               CASE 
+                 WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
+                 ELSE false
+               END as is_processing
         FROM slots s
         JOIN users u ON s.user_id = u.id
+        LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
+        LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
         WHERE 1=1
       `;
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE 1=1';
@@ -119,9 +147,23 @@ export async function getSlots(req: AuthRequest, res: Response) {
       params.push(userId);
       countParams.push(userId);
       query = `
-        SELECT s.*, u.email as user_email, u.full_name as user_name, s.approved_price, s.product_name, s.thumbnail, s.rank, s.first_rank
+        SELECT s.*, 
+               u.email as user_email, 
+               u.full_name as user_name, 
+               s.approved_price, 
+               s.product_name, 
+               s.thumbnail,
+               COALESCE(rd_today.rank, 0) as current_rank,
+               rd_yesterday.rank as yesterday_rank,
+               rd_today.fail_count as fail_count,
+               CASE 
+                 WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
+                 ELSE false
+               END as is_processing
         FROM slots s
         JOIN users u ON s.user_id = u.id
+        LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
+        LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
         WHERE s.user_id = $1
       `;
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
@@ -201,6 +243,38 @@ export async function getSlots(req: AuthRequest, res: Response) {
       // 각 슬롯에 field_values 할당
       slots.forEach(slot => {
         slot.fieldValues = fieldValuesBySlot[slot.id] || [];
+      });
+    }
+    
+    // 디버그: rank 데이터 확인
+    if (slots.length > 0) {
+      // 특정 슬롯 찾기
+      const targetSlot = slots.find(s => s.id === '68d62365-d548-452c-aecf-ccc7af611ad7');
+      if (targetSlot) {
+        console.log('[DEBUG] Target slot (68d62365) rank data:', {
+          id: targetSlot.id,
+          current_rank: targetSlot.current_rank,
+          yesterday_rank: targetSlot.yesterday_rank,
+          is_processing: targetSlot.is_processing,
+          fail_count: targetSlot.fail_count
+        });
+      }
+    }
+    
+    // current_rank를 rank로 맵핑 (프론트엔드 호환성)
+    slots.forEach(slot => {
+      slot.rank = slot.current_rank;
+      delete slot.current_rank;
+    });
+    
+    // 맵핑 후 데이터 확인
+    const targetSlotAfter = slots.find(s => s.id === '68d62365-d548-452c-aecf-ccc7af611ad7');
+    if (targetSlotAfter) {
+      console.log('[DEBUG] After mapping - Target slot:', {
+        id: targetSlotAfter.id,
+        rank: targetSlotAfter.rank,
+        yesterday_rank: targetSlotAfter.yesterday_rank,
+        is_processing: targetSlotAfter.is_processing
       });
     }
 

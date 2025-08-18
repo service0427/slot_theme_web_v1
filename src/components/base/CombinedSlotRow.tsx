@@ -459,27 +459,38 @@ function CombinedSlotRowComponent({
       
       {/* 시스템 필드들 */}
       <td className="px-3 py-4 text-center border-r text-sm">
-        {slot.rank ? (
+        {(() => {
+          console.log('Slot rank data:', { 
+            id: slot.id, 
+            rank: slot.rank, 
+            yesterday_rank: slot.yesterday_rank,
+            is_processing: slot.is_processing 
+          });
+          return null;
+        })()}
+        {slot.is_processing ? (
+          <span className="text-blue-600 font-medium">진행중</span>
+        ) : slot.rank && slot.rank > 0 ? (
           <div className="flex items-center justify-center gap-1">
             <span className="font-semibold text-gray-900">{slot.rank}</span>
-            {slot.first_rank && (
+            {slot.yesterday_rank && (
               <span className={`text-xs ${
-                slot.first_rank > slot.rank 
+                slot.yesterday_rank > slot.rank 
                   ? 'text-green-600' 
-                  : slot.first_rank < slot.rank 
+                  : slot.yesterday_rank < slot.rank 
                     ? 'text-red-600' 
                     : 'text-gray-500'
               }`}>
-                {slot.first_rank > slot.rank 
-                  ? `(▲${slot.first_rank - slot.rank})` 
-                  : slot.first_rank < slot.rank 
-                    ? `(▼${slot.rank - slot.first_rank})` 
+                {slot.yesterday_rank > slot.rank 
+                  ? `(▲${slot.yesterday_rank - slot.rank})` 
+                  : slot.yesterday_rank < slot.rank 
+                    ? `(▼${slot.rank - slot.yesterday_rank})` 
                     : '(-)'}
               </span>
             )}
           </div>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-gray-400">순위없음</span>
         )}
       </td>
       <td className="px-3 py-4 text-center border-r text-gray-400 text-sm">

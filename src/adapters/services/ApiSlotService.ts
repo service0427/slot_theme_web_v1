@@ -72,6 +72,12 @@ export class ApiSlotService extends BaseSlotService {
           
           // fieldValues를 별도로 저장
           (slot as any).fieldValues = item.fieldValues;
+          
+          // rank 관련 필드 추가
+          (slot as any).rank = item.rank || 0;
+          (slot as any).yesterday_rank = item.yesterday_rank;
+          (slot as any).is_processing = item.is_processing;
+          (slot as any).fail_count = item.fail_count;
           (slot as any).slot_number = item.slot_number;
           (slot as any).is_empty = item.is_empty;
           (slot as any).url = item.url;
@@ -487,6 +493,12 @@ export class ApiSlotService extends BaseSlotService {
 
           // fieldValues를 별도로 저장
           (slot as any).fieldValues = item.fieldValues;
+          
+          // rank 관련 필드 추가
+          (slot as any).rank = item.rank || 0;
+          (slot as any).yesterday_rank = item.yesterday_rank;
+          (slot as any).is_processing = item.is_processing;
+          (slot as any).fail_count = item.fail_count;
           (slot as any).slot_number = item.slot_number;
           (slot as any).is_empty = item.is_empty;
           (slot as any).url = item.url;

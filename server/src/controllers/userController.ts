@@ -188,6 +188,15 @@ export async function createUser(req: AuthRequest, res: Response) {
       });
     }
     
+    // 아이디 영문자와 숫자만 허용
+    const alphanumericRegex = /^[a-zA-Z0-9]+$/;
+    if (!alphanumericRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: '아이디는 영문자와 숫자만 사용 가능합니다.'
+      });
+    }
+    
     // 이메일 중복 확인
     const existingUser = await pool.query(
       'SELECT id FROM users WHERE email = $1',

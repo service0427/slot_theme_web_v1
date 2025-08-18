@@ -171,27 +171,29 @@ export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResum
       {/* 시스템 필드들 */}
       {/* 순위 */}
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
-        {(slot as any).rank ? (
+        {(slot as any).is_processing ? (
+          <span className="text-blue-600 font-medium">진행중</span>
+        ) : (slot as any).rank && (slot as any).rank > 0 ? (
           <div className="flex items-center justify-center gap-1">
             <span className="font-semibold text-gray-900">{(slot as any).rank}</span>
-            {(slot as any).first_rank && (
+            {(slot as any).yesterday_rank && (
               <span className={`text-xs ${
-                (slot as any).first_rank > (slot as any).rank 
+                (slot as any).yesterday_rank > (slot as any).rank 
                   ? 'text-green-600' 
-                  : (slot as any).first_rank < (slot as any).rank 
+                  : (slot as any).yesterday_rank < (slot as any).rank 
                     ? 'text-red-600' 
                     : 'text-gray-500'
               }`}>
-                {(slot as any).first_rank > (slot as any).rank 
-                  ? `(▲${(slot as any).first_rank - (slot as any).rank})` 
-                  : (slot as any).first_rank < (slot as any).rank 
-                    ? `(▼${(slot as any).rank - (slot as any).first_rank})` 
+                {(slot as any).yesterday_rank > (slot as any).rank 
+                  ? `(▲${(slot as any).yesterday_rank - (slot as any).rank})` 
+                  : (slot as any).yesterday_rank < (slot as any).rank 
+                    ? `(▼${(slot as any).rank - (slot as any).yesterday_rank})` 
                     : '(-)'}
               </span>
             )}
           </div>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-gray-400">순위없음</span>
         )}
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-500">
