@@ -18,7 +18,11 @@ export function SlotListPage() {
   const [showBulkRegistrationModal, setShowBulkRegistrationModal] = useState(false);
   const [viewType, setViewType] = useState<ViewType>('list');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(12);
+  // localStorage에서 리스트 개수 설정 불러오기
+  const [itemsPerPage, setItemsPerPage] = useState(() => {
+    const saved = localStorage.getItem('listItemsPerPage');
+    return saved ? Number(saved) : 10;
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -145,13 +149,16 @@ export function SlotListPage() {
             <select
               value={itemsPerPage}
               onChange={(e) => {
-                setItemsPerPage(Number(e.target.value));
+                const newValue = Number(e.target.value);
+                setItemsPerPage(newValue);
                 setCurrentPage(1);
+                // localStorage에 저장
+                localStorage.setItem('listItemsPerPage', newValue.toString());
               }}
               className="px-3 py-2 border border-gray-300 rounded-lg"
             >
               <option value={10}>10개씩</option>
-              <option value={20}>20개씩</option>
+              <option value={30}>30개씩</option>
               <option value={50}>50개씩</option>
               <option value={100}>100개씩</option>
             </select>

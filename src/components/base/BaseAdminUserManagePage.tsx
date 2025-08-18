@@ -55,7 +55,11 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
     total: 0,
     totalPages: 0
   });
-  const [pageSize, setPageSize] = useState(10);
+  // localStorage에서 리스트 개수 설정 불러오기
+  const [pageSize, setPageSize] = useState(() => {
+    const saved = localStorage.getItem('listItemsPerPage');
+    return saved ? Number(saved) : 10;
+  });
 
   // 슬롯 할당 관련 상태
   const [showSlotAllocationModal, setShowSlotAllocationModal] = useState(false);
@@ -188,6 +192,8 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
       limit: newSize,
       page: 1 
     }));
+    // localStorage에 저장
+    localStorage.setItem('listItemsPerPage', newSize.toString());
   };
 
   // 사용자 추가
@@ -444,6 +450,7 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
           className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value={10}>10개씩</option>
+          <option value={30}>30개씩</option>
           <option value={50}>50개씩</option>
           <option value={100}>100개씩</option>
         </select>

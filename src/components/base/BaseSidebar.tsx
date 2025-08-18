@@ -85,10 +85,12 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
         <h2 className={styles.title}>{getSetting('siteName', 'business') || 'Simple Slot'}</h2>
         
         <div className={styles.userInfo}>
-          <div>{user?.email || 'test@example.com'}</div>
-          <div className="font-medium">{user?.fullName || '홍길동'}</div>
+          <div className="text-sm text-gray-700">
+            <span className="font-semibold">{user?.email || 'test@example.com'}</span>
+            <span className="text-gray-500 ml-1">({user?.fullName || '홍길동'})</span>
+          </div>
           {config.useCashSystem && (
-            <div className={styles.balance}>
+            <div className={`${styles.balance} mt-2`}>
               {balance ? balance.amount.toLocaleString() : '0'}원
             </div>
           )}

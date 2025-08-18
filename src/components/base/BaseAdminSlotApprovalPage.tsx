@@ -63,7 +63,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [currentPage, setCurrentPage] = useState(1);
   const [viewingHistorySlot, setViewingHistorySlot] = useState<string | null>(null);
   const [slotHistory, setSlotHistory] = useState<any[]>([]);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  // localStorage에서 리스트 개수 설정 불러오기
+  const [itemsPerPage, setItemsPerPage] = useState(() => {
+    const saved = localStorage.getItem('listItemsPerPage');
+    return saved ? Number(saved) : 10;
+  });
   const [editingSlot, setEditingSlot] = useState<UserSlot | null>(null);
   const [editFormData, setEditFormData] = useState<Record<string, string>>({});
 
@@ -657,6 +661,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {/* 금액 필터 - 주석처리
           <input
             type="number"
             placeholder="최소 금액"
@@ -664,6 +669,24 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
             onChange={(e) => setPriceFilter(e.target.value)}
             className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          */}
+          {/* 리스트 개수 선택 - 페이징과 관계없이 항상 표시 */}
+          <select
+            value={itemsPerPage}
+            onChange={(e) => {
+              const newValue = Number(e.target.value);
+              setItemsPerPage(newValue);
+              setCurrentPage(1);
+              // localStorage에 저장
+              localStorage.setItem('listItemsPerPage', newValue.toString());
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value={10}>10개씩</option>
+            <option value={30}>30개씩</option>
+            <option value={50}>50개씩</option>
+            <option value={100}>100개씩</option>
+          </select>
         </div>
       </div>
 
@@ -695,11 +718,13 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">순위</th>
                 {/* URL 파싱 필드들 */}
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">상품ID</th>
+                {/* 아이템ID, 판매자ID - 주석처리
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">아이템ID</th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">판매자ID</th>
+                */}
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">시작일</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">종료일</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">금액</th>
+                {/* <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">금액</th> */}
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">액션</th>
               </tr>
@@ -794,12 +819,13 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       <span className="text-gray-400">순위없음</span>
                     )}
                   </td>
-                  {/* URL 파싱 필드들 */}
+                  {/* URL 파싱 필드들 - 상품ID만 표시 */}
                   <td className="px-3 py-2 text-sm text-gray-900">
                     <span className="text-xs">
                       {getSlotFieldValue(slot, 'url_product_id') || '-'}
                     </span>
                   </td>
+                  {/* 아이템ID, 판매자ID - 주석처리
                   <td className="px-3 py-2 text-sm text-gray-900">
                     <span className="text-xs">
                       {getSlotFieldValue(slot, 'url_item_id') || '-'}
@@ -810,6 +836,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       {getSlotFieldValue(slot, 'url_vendor_item_id') || '-'}
                     </span>
                   </td>
+                  */}
                   {/* 시작일 */}
                   <td className="px-3 py-2 text-sm text-gray-900">
                     {slot.startDate ? (
@@ -838,6 +865,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       </div>
                     ) : '-'}
                   </td>
+                  {/* 금액 - 주석처리
                   <td className="px-3 py-2 text-sm font-medium text-gray-900">
                     <div className="flex items-center gap-2">
                       {slot.approvedPrice ? `₩${Math.floor(slot.approvedPrice).toLocaleString()}` : 
@@ -857,6 +885,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       )}
                     </div>
                   </td>
+                  */}
                   <td className="px-3 py-2 text-sm">
                     <div className="relative inline-block group">
                       <span 
@@ -981,18 +1010,6 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 전체 {pendingSlots.length}개 중 {startIndex + 1}-{Math.min(endIndex, pendingSlots.length)}개 표시
               </div>
               <div className="flex gap-2">
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value={10}>10개씩</option>
-                  <option value={50}>50개씩</option>
-                  <option value={100}>100개씩</option>
-                </select>
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}

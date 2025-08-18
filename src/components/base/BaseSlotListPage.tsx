@@ -423,7 +423,11 @@ export function BaseSlotListPage({
   const [showBulkRegistrationModal, setShowBulkRegistrationModal] = useState(false);
   const [viewType, setViewType] = useState<ViewType>('list');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  // localStorage에서 리스트 개수 설정 불러오기
+  const [itemsPerPage, setItemsPerPage] = useState(() => {
+    const saved = localStorage.getItem('listItemsPerPage');
+    return saved ? Number(saved) : 10;
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
@@ -899,6 +903,24 @@ export function BaseSlotListPage({
             <option value="rejected">거절됨</option>
           </select>
           
+          {/* 리스트 개수 선택 - 페이징과 관계없이 항상 표시 */}
+          <select
+            value={itemsPerPage}
+            onChange={(e) => {
+              const newValue = Number(e.target.value);
+              setItemsPerPage(newValue);
+              setCurrentPage(1);
+              // localStorage에 저장
+              localStorage.setItem('listItemsPerPage', newValue.toString());
+            }}
+            className={styles.select}
+          >
+            <option value={10}>10개씩</option>
+            <option value={30}>30개씩</option>
+            <option value={50}>50개씩</option>
+            <option value={100}>100개씩</option>
+          </select>
+          
           {/* 선슬롯발행 모드에서 전체 저장 버튼 */}
           {slotOperationMode === 'pre-allocation' && (
             <button
@@ -1177,18 +1199,6 @@ export function BaseSlotListPage({
           {/* 페이징 */}
           {totalPages > 1 && (
             <div className={styles.pagination.container}>
-              <select
-                value={itemsPerPage}
-                onChange={(e) => {
-                  setItemsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value={10}>10개씩</option>
-                <option value={50}>50개씩</option>
-                <option value={100}>100개씩</option>
-              </select>
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
