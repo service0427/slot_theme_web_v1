@@ -297,7 +297,7 @@ export function BaseSlotAllocationHistoryPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm font-medium text-gray-900">
-                        {allocation.price_per_slot.toLocaleString()}원
+                        {Math.floor(allocation.price_per_slot).toLocaleString()}원
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700">
