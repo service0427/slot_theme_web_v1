@@ -89,4 +89,58 @@ router.get('/:id/rank-delete-query', authenticateToken, async (req, res) => {
   }
 });
 
+// rank_daily 데이터 실제 삭제
+router.delete('/:id/rank-data', authenticateToken, async (req, res) => {
+  const { pool } = require('../config/database');
+  
+  try {
+    const { id } = req.params;
+    
+    // 권한 확인 (관리자나 슬롯 소유자만 가능)
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    
+    // 슬롯 소유자 확인
+    const slotResult = await pool.query(
+      'SELECT user_id FROM slots WHERE id = $1',
+      [id]
+    );
+    
+    if (slotResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Slot not found'
+      });
+    }
+    
+    const slotOwnerId = slotResult.rows[0].user_id;
+    
+    // 권한 체크: 관리자이거나 슬롯 소유자여야 함
+    if (userRole !== 'operator' && userRole !== 'developer' && userId !== slotOwnerId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized'
+      });
+    }
+    
+    // rank_daily 데이터 삭제
+    const deleteResult = await pool.query(
+      'DELETE FROM rank_daily WHERE slot_id = $1',
+      [id]
+    );
+    
+    res.json({
+      success: true,
+      message: `Deleted ${deleteResult.rowCount} rank records`,
+      deletedCount: deleteResult.rowCount
+    });
+  } catch (error) {
+    console.error('Error deleting rank data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete rank data'
+    });
+  }
+});
+
 export { router as slotRoutes };

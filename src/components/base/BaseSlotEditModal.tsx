@@ -91,22 +91,25 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
         return;
       }
       
-      // rank_daily 삭제 쿼리 가져오기 (실제 삭제는 하지 않음)
+      // rank_daily 데이터 실제 삭제
       try {
         const token = localStorage.getItem('accessToken');
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
-        const response = await fetch(`${apiUrl}/slots/${slot.id}/rank-delete-query`, {
+        const response = await fetch(`${apiUrl}/slots/${slot.id}/rank-data`, {
+          method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
         
         if (response.ok) {
-          const deleteQuery = await response.text();
-          console.log('Rank delete query:', deleteQuery);
+          const result = await response.json();
+          console.log('Rank data deleted:', result.message);
+        } else {
+          console.error('Failed to delete rank data');
         }
       } catch (error) {
-        console.error('Failed to get rank delete query:', error);
+        console.error('Failed to delete rank data:', error);
       }
     }
     

@@ -468,8 +468,10 @@ function CombinedSlotRowComponent({
           });
           return null;
         })()}
-        {slot.is_processing ? (
-          <span className="text-blue-600 font-medium">진행중</span>
+        {slot.status === 'empty' ? (
+          <span className="text-gray-400">-</span>
+        ) : slot.is_processing ? (
+          <span className="text-blue-600 font-medium">측정중</span>
         ) : slot.rank && slot.rank > 0 ? (
           <div className="flex items-center justify-center gap-1">
             <span className="font-semibold text-gray-900">{slot.rank}</span>

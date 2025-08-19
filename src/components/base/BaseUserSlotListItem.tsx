@@ -171,8 +171,10 @@ export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResum
       {/* 시스템 필드들 */}
       {/* 순위 */}
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
-        {(slot as any).is_processing ? (
-          <span className="text-blue-600 font-medium">진행중</span>
+        {slot.status === 'empty' ? (
+          <span className="text-gray-400">-</span>
+        ) : (slot as any).is_processing ? (
+          <span className="text-blue-600 font-medium">측정중</span>
         ) : (slot as any).rank && (slot as any).rank > 0 ? (
           <div className="flex items-center justify-center gap-1">
             <span className="font-semibold text-gray-900">{(slot as any).rank}</span>
