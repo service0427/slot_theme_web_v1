@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { 
   getSlots, 
   getSlotCount,
@@ -17,7 +17,7 @@ import {
   getSlotAllocationHistory,
   updatePaymentStatus
 } from '../controllers/slotController';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -73,7 +73,7 @@ router.get('/:id/logs', getSlotChangeLogs);
 router.get('/user/:userId/logs', getUserSlotChangeLogs);
 
 // rank_daily 삭제 쿼리 반환 (실제 삭제하지 않음)
-router.get('/:id/rank-delete-query', authenticateToken, async (req, res) => {
+router.get('/:id/rank-delete-query', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     
@@ -90,7 +90,7 @@ router.get('/:id/rank-delete-query', authenticateToken, async (req, res) => {
 });
 
 // rank_daily 데이터 실제 삭제
-router.delete('/:id/rank-data', authenticateToken, async (req, res) => {
+router.delete('/:id/rank-data', authenticateToken, async (req: AuthRequest, res: Response) => {
   const { pool } = require('../config/database');
   
   try {
