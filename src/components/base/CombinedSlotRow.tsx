@@ -40,8 +40,8 @@ function CombinedSlotRowComponent({
   const isWaiting = slot.status === 'active' && start && now < start;
   const isCompleted = slot.status === 'active' && end && now > end;
   
-  // 빈 슬롯만 inline 편집 가능
-  const canInlineEdit = isEmptySlot;
+  // 모든 슬롯 inline 편집 가능 (엑셀 붙여넣기 지원)
+  const canInlineEdit = true;
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -366,7 +366,7 @@ function CombinedSlotRowComponent({
         
         return (
           <td key={field.field_key} className={`${isReadOnlyField ? 'px-1 py-2' : 'px-3 py-2'} border-r`}>
-            {canInlineEdit && !isReadOnlyField ? (
+            {!isReadOnlyField ? (
               <div className="relative">
                 <div className="flex items-center gap-1">
                   <input
@@ -498,23 +498,31 @@ function CombinedSlotRowComponent({
           year: 'numeric',
           month: '2-digit',
           day: '2-digit'
-        }).replace(/\./g, '-').replace(/-$/, '') : '-'}
+        }).replace(/\. /g, '-').replace(/\.$/, '') : '-'}
       </td>
       <td className="px-3 py-4 text-center border-r text-sm">
         {slot.endDate ? (() => {
           const now = new Date();
           const end = new Date(slot.endDate);
           const timeLeft = end.getTime() - now.getTime();
-          const daysLeft = timeLeft / (1000 * 60 * 60 * 24);
+          const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
           
           let colorClass = 'text-gray-400'; // 기본 색상
+          let daysText = '';
           
           if (now > end) {
             colorClass = 'text-green-600 font-medium'; // 완료 - 녹색
-          } else if (daysLeft <= 3) {
-            colorClass = 'text-red-600 font-semibold'; // 3일 미만 - 빨간색
-          } else if (daysLeft <= 7) {
-            colorClass = 'text-orange-500 font-medium'; // 1주일 미만 - 주황색
+            daysText = '(완료)';
+          } else if (daysLeft === 0) {
+            colorClass = 'text-red-600 font-semibold'; // 오늘 - 빨간색
+            daysText = '(오늘)';
+          } else if (daysLeft > 0) {
+            if (daysLeft <= 3) {
+              colorClass = 'text-red-600 font-semibold'; // 3일 미만 - 빨간색
+            } else if (daysLeft <= 7) {
+              colorClass = 'text-orange-500 font-medium'; // 1주일 미만 - 주황색
+            }
+            daysText = `(${daysLeft}일)`;
           }
           
           return (
@@ -523,7 +531,8 @@ function CombinedSlotRowComponent({
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit'
-              }).replace(/\./g, '-').replace(/-$/, '')}
+              }).replace(/\. /g, '-').replace(/\.$/, '')}
+              {daysText && <span className="ml-1">{daysText}</span>}
             </span>
           );
         })() : <span className="text-gray-400">-</span>}
@@ -603,7 +612,8 @@ function CombinedSlotRowComponent({
       
       {/* 액션 컬럼 */}
       <td className="px-3 py-4 text-center">
-        {canInlineEdit && onSave ? (
+        {isEmptySlot && onSave ? (
+          // empty 슬롯은 저장 버튼
           <button
             onClick={handleSave}
             disabled={isSaving}
@@ -615,7 +625,8 @@ function CombinedSlotRowComponent({
           >
             {isSaving ? '저장 중...' : '저장'}
           </button>
-        ) : onEdit ? (
+        ) : !isEmptySlot && onEdit ? (
+          // empty가 아닌 슬롯은 수정 버튼 (모달 열기)
           <button
             onClick={onEdit}
             className="px-3 py-1 text-xs font-medium bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"

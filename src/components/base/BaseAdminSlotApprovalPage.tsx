@@ -403,10 +403,42 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const handleSaveEdit = async () => {
     if (!editingSlot) return;
     
-    try {
-      const token = localStorage.getItem('accessToken');
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+    // 기존 값과 비교
+    let hasKeywordOrUrlChange = false;
+    
+    // keyword 필드 체크
+    const oldKeyword = getSlotFieldValue(editingSlot, 'keyword') || '';
+    const newKeyword = editFormData.keyword || '';
+    if (oldKeyword !== newKeyword) hasKeywordOrUrlChange = true;
+    
+    // url 필드 체크
+    const oldUrl = getSlotFieldValue(editingSlot, 'url') || '';
+    const newUrl = editFormData.url || '';
+    if (oldUrl !== newUrl) hasKeywordOrUrlChange = true;
+    
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+    const token = localStorage.getItem('accessToken');
+    
+    if (hasKeywordOrUrlChange) {
+      if (!confirm('키워드, URL 변경할 경우 기존 순위 정보는 초기화 됩니다.\n계속하시겠습니까?')) {
+        return;
+      }
       
+      // rank_daily 삭제 쿼리 로그
+      try {
+        const response = await fetch(`${API_BASE_URL}/slots/${editingSlot.id}/rank-delete-query`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const query = await response.text();
+        console.log('Rank delete query for slot:', editingSlot.id, '\nQuery:', query);
+      } catch (error) {
+        console.error('Failed to get rank delete query:', error);
+      }
+    }
+    
+    try {
       const response = await fetch(`${API_BASE_URL}/slots/${editingSlot.id}/update-fields`, {
         method: 'PUT',
         headers: {
@@ -535,7 +567,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
               전체 슬롯: {statusCounts.all}개
               {isPreAllocationMode && (
                 <span className="ml-2">
-                  (입력대기: {statusCounts.empty}, 진행대기: {statusCounts.waiting}, 
+                  (대기: {statusCounts.empty}, 진행대기: {statusCounts.waiting}, 
                   진행중: {statusCounts.active}, 완료: {statusCounts.completed}, 일시정지: {statusCounts.paused})
                 </span>
               )}
@@ -573,7 +605,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                     : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
                 }`}
               >
-                입력대기 ({statusCounts.empty})
+                대기 ({statusCounts.empty})
               </button>
               <button
                 onClick={() => setStatusFilter('waiting')}
@@ -794,8 +826,10 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   })}
                   {/* 순위 */}
                   <td className="px-3 py-2 text-center text-sm">
-                    {(slot as any).is_processing ? (
-                      <span className="text-blue-600 font-medium">진행중</span>
+                    {slot.status === 'empty' ? (
+                      <span className="text-gray-400">-</span>
+                    ) : (slot as any).is_processing ? (
+                      <span className="text-blue-600 font-medium">측정중</span>
                     ) : (slot as any).rank && (slot as any).rank > 0 ? (
                       <div className="flex items-center justify-center gap-1">
                         <span className="font-semibold text-gray-900">{(slot as any).rank}</span>
@@ -887,32 +921,33 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   </td>
                   */}
                   <td className="px-3 py-2 text-sm">
-                    <div className="relative inline-block group">
-                      <span 
-                        className={`inline-flex px-2 py-1 text-xs rounded-full ${(() => {
-                          if (slot.status === 'empty') return 'bg-blue-100 text-blue-800';
-                          if (slot.status === 'pending') return 'bg-yellow-100 text-yellow-800';
-                          if (slot.status === 'rejected') return 'bg-red-100 text-red-800';
-                          if (slot.status === 'paused') return 'bg-gray-100 text-gray-800';
-                          if (slot.status === 'refunded') return 'bg-purple-100 text-purple-800';
-                          if (slot.status === 'active') {
-                            const now = new Date();
-                            const start = slot.startDate ? new Date(slot.startDate) : null;
-                            const end = slot.endDate ? new Date(slot.endDate) : null;
-                            if (start && now < start) return 'bg-blue-100 text-blue-800';
-                            if (end && now > end) return 'bg-gray-100 text-gray-800';
-                            return 'bg-green-100 text-green-800';
-                          }
-                          return 'bg-gray-100 text-gray-800';
-                        })()}`}
-                      >
-                        {(() => {
-                          if (slot.status === 'empty') return '입력대기';
-                          if (slot.status === 'pending') return '승인대기';
-                          if (slot.status === 'rejected') return '거부됨';
-                          if (slot.status === 'paused') return '일시정지';
-                          if (slot.status === 'refunded') return '환불됨';
-                          if (slot.status === 'active') {
+                    <div className="flex items-center gap-2">
+                      <div className="relative inline-block group">
+                        <span 
+                          className={`inline-flex px-2 py-1 text-xs rounded-full ${(() => {
+                            if (slot.status === 'empty') return 'bg-blue-100 text-blue-800';
+                            if (slot.status === 'pending') return 'bg-yellow-100 text-yellow-800';
+                            if (slot.status === 'rejected') return 'bg-red-100 text-red-800';
+                            if (slot.status === 'paused') return 'bg-gray-100 text-gray-800';
+                            if (slot.status === 'refunded') return 'bg-purple-100 text-purple-800';
+                            if (slot.status === 'active') {
+                              const now = new Date();
+                              const start = slot.startDate ? new Date(slot.startDate) : null;
+                              const end = slot.endDate ? new Date(slot.endDate) : null;
+                              if (start && now < start) return 'bg-blue-100 text-blue-800';
+                              if (end && now > end) return 'bg-gray-100 text-gray-800';
+                              return 'bg-green-100 text-green-800';
+                            }
+                            return 'bg-gray-100 text-gray-800';
+                          })()}`}
+                        >
+                          {(() => {
+                            if (slot.status === 'empty') return '대기';
+                            if (slot.status === 'pending') return '승인대기';
+                            if (slot.status === 'rejected') return '거부됨';
+                            if (slot.status === 'paused') return '일시정지';
+                            if (slot.status === 'refunded') return '환불';
+                            if (slot.status === 'active') {
                             const now = new Date();
                             const start = slot.startDate ? new Date(slot.startDate) : null;
                             const end = slot.endDate ? new Date(slot.endDate) : null;
@@ -942,7 +977,14 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                         </div>
                       )}
                     </div>
-                  </td>
+                    {/* 결제 완료 표시 */}
+                    {(slot as any).payment_completed && (
+                      <span className="inline-flex px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-800 ml-2">
+                        결제
+                      </span>
+                    )}
+                  </div>
+                </td>
                   {/* 액션 버튼들 */}
                   <td className="px-3 py-2 text-sm">
                     <div className="flex gap-1">
@@ -995,6 +1037,15 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                             히스토리
                           </button>
                         </>
+                      )}
+                      {slot.status === 'empty' && (
+                        <button
+                          onClick={() => setRefundingSlot(slot.id)}
+                          className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                          title="환불"
+                        >
+                          환불
+                        </button>
                       )}
                     </div>
                   </td>
@@ -1302,18 +1353,40 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                             {(() => {
                               // 변경 타입별 메시지 생성
                               if (log.change_type === 'field_update' && log.field_key) {
-                                const fieldName = fieldNameMap[log.field_key] || log.field_key;
+                                // URL 파싱 필드들은 히스토리에서 제외
+                                if (['url_product_id', 'url_item_id', 'url_vendor_item_id'].includes(log.field_key)) {
+                                  return null;
+                                }
+                                
+                                // field_key가 배열인 경우 처리
+                                let actualFieldKey = log.field_key;
+                                let displayFieldName = log.field_key;
+                                
+                                if (Array.isArray(log.field_key)) {
+                                  // URL 파싱 필드 제외하고 메인 필드만 사용
+                                  const mainFields = log.field_key.filter(key => !['url_product_id', 'url_item_id', 'url_vendor_item_id'].includes(key));
+                                  if (mainFields.length === 0) return null; // 모든 필드가 URL 파싱 필드면 숨김
+                                  actualFieldKey = mainFields[0]; // 첫 번째 메인 필드 사용
+                                  displayFieldName = mainFields[0];
+                                } else {
+                                  // 단일 필드인 경우 URL 파싱 필드들은 제외
+                                  if (['url_product_id', 'url_item_id', 'url_vendor_item_id'].includes(log.field_key)) {
+                                    return null;
+                                  }
+                                }
+                                
+                                const fieldName = fieldNameMap[displayFieldName] || displayFieldName;
                                 
                                 // 객체인 경우 해당 필드의 값만 추출
                                 let oldVal = log.old_value;
                                 let newVal = log.new_value;
                                 
-                                // form_data의 특정 필드 변경인 경우 처리
-                                if (typeof oldVal === 'object' && oldVal !== null && log.field_key in oldVal) {
-                                  oldVal = oldVal[log.field_key];
+                                // JSON 객체에서 실제 필드 값 추출
+                                if (typeof oldVal === 'object' && oldVal !== null) {
+                                  oldVal = oldVal[actualFieldKey] || oldVal;
                                 }
-                                if (typeof newVal === 'object' && newVal !== null && log.field_key in newVal) {
-                                  newVal = newVal[log.field_key];
+                                if (typeof newVal === 'object' && newVal !== null) {
+                                  newVal = newVal[actualFieldKey] || newVal;
                                 }
                                 
                                 // 여전히 객체인 경우 문자열로 변환
@@ -1328,7 +1401,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                                 newVal = newVal || '(비어있음)';
                                 
                                 // 특별한 필드 처리
-                                if (log.field_key === 'status') {
+                                if (displayFieldName === 'status') {
                                   const statusMap: Record<string, string> = {
                                     'pending': '대기중',
                                     'active': '활성',
@@ -1355,7 +1428,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                                       (으)로 변경되었습니다.
                                     </div>
                                   );
-                                } else if (log.field_key === 'daily_budget' || log.field_key === 'approved_price') {
+                                } else if (displayFieldName === 'daily_budget' || displayFieldName === 'approved_price') {
                                   return (
                                     <div className={
                                       currentTheme === 'luxury'

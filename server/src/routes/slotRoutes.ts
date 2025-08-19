@@ -14,7 +14,8 @@ import {
   updateSlotFields,
   getSlotChangeLogs,
   getUserSlotChangeLogs,
-  getSlotAllocationHistory
+  getSlotAllocationHistory,
+  updatePaymentStatus
 } from '../controllers/slotController';
 import { authenticateToken } from '../middleware/auth';
 
@@ -31,6 +32,9 @@ router.get('/count', getSlotCount);
 
 // 슬롯 발급 내역 조회 (관리자 전용) - 특정 ID 라우트보다 먼저 와야 함
 router.get('/allocation-history', getSlotAllocationHistory);
+
+// 결제 상태 업데이트 (관리자 전용)
+router.patch('/allocation-history/:id/payment', updatePaymentStatus);
 
 // 슬롯 생성
 router.post('/', createSlot);
@@ -67,5 +71,22 @@ router.get('/:id/logs', getSlotChangeLogs);
 
 // 사용자의 모든 슬롯 변경 로그 조회
 router.get('/user/:userId/logs', getUserSlotChangeLogs);
+
+// rank_daily 삭제 쿼리 반환 (실제 삭제하지 않음)
+router.get('/:id/rank-delete-query', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 쿼리만 반환, 실행하지 않음
+    const deleteQuery = `DELETE FROM rank_daily WHERE slot_id = '${id}'`;
+    
+    res.status(200).send(deleteQuery);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate delete query'
+    });
+  }
+});
 
 export { router as slotRoutes };

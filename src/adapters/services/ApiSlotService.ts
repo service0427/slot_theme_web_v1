@@ -103,6 +103,9 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).refund_reason = item.refund_reason;
           (slot as any).refunded_by = item.refunded_by;
           
+          // 결제 완료 상태 추가
+          (slot as any).payment_completed = item.payment_completed;
+          
           return slot;
         });
 
@@ -523,6 +526,9 @@ export class ApiSlotService extends BaseSlotService {
           // 환불 관련 데이터 추가
           (slot as any).refund_reason = item.refund_reason;
           (slot as any).refunded_by = item.refunded_by;
+          
+          // 결제 완료 상태 추가
+          (slot as any).payment_completed = item.payment_completed;
           
           return slot;
         });

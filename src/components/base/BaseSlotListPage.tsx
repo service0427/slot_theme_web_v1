@@ -223,6 +223,34 @@ function EmptySlotRow({ slot, slotIndex, fieldConfigs, onSave, onBulkPaste, allE
   const handleSave = async () => {
     if (!validateForm()) return;
     
+    // 기존 데이터와 비교 (수정인 경우)
+    if (slot.customFields && slot.status !== 'empty') {
+      const keywordChanged = (slot.customFields.keyword || '') !== (formData.keyword || '');
+      const urlChanged = (slot.customFields.url || '') !== (formData.url || '');
+      
+      if (keywordChanged || urlChanged) {
+        if (!confirm('키워드, URL 변경할 경우 기존 순위 정보는 초기화 됩니다.\n계속하시겠습니까?')) {
+          return;
+        }
+        
+        // rank_daily 삭제 쿼리 가져오기 (실제 삭제하지 않음)
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+        const token = localStorage.getItem('accessToken');
+        
+        try {
+          const response = await fetch(`${API_BASE_URL}/slots/${slot.id}/rank-delete-query`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const query = await response.text();
+          console.log('Rank delete query for slot:', slot.id, '\nQuery:', query);
+        } catch (error) {
+          console.error('Failed to get rank delete query:', error);
+        }
+      }
+    }
+    
     setIsSaving(true);
     try {
       await onSave({ customFields: formData });
@@ -645,6 +673,9 @@ export function BaseSlotListPage({
   // 슬롯 수정 처리
   const handleEditSlot = async (slotId: string, data: Record<string, string>) => {
     try {
+      // BaseSlotEditModal에서 이미 키워드/URL 변경 체크와 confirm을 처리함
+      // 여기서는 중복 체크 제거
+      
       const token = localStorage.getItem('accessToken');
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
       const response = await fetch(`${apiUrl}/slots/${slotId}/update-fields`, {
@@ -977,6 +1008,50 @@ export function BaseSlotListPage({
                   return;
                 }
                 
+                // 수정된 슬롯 체크 (키워드나 URL이 변경된 경우)
+                const modifiedSlots = [];
+                for (const { slot, formData } of editableSlots) {
+                  if (slot.status !== 'empty' && slot.customFields) {
+                    const keywordChanged = (slot.customFields.keyword || '') !== (formData.keyword || '');
+                    const urlChanged = (slot.customFields.url || '') !== (formData.url || '');
+                    
+                    if (keywordChanged || urlChanged) {
+                      modifiedSlots.push({
+                        id: slot.id,
+                        oldKeyword: slot.customFields.keyword,
+                        newKeyword: formData.keyword,
+                        oldUrl: slot.customFields.url,
+                        newUrl: formData.url
+                      });
+                    }
+                  }
+                }
+                
+                // 수정이 있으면 경고 표시
+                if (modifiedSlots.length > 0) {
+                  if (!confirm('키워드, URL 변경할 경우 기존 순위 정보는 초기화 됩니다.\n계속하시겠습니까?')) {
+                    return;
+                  }
+                  
+                  // rank_daily 삭제 쿼리 가져오기 (실제 삭제하지 않음)
+                  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+                  const token = localStorage.getItem('accessToken');
+                  
+                  for (const slot of modifiedSlots) {
+                    try {
+                      const response = await fetch(`${API_BASE_URL}/slots/${slot.id}/rank-delete-query`, {
+                        headers: {
+                          'Authorization': `Bearer ${token}`
+                        }
+                      });
+                      const query = await response.text();
+                      console.log('Rank delete query for slot:', slot.id, '\nQuery:', query);
+                    } catch (error) {
+                      console.error('Failed to get rank delete query:', error);
+                    }
+                  }
+                }
+                
                 let successCount = 0;
                 let failCount = 0;
                 
@@ -1101,11 +1176,15 @@ export function BaseSlotListPage({
                             }}
                             slotIndex={slotIndex}
                             fieldConfigs={fieldConfigs}
-                            onSave={
-                              slot.status === 'empty' 
-                                ? (data) => handleFillEmptySlot(data, slot.id)
-                                : undefined
-                            }
+                            onSave={async (data) => {
+                              // empty 슬롯은 fillEmptySlot, 나머지는 updateSlot 사용
+                              if (slot.status === 'empty') {
+                                return handleFillEmptySlot(data, slot.id);
+                              } else {
+                                // 키워드/URL 변경 체크는 이미 개별 저장 버튼에서 처리됨
+                                return updateSlot(slot.id, data);
+                              }
+                            }}
                             onEdit={(slot.status !== 'empty') ? () => {
                               setEditingSlot(slot);
                               setShowEditModal(true);

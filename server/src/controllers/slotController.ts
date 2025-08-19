@@ -109,11 +109,13 @@ export async function getSlots(req: AuthRequest, res: Response) {
                CASE 
                  WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
                  ELSE false
-               END as is_processing
+               END as is_processing,
+               sah.payment as payment_completed
         FROM slots s
         JOIN users u ON s.user_id = u.id
         LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
         LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
+        LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
         WHERE s.user_id = $1
       `;
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
@@ -133,11 +135,13 @@ export async function getSlots(req: AuthRequest, res: Response) {
                CASE 
                  WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
                  ELSE false
-               END as is_processing
+               END as is_processing,
+               sah.payment as payment_completed
         FROM slots s
         JOIN users u ON s.user_id = u.id
         LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
         LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
+        LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
         WHERE 1=1
       `;
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE 1=1';
@@ -159,11 +163,13 @@ export async function getSlots(req: AuthRequest, res: Response) {
                CASE 
                  WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
                  ELSE false
-               END as is_processing
+               END as is_processing,
+               sah.payment as payment_completed
         FROM slots s
         JOIN users u ON s.user_id = u.id
         LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
         LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
+        LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
         WHERE s.user_id = $1
       `;
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
@@ -669,6 +675,42 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
     try {
       await client.query('BEGIN');
 
+      // 먼저 slot_allocation_history 생성 (ID를 받기 위해)
+      const userResult = await client.query(
+        'SELECT full_name, email FROM users WHERE id = $1',
+        [userId]
+      );
+      const adminResult = await client.query(
+        'SELECT full_name FROM users WHERE id = $1',
+        [adminId]
+      );
+      
+      const historyResult = await client.query(
+        `INSERT INTO slot_allocation_history (
+          operator_id,
+          operator_name,
+          user_id,
+          user_name,
+          user_email,
+          slot_count,
+          price_per_slot,
+          reason,
+          memo
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [
+          adminId,
+          adminResult.rows[0]?.full_name || 'Admin',
+          userId,
+          userResult.rows[0]?.full_name || '',
+          userResult.rows[0]?.email || '',
+          slotCount,
+          amount || 0,
+          `선슬롯 ${slotCount}개 발행`,
+          description || null
+        ]
+      );
+      const allocationHistoryId = historyResult.rows[0].id;
+
       // 기존 할당 정보 확인
       const existingAllocation = await client.query(
         'SELECT * FROM user_slot_allocations WHERE user_id = $1',
@@ -718,7 +760,8 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
           `INSERT INTO slots (
             user_id, 
             seq,
-            allocation_id, 
+            allocation_id,
+            allocation_history_id, 
             slot_number,
             is_empty,
             status,
@@ -731,11 +774,12 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
             pre_allocation_amount,
             pre_allocation_description,
             created_at
-          ) VALUES ($1, $2, $3, $4, true, $5, NULL, NULL, NULL, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)`,
+          ) VALUES ($1, $2, $3, $4, $5, true, $6, NULL, NULL, NULL, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)`,
           [
             userId, 
             nextSeq, 
-            allocationId, 
+            allocationId,
+            allocationHistoryId,  // 새로 추가
             startNumber + i, 
             slotStatus,
             startDate || null,
@@ -747,40 +791,7 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
         );
       }
 
-      // 선슬롯 발행 내역 기록
-      const userResult = await client.query(
-        'SELECT full_name, email FROM users WHERE id = $1',
-        [userId]
-      );
-      const adminResult = await client.query(
-        'SELECT full_name FROM users WHERE id = $1',
-        [adminId]
-      );
-      
-      await client.query(
-        `INSERT INTO slot_allocation_history (
-          operator_id,
-          operator_name,
-          user_id,
-          user_name,
-          user_email,
-          slot_count,
-          price_per_slot,
-          reason,
-          memo
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          adminId,
-          adminResult.rows[0]?.full_name || 'Admin',
-          userId,
-          userResult.rows[0]?.full_name || '',
-          userResult.rows[0]?.email || '',
-          slotCount,
-          amount || 0,
-          `선슬롯 ${slotCount}개 발행`,
-          description || null
-        ]
-      );
+      // slot_allocation_history는 이미 위에서 생성했으므로 제거
 
       await client.query('COMMIT');
 
@@ -1612,5 +1623,52 @@ export async function getSlotAllocationHistory(req: AuthRequest, res: Response) 
       success: false,
       error: '슬롯 발급 내역 조회 중 오류가 발생했습니다.'
     });
+  }
+}
+
+// 결제 상태 업데이트
+export async function updatePaymentStatus(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const { payment } = req.body;
+
+  if (!req.user || req.user.role !== 'operator') {
+    return res.status(403).json({
+      success: false,
+      error: 'Only operators can update payment status'
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    // 발급 내역 존재 확인
+    const checkResult = await client.query(
+      'SELECT * FROM slot_allocation_history WHERE id = $1',
+      [id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Allocation history not found'
+      });
+    }
+
+    // 결제 상태 업데이트
+    await client.query(
+      'UPDATE slot_allocation_history SET payment = $1 WHERE id = $2',
+      [payment, id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Payment status updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update payment status'
+    });
+  } finally {
+    client.release();
   }
 }

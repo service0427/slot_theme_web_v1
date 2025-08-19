@@ -16,6 +16,7 @@ interface AllocationHistory {
   reason: string;
   memo: string;
   created_at: string;
+  payment?: boolean;
 }
 
 interface PaginationInfo {
@@ -134,6 +135,38 @@ export function BaseSlotAllocationHistoryPage() {
     setPagination(prev => ({ ...prev, page: 1, limit: newSize }));
   };
 
+  // 결제 완료 처리
+  const handlePaymentComplete = async (allocationId: string) => {
+    if (!confirm('결제 완료 처리하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiUrl}/slots/allocation-history/${allocationId}/payment`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ payment: true })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // 목록 새로고침
+          loadAllocations();
+        } else {
+          alert('결제 완료 처리에 실패했습니다.');
+        }
+      } else {
+        alert('결제 완료 처리에 실패했습니다.');
+      }
+    } catch (error) {
+      alert('결제 완료 처리 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow-sm border">
@@ -245,6 +278,7 @@ export function BaseSlotAllocationHistoryPage() {
                       )}
                     </div>
                   </th>
+                  {/* 단가 컬럼 주석처리
                   <th 
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => toggleSort('price_per_slot')}
@@ -255,12 +289,15 @@ export function BaseSlotAllocationHistoryPage() {
                         sortOrder === 'desc' ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />
                       )}
                     </div>
-                  </th>
+                  </th> */}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     사유
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     메모
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    액션
                   </th>
                 </tr>
               </thead>
@@ -295,11 +332,12 @@ export function BaseSlotAllocationHistoryPage() {
                         {allocation.slot_count}개
                       </span>
                     </td>
+                    {/* 단가 데이터 주석처리
                     <td className="px-6 py-4">
                       <span className="text-sm font-medium text-gray-900">
                         {Math.floor(allocation.price_per_slot).toLocaleString()}원
                       </span>
-                    </td>
+                    </td> */}
                     <td className="px-6 py-4 text-sm text-gray-700">
                       {allocation.reason || '-'}
                     </td>
@@ -321,6 +359,20 @@ export function BaseSlotAllocationHistoryPage() {
                         </div>
                       ) : (
                         '-'
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {!allocation.payment ? (
+                        <button
+                          onClick={() => handlePaymentComplete(allocation.id)}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        >
+                          결제 완료
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          완료됨
+                        </span>
                       )}
                     </td>
                   </tr>

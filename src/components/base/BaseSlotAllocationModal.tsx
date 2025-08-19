@@ -313,9 +313,8 @@ export function BaseSlotAllocationModal({
             </p>
           </div>
 
-          {/* 작업 수와 금액 - 그리드 레이아웃 */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* 작업 수 (선택) */}
+          {/* 작업 수와 금액 - 그리드 레이아웃 - 주석처리 */}
+          {/* <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 작업 수 (선택)
@@ -331,7 +330,6 @@ export function BaseSlotAllocationModal({
               />
             </div>
 
-            {/* 금액 (선택) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 금액 (선택)
@@ -347,7 +345,7 @@ export function BaseSlotAllocationModal({
                 disabled={isLoading}
               />
             </div>
-          </div>
+          </div> */}
 
           {/* 설명 (선택) */}
           <div>
@@ -371,12 +369,12 @@ export function BaseSlotAllocationModal({
               <li>• 대상자: <strong>{userName}</strong></li>
               <li>• 발행할 슬롯: <strong>{formData.slotCount}개</strong></li>
               <li>• 운영 기간: <strong>{formData.startDate} ~ {formData.endDate}</strong></li>
-              {formData.workCount && (
+              {/* {formData.workCount && (
                 <li>• 예상 작업 수: <strong>{formData.workCount}개</strong></li>
               )}
               {formData.amount && (
                 <li>• 설정 금액: <strong>{formData.amount.toLocaleString()}원</strong></li>
-              )}
+              )} */}
             </ul>
           </div>
         </form>

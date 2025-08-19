@@ -522,12 +522,13 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
                     >
                       수정
                     </button>
+                    {/* 삭제 버튼 주석처리
                     <button
                       onClick={() => handleDeleteUser(user.id)}
                       className="text-red-600 hover:text-red-900"
                     >
                       삭제
-                    </button>
+                    </button> */}
                   </div>
                 </td>
               </tr>

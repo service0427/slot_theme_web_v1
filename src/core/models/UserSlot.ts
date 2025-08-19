@@ -23,6 +23,7 @@ export interface UserSlot {
   description?: string;
   slot_number?: number;
   fieldValues?: any[];
+  payment_completed?: boolean; // 결제 완료 상태
 }
 
 export type SlotStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'expired' | 'empty' | 'refunded';

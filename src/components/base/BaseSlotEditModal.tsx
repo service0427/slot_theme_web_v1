@@ -10,6 +10,7 @@ interface BaseSlotEditModalProps {
 
 export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotEditModalProps) {
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [originalData, setOriginalData] = useState<Record<string, string>>({});
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -63,20 +64,52 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
         if (!values.mid && slot.mid) values.mid = slot.mid;
         
         setFormData(values);
+        setOriginalData(values); // 원본 데이터 저장
       }
     } catch (error) {
       // console.error('슬롯 데이터 로드 실패:', error);
       // fallback으로 slots 테이블의 값 사용
-      setFormData({
+      const fallbackData = {
         url: slot.url || '',
         keyword: slot.keyword || '',
         mid: slot.mid || ''
-      });
+      };
+      setFormData(fallbackData);
+      setOriginalData(fallbackData); // 원본 데이터 저장
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 키워드나 URL 변경 체크
+    const keywordChanged = (originalData.keyword || '') !== (formData.keyword || '');
+    const urlChanged = (originalData.url || '') !== (formData.url || '');
+    
+    if (keywordChanged || urlChanged) {
+      if (!confirm('키워드, URL 변경할 경우 기존 순위 정보는 초기화 됩니다.\n계속하시겠습니까?')) {
+        return;
+      }
+      
+      // rank_daily 삭제 쿼리 가져오기 (실제 삭제는 하지 않음)
+      try {
+        const token = localStorage.getItem('accessToken');
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+        const response = await fetch(`${apiUrl}/slots/${slot.id}/rank-delete-query`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const deleteQuery = await response.text();
+          console.log('Rank delete query:', deleteQuery);
+        }
+      } catch (error) {
+        console.error('Failed to get rank delete query:', error);
+      }
+    }
+    
     setIsSaving(true);
     
     try {
