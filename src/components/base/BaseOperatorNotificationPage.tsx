@@ -204,7 +204,7 @@ export function BaseOperatorNotificationPage() {
       <div className="bg-white rounded-lg shadow-sm border p-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">운영자 알림 발송</h1>
         
-        {/* 빠른 발송 */}
+        {/* 빠른 발송 - 주석처리
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <h2 className="font-semibold text-blue-900 mb-4">빠른 발송</h2>
           <div className="flex gap-3">
@@ -231,6 +231,7 @@ export function BaseOperatorNotificationPage() {
             </button>
           </div>
         </div>
+        */}
 
         {/* 커스텀 알림 생성 */}
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -420,7 +421,6 @@ export function BaseOperatorNotificationPage() {
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6">
           <h3 className="font-semibold text-amber-900 mb-2">📖 사용법 안내</h3>
           <ul className="text-sm text-amber-800 space-y-1">
-            <li>• <strong>빠른 발송:</strong> 미리 정의된 템플릿으로 즉시 알림을 발송할 수 있습니다.</li>
             <li>• <strong>전체 발송:</strong> 모든 접속 중인 사용자에게 알림이 전송됩니다.</li>
             <li>• <strong>선택 발송:</strong> 드롭다운에서 사용자를 검색하고 선택하여 특정 사용자들에게만 발송합니다.</li>
             <li>• <strong>자동 닫기:</strong> 체크하면 지정된 시간 후 알림이 자동으로 사라집니다.</li>
