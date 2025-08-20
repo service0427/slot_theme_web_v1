@@ -833,7 +833,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                     ) : (slot as any).rank && (slot as any).rank > 0 ? (
                       <div className="flex items-center justify-center gap-1">
                         <span className="font-semibold text-gray-900">{(slot as any).rank}</span>
-                        {(slot as any).yesterday_rank && (
+                        {(slot as any).yesterday_rank && (slot as any).yesterday_rank > 0 && (
                           <span className={`text-xs ${
                             (slot as any).yesterday_rank > (slot as any).rank 
                               ? 'text-green-600' 
