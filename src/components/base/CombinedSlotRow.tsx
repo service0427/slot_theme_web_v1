@@ -475,7 +475,7 @@ function CombinedSlotRowComponent({
         ) : slot.rank && slot.rank > 0 ? (
           <div className="flex items-center justify-center gap-1">
             <span className="font-semibold text-gray-900">{slot.rank}</span>
-            {slot.yesterday_rank && (
+            {slot.yesterday_rank && slot.yesterday_rank > 0 && (
               <span className={`text-xs ${
                 slot.yesterday_rank > slot.rank 
                   ? 'text-green-600' 
