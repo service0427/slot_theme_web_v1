@@ -10,10 +10,16 @@ import { EnhancedConfigProvider } from './contexts/EnhancedConfigContext';
 import { SystemSettingsProvider, useSystemSettings } from './contexts/SystemSettingsContext';
 import { LoginPreviewPage } from './pages/LoginPreviewPage';
 import { ThemedLoadingScreen } from './components/LoadingScreen';
+import { setupAuthInterceptor } from './utils/setupAuthInterceptor';
 
 function AppContent() {
   const { theme, isLoading: settingsLoading, getSetting } = useSystemSettings();
   const auth = useAuthContext();
+  
+  // Auth interceptor 설정 (컴포넌트 마운트 시 한 번만)
+  useEffect(() => {
+    setupAuthInterceptor();
+  }, []);
   
   // 사이트 제목 동적 설정
   useEffect(() => {

@@ -34,6 +34,16 @@ export function BaseLoginPage({
   const { companyName } = useSystemSettings();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // 세션 스토리지에서 인증 에러 메시지 확인
+  useEffect(() => {
+    const errorMessage = sessionStorage.getItem('authError');
+    if (errorMessage) {
+      setAuthError(errorMessage);
+      sessionStorage.removeItem('authError');
+    }
+  }, []);
 
   // 로그인 성공시 리다이렉트
   useEffect(() => {
@@ -62,9 +72,9 @@ export function BaseLoginPage({
       )}
       <h1 className={styles.title}>{title}</h1>
       
-      {error && (
+      {(error || authError) && (
         <div className={styles.errorMessage}>
-          {error}
+          {authError || error}
         </div>
       )}
 
