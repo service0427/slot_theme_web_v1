@@ -110,7 +110,14 @@ export async function getSlots(req: AuthRequest, res: Response) {
                  WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
                  ELSE false
                END as is_processing,
-               sah.payment as payment_completed
+               sah.payment as payment_completed,
+               s.parent_slot_id,
+               s.extension_days,
+               s.extended_at,
+               s.extended_by,
+               s.extension_type,
+               CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
+               EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension
         FROM slots s
         JOIN users u ON s.user_id = u.id
         LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
@@ -136,7 +143,14 @@ export async function getSlots(req: AuthRequest, res: Response) {
                  WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
                  ELSE false
                END as is_processing,
-               sah.payment as payment_completed
+               sah.payment as payment_completed,
+               s.parent_slot_id,
+               s.extension_days,
+               s.extended_at,
+               s.extended_by,
+               s.extension_type,
+               CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
+               EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension
         FROM slots s
         JOIN users u ON s.user_id = u.id
         LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
@@ -164,7 +178,14 @@ export async function getSlots(req: AuthRequest, res: Response) {
                  WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
                  ELSE false
                END as is_processing,
-               sah.payment as payment_completed
+               sah.payment as payment_completed,
+               s.parent_slot_id,
+               s.extension_days,
+               s.extended_at,
+               s.extended_by,
+               s.extension_type,
+               CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
+               EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension
         FROM slots s
         JOIN users u ON s.user_id = u.id
         LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
@@ -1667,6 +1688,488 @@ export async function updatePaymentStatus(req: AuthRequest, res: Response) {
     res.status(500).json({
       success: false,
       error: 'Failed to update payment status'
+    });
+  } finally {
+    client.release();
+  }
+}
+
+// 개별 슬롯 연장
+export async function extendSlot(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const { extensionDays } = req.body;
+  const userId = req.user?.id;
+  const userRole = req.user?.role;
+
+  // 권한 체크 (operator 또는 developer만 가능)
+  if (userRole !== 'operator' && userRole !== 'developer') {
+    return res.status(403).json({
+      success: false,
+      error: '슬롯 연장은 관리자만 가능합니다.'
+    });
+  }
+
+  // 연장 기간 검증
+  const validExtensionDays = [1, 7, 10, 30];
+  if (!validExtensionDays.includes(extensionDays)) {
+    return res.status(400).json({
+      success: false,
+      error: '유효하지 않은 연장 기간입니다.'
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 원본 슬롯 조회
+    const slotResult = await client.query(
+      `SELECT s.*, u.email as user_email, u.full_name as user_name
+       FROM slots s
+       JOIN users u ON s.user_id = u.id
+       WHERE s.id = $1`,
+      [id]
+    );
+
+    if (slotResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: '슬롯을 찾을 수 없습니다.'
+      });
+    }
+
+    const originalSlot = slotResult.rows[0];
+
+    // 연장 시작일 계산 (스마트 연장)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const originalEndDate = new Date(originalSlot.pre_allocation_end_date || originalSlot.end_date);
+    originalEndDate.setHours(0, 0, 0, 0);
+
+    let startDate;
+    if (originalEndDate >= today) {
+      // 아직 활성 - 원본 종료일 다음날부터
+      startDate = new Date(originalEndDate);
+      startDate.setDate(startDate.getDate() + 1);
+    } else {
+      // 이미 만료 - 오늘부터
+      startDate = today;
+    }
+
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + extensionDays - 1);
+
+    // 해당 사용자의 다음 seq 번호 찾기
+    const maxSeqResult = await client.query(
+      `SELECT COALESCE(MAX(seq), 0) + 1 as next_seq 
+       FROM slots 
+       WHERE user_id = $1`,
+      [originalSlot.user_id]
+    );
+    const nextSeq = maxSeqResult.rows[0].next_seq;
+
+    // 새 슬롯 생성 (연장 슬롯)
+    const insertResult = await client.query(
+      `INSERT INTO slots (
+        user_id, seq, keyword, trim_keyword, url, mid, 
+        daily_budget, status, approved_price,
+        approved_at, approved_by,
+        issue_type, is_empty, allocation_id, slot_number,
+        pre_allocation_start_date, pre_allocation_end_date,
+        pre_allocation_work_count, pre_allocation_amount,
+        allocation_history_id,
+        parent_slot_id, extension_days, extended_at, extended_by, extension_type
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6,
+        $7, $8, $9,
+        $10, $11,
+        $12, $13, $14, $15,
+        $16, $17,
+        $18, $19,
+        $20,
+        $21, $22, $23, $24, $25
+      ) RETURNING *`,
+      [
+        originalSlot.user_id,
+        nextSeq, // 새로운 seq 번호 사용
+        originalSlot.keyword,
+        originalSlot.trim_keyword,
+        originalSlot.url,
+        originalSlot.mid,
+        originalSlot.daily_budget,
+        'active', // 연장 슬롯은 자동으로 active 상태
+        originalSlot.approved_price,
+        new Date(), // 승인 시간
+        userId, // 승인자
+        originalSlot.issue_type,
+        false, // 빈 슬롯 아님
+        originalSlot.allocation_id,
+        originalSlot.slot_number,
+        startDate,
+        endDate,
+        extensionDays,
+        originalSlot.pre_allocation_amount,
+        originalSlot.allocation_history_id,
+        id, // parent_slot_id
+        extensionDays,
+        new Date(), // extended_at
+        userId, // extended_by
+        'individual' // 개별 연장
+      ]
+    );
+
+    const newSlot = insertResult.rows[0];
+
+    // 원본 슬롯의 field values 복사
+    const fieldValuesResult = await client.query(
+      `SELECT field_key, value FROM slot_field_values WHERE slot_id = $1`,
+      [id]
+    );
+
+    if (fieldValuesResult.rows.length > 0) {
+      for (const fieldValue of fieldValuesResult.rows) {
+        await client.query(
+          `INSERT INTO slot_field_values (slot_id, field_key, value)
+           VALUES ($1, $2, $3)`,
+          [newSlot.id, fieldValue.field_key, fieldValue.value]
+        );
+      }
+    }
+
+    // allocation_history의 payment를 true로 설정 (연장은 결제완료 상태)
+    if (originalSlot.allocation_history_id) {
+      await client.query(
+        `UPDATE slot_allocation_history 
+         SET payment = true 
+         WHERE id = $1`,
+        [originalSlot.allocation_history_id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      data: newSlot,
+      message: `슬롯이 ${extensionDays}일 연장되었습니다.`
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Extend slot error:', error);
+    res.status(500).json({
+      success: false,
+      error: '슬롯 연장 중 오류가 발생했습니다.'
+    });
+  } finally {
+    client.release();
+  }
+}
+
+// 대량 슬롯 연장 (발급 건별)
+export async function extendBulkSlots(req: AuthRequest, res: Response) {
+  const { allocationHistoryId, extensionDays } = req.body;
+  const userId = req.user?.id;
+  const userRole = req.user?.role;
+
+  // 권한 체크
+  if (userRole !== 'operator' && userRole !== 'developer') {
+    return res.status(403).json({
+      success: false,
+      error: '대량 슬롯 연장은 관리자만 가능합니다.'
+    });
+  }
+
+  // 연장 기간 검증
+  const validExtensionDays = [1, 7, 10, 30];
+  if (!validExtensionDays.includes(extensionDays)) {
+    return res.status(400).json({
+      success: false,
+      error: '유효하지 않은 연장 기간입니다.'
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 해당 발급 건의 모든 슬롯 조회 (개별 연장된 슬롯 제외)
+    const slotsResult = await client.query(
+      `SELECT s.*
+       FROM slots s
+       WHERE s.allocation_history_id = $1
+       AND s.parent_slot_id IS NULL  -- 원본 슬롯만 (이미 연장된 것 제외)
+       AND NOT EXISTS (
+         SELECT 1 FROM slots child 
+         WHERE child.parent_slot_id = s.id
+       )`, // 개별 연장으로 자식 슬롯이 있는 경우 제외
+      [allocationHistoryId]
+    );
+
+    if (slotsResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: '해당 발급 건의 슬롯을 찾을 수 없습니다.'
+      });
+    }
+
+    const slots = slotsResult.rows;
+    const extendedSlots = [];
+    const failedSlots = [];
+
+    // 각 슬롯 연장 처리
+    for (const originalSlot of slots) {
+      try {
+        // 연장 시작일 계산
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const originalEndDate = new Date(originalSlot.pre_allocation_end_date || originalSlot.end_date);
+        originalEndDate.setHours(0, 0, 0, 0);
+
+        let startDate;
+        if (originalEndDate >= today) {
+          startDate = new Date(originalEndDate);
+          startDate.setDate(startDate.getDate() + 1);
+        } else {
+          startDate = today;
+        }
+
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + extensionDays - 1);
+
+        // 해당 사용자의 다음 seq 번호 찾기
+        const maxSeqResult = await client.query(
+          `SELECT COALESCE(MAX(seq), 0) + 1 as next_seq 
+           FROM slots 
+           WHERE user_id = $1`,
+          [originalSlot.user_id]
+        );
+        const nextSeq = maxSeqResult.rows[0].next_seq;
+
+        // 새 슬롯 생성
+        const insertResult = await client.query(
+          `INSERT INTO slots (
+            user_id, seq, keyword, trim_keyword, url, mid,
+            daily_budget, status, approved_price,
+            approved_at, approved_by,
+            issue_type, is_empty, allocation_id, slot_number,
+            pre_allocation_start_date, pre_allocation_end_date,
+            pre_allocation_work_count, pre_allocation_amount,
+            allocation_history_id,
+            parent_slot_id, extension_days, extended_at, extended_by, extension_type
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9,
+            $10, $11,
+            $12, $13, $14, $15,
+            $16, $17,
+            $18, $19,
+            $20,
+            $21, $22, $23, $24, $25
+          ) RETURNING *`,
+          [
+            originalSlot.user_id,
+            nextSeq, // 새로운 seq 번호 사용
+            originalSlot.keyword,
+            originalSlot.trim_keyword,
+            originalSlot.url,
+            originalSlot.mid,
+            originalSlot.daily_budget,
+            'active', // 연장 슬롯은 자동으로 active 상태
+            originalSlot.approved_price,
+            new Date(),
+            userId,
+            originalSlot.issue_type,
+            false,
+            originalSlot.allocation_id,
+            originalSlot.slot_number,
+            startDate,
+            endDate,
+            extensionDays,
+            originalSlot.pre_allocation_amount,
+            originalSlot.allocation_history_id,
+            originalSlot.id, // parent_slot_id
+            extensionDays,
+            new Date(),
+            userId,
+            'bulk' // 단체 연장
+          ]
+        );
+
+        const newSlot = insertResult.rows[0];
+
+        // 원본 슬롯의 field values 복사
+        const fieldValuesResult = await client.query(
+          `SELECT field_key, value FROM slot_field_values WHERE slot_id = $1`,
+          [originalSlot.id]
+        );
+
+        if (fieldValuesResult.rows.length > 0) {
+          for (const fieldValue of fieldValuesResult.rows) {
+            await client.query(
+              `INSERT INTO slot_field_values (slot_id, field_key, value)
+               VALUES ($1, $2, $3)`,
+              [newSlot.id, fieldValue.field_key, fieldValue.value]
+            );
+          }
+        }
+
+        extendedSlots.push(newSlot);
+      } catch (err) {
+        failedSlots.push({
+          slotId: originalSlot.id,
+          error: err instanceof Error ? err.message : '알 수 없는 오류'
+        });
+      }
+    }
+
+    // allocation_history의 payment를 true로 설정
+    await client.query(
+      `UPDATE slot_allocation_history 
+       SET payment = true 
+       WHERE id = $1`,
+      [allocationHistoryId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      data: {
+        extended: extendedSlots.length,
+        failed: failedSlots.length,
+        total: slots.length,
+        failedSlots
+      },
+      message: `${extendedSlots.length}개 슬롯이 ${extensionDays}일 연장되었습니다.`
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Extend bulk slots error:', error);
+    res.status(500).json({
+      success: false,
+      error: '대량 슬롯 연장 중 오류가 발생했습니다.'
+    });
+  } finally {
+    client.release();
+  }
+}
+
+// 슬롯 체인의 rank_daily 조회 (원본 + 연장 슬롯들의 순위 데이터)
+export async function getSlotRankChain(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  
+  const client = await pool.connect();
+  try {
+    // WITH RECURSIVE를 사용하여 슬롯 체인 조회
+    const query = `
+      WITH RECURSIVE slot_chain AS (
+        -- 현재 슬롯부터 시작 (아래에서 위로)
+        SELECT id, parent_slot_id, 0 as chain_level
+        FROM slots 
+        WHERE id = $1
+        
+        UNION ALL
+        
+        -- 부모 슬롯들을 재귀적으로 조회
+        SELECT s.id, s.parent_slot_id, sc.chain_level + 1
+        FROM slots s
+        JOIN slot_chain sc ON s.id = sc.parent_slot_id
+        
+        UNION ALL
+        
+        -- 자식 슬롯들을 재귀적으로 조회
+        SELECT s.id, s.parent_slot_id, sc.chain_level - 1
+        FROM slots s
+        JOIN slot_chain sc ON s.parent_slot_id = sc.id
+      )
+      SELECT DISTINCT
+        rd.*,
+        sc.chain_level,
+        s.pre_allocation_start_date as slot_start,
+        s.pre_allocation_end_date as slot_end,
+        s.parent_slot_id,
+        CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended
+      FROM slot_chain sc
+      JOIN slots s ON s.id = sc.id
+      LEFT JOIN rank_daily rd ON rd.slot_id = sc.id
+      ORDER BY rd.date DESC NULLS LAST
+    `;
+    
+    const result = await client.query(query, [id]);
+    
+    res.json({
+      success: true,
+      data: result.rows
+    });
+    
+  } catch (error) {
+    console.error('Get slot rank chain error:', error);
+    res.status(500).json({
+      success: false,
+      error: '슬롯 순위 체인 조회 중 오류가 발생했습니다.'
+    });
+  } finally {
+    client.release();
+  }
+}
+
+// 슬롯 결제 취소
+export async function cancelSlotPayment(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const userRole = req.user?.role;
+
+  // 권한 체크
+  if (userRole !== 'operator' && userRole !== 'developer') {
+    return res.status(403).json({
+      success: false,
+      error: '결제 취소는 관리자만 가능합니다.'
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    // 슬롯의 allocation_history_id 조회
+    const slotResult = await client.query(
+      'SELECT allocation_history_id FROM slots WHERE id = $1',
+      [id]
+    );
+
+    if (slotResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '슬롯을 찾을 수 없습니다.'
+      });
+    }
+
+    const allocationHistoryId = slotResult.rows[0].allocation_history_id;
+
+    if (!allocationHistoryId) {
+      return res.status(400).json({
+        success: false,
+        error: '발급 내역이 없는 슬롯입니다.'
+      });
+    }
+
+    // payment를 false로 업데이트
+    await client.query(
+      'UPDATE slot_allocation_history SET payment = false WHERE id = $1',
+      [allocationHistoryId]
+    );
+
+    res.json({
+      success: true,
+      message: '결제가 취소되었습니다.'
+    });
+
+  } catch (error) {
+    console.error('Cancel payment error:', error);
+    res.status(500).json({
+      success: false,
+      error: '결제 취소 중 오류가 발생했습니다.'
     });
   } finally {
     client.release();

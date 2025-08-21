@@ -10,6 +10,10 @@ export function useAuth(authStore: AuthStore) {
     await authStore.login(credentials);
   }, [authStore]);
 
+  const loginWithToken = useCallback(async (accessToken: string) => {
+    await authStore.loginWithToken(accessToken);
+  }, [authStore]);
+
   const logout = useCallback(async () => {
     await authStore.logout();
   }, [authStore]);
@@ -24,6 +28,7 @@ export function useAuth(authStore: AuthStore) {
     isLoading: state.isLoading,
     error: state.error,
     login,
+    loginWithToken,
     logout,
     updateUser
   };

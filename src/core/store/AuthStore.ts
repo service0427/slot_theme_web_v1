@@ -103,4 +103,53 @@ export class AuthStore extends Store<AuthState> {
       return { success: false, error: '사용자 정보 업데이트 중 오류가 발생했습니다.' };
     }
   }
+
+  // 토큰으로 직접 로그인 (사용자 전환용)
+  async loginWithToken(accessToken: string): Promise<void> {
+    this.setState({ isLoading: true, error: null });
+    
+    try {
+      // 토큰을 로컬 스토리지에 저장
+      localStorage.setItem('accessToken', accessToken);
+      
+      // ApiAuthService의 fetchCurrentUser 메서드 사용
+      if ('fetchCurrentUser' in this.authService) {
+        const userResult = await (this.authService as any).fetchCurrentUser();
+        
+        if (userResult && userResult.success && userResult.data) {
+          this.setState({
+            user: userResult.data,
+            isAuthenticated: true,
+            isLoading: false
+          });
+        } else {
+          this.setState({
+            error: userResult?.error || '사용자 정보를 가져올 수 없습니다.',
+            isLoading: false
+          });
+        }
+      } else {
+        // fallback: 현재 사용자 정보 가져오기
+        const currentUser = this.authService.getCurrentUser();
+        
+        if (currentUser) {
+          this.setState({
+            user: currentUser,
+            isAuthenticated: true,
+            isLoading: false
+          });
+        } else {
+          this.setState({
+            error: '사용자 정보를 가져올 수 없습니다.',
+            isLoading: false
+          });
+        }
+      }
+    } catch (error) {
+      this.setState({
+        error: '토큰 로그인 중 오류가 발생했습니다.',
+        isLoading: false
+      });
+    }
+  }
 }

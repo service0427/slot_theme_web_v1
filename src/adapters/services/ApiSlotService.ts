@@ -99,6 +99,15 @@ export class ApiSlotService extends BaseSlotService {
           // product_name 추가
           (slot as any).product_name = item.product_name;
           
+          // 연장 관련 필드 추가
+          slot.parent_slot_id = item.parent_slot_id;
+          slot.extension_days = item.extension_days;
+          slot.extended_at = item.extended_at;
+          slot.extended_by = item.extended_by;
+          slot.extension_type = item.extension_type;
+          slot.is_extended = item.is_extended;
+          slot.has_extension = item.has_extension;
+          
           // 환불 관련 데이터 추가
           (slot as any).refund_reason = item.refund_reason;
           (slot as any).refunded_by = item.refunded_by;
@@ -522,6 +531,15 @@ export class ApiSlotService extends BaseSlotService {
           
           // product_name 추가
           (slot as any).product_name = item.product_name;
+          
+          // 연장 관련 필드 추가
+          slot.parent_slot_id = item.parent_slot_id;
+          slot.extension_days = item.extension_days;
+          slot.extended_at = item.extended_at;
+          slot.extended_by = item.extended_by;
+          slot.extension_type = item.extension_type;
+          slot.is_extended = item.is_extended;
+          slot.has_extension = item.has_extension;
           
           // 환불 관련 데이터 추가
           (slot as any).refund_reason = item.refund_reason;

@@ -459,19 +459,12 @@ function CombinedSlotRowComponent({
       
       {/* 시스템 필드들 */}
       <td className="px-3 py-4 text-center border-r text-sm">
-        {(() => {
-          console.log('Slot rank data:', { 
-            id: slot.id, 
-            rank: slot.rank, 
-            yesterday_rank: slot.yesterday_rank,
-            is_processing: slot.is_processing 
-          });
-          return null;
-        })()}
         {slot.status === 'empty' ? (
           <span className="text-gray-400">-</span>
-        ) : slot.is_processing ? (
-          <span className="text-blue-600 font-medium">측정중</span>
+        ) : slot.status === 'pending' ? (
+          <span className="text-gray-400">-</span>
+        ) : slot.is_processing || (slot.status === 'active' && !slot.rank) ? (
+          <span className="text-orange-500 font-medium animate-pulse">측정중</span>
         ) : slot.rank && slot.rank > 0 ? (
           <div className="flex items-center justify-center gap-1">
             <span className="font-semibold text-gray-900">{slot.rank}</span>
@@ -500,7 +493,7 @@ function CombinedSlotRowComponent({
           year: 'numeric',
           month: '2-digit',
           day: '2-digit'
-        }).replace(/\. /g, '-').replace(/\.$/, '') : '-'}
+        }).replace(/\./g, '').replace(/ /g, '-') : '-'}
       </td>
       <td className="px-3 py-4 text-center border-r text-sm">
         {slot.endDate ? (() => {
@@ -533,7 +526,7 @@ function CombinedSlotRowComponent({
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit'
-              }).replace(/\. /g, '-').replace(/\.$/, '')}
+              }).replace(/\./g, '').replace(/ /g, '-')}
               {daysText && <span className="ml-1">{daysText}</span>}
             </span>
           );

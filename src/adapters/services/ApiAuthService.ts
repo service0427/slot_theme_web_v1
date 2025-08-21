@@ -1,9 +1,25 @@
 import { IAuthService, LoginCredentials, AuthToken } from '@/core/services/AuthService';
 import { UserModel, User } from '@/core/models/User';
-import { LoginDto, RegisterDto } from '@/dto';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { ApiNotificationService } from './ApiNotificationService';
-import { AuthResult } from '@/types/auth.types';
+
+// 임시 타입 정의
+interface LoginDto {
+  email: string;
+  password: string;
+}
+
+interface RegisterDto {
+  email: string;
+  password: string;
+  fullName: string;
+}
+
+interface AuthResult<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
 
 // 임시 타입 정의
 interface AuthModel {
@@ -497,6 +513,82 @@ export class ApiAuthService implements IAuthService {
       return {
         success: false,
         error: error.message || '사용자 정보 업데이트 중 오류가 발생했습니다.'
+      };
+    }
+  }
+
+  // 서버에서 현재 사용자 정보 가져오기
+  async fetchCurrentUser(): Promise<AuthResult<UserModel>> {
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        return {
+          success: false,
+          error: '인증 토큰이 없습니다.'
+        };
+      }
+
+      const response = await fetch(`${this.apiUrl}/auth/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Connection': 'keep-alive',
+        },
+        signal: AbortSignal.timeout(15000)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return {
+          success: false,
+          error: error.error || '사용자 정보를 가져올 수 없습니다.'
+        };
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || '사용자 정보를 가져올 수 없습니다.'
+        };
+      }
+
+      const userData = result.data;
+      const userModel = new UserModel(
+        userData.id,
+        userData.email,
+        userData.role,
+        'active', // status
+        new Date(), // createdAt
+        new Date(), // updatedAt
+        userData.fullName
+      );
+
+      // localStorage에 사용자 정보 저장
+      localStorage.setItem('user', JSON.stringify({
+        id: userModel.id,
+        email: userModel.email,
+        role: userModel.role,
+        fullName: userModel.fullName
+      }));
+
+      // 현재 인증 상태 업데이트
+      const accessTokenStored = localStorage.getItem('accessToken');
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (accessTokenStored && refreshToken) {
+        const tokens = { accessToken: accessTokenStored, refreshToken };
+        this.setAuthState(userModel, tokens);
+      }
+      
+      return {
+        success: true,
+        data: userModel
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || '사용자 정보 조회 중 오류가 발생했습니다.'
       };
     }
   }
