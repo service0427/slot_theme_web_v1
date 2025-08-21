@@ -119,7 +119,10 @@ export function BaseUserSlotListItem({
             className="w-12 h-12 object-cover rounded mx-auto"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
-              e.currentTarget.nextSibling?.classList.remove('hidden');
+              const nextElement = e.currentTarget.nextSibling as HTMLElement;
+              if (nextElement) {
+                nextElement.classList.remove('hidden');
+              }
             }}
           />
         ) : (

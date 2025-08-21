@@ -826,35 +826,35 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           <table className={mergedTheme.tableClass}>
             <thead className={mergedTheme.tableHeaderClass}>
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">신청일시</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">광고주</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">신청일시</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">광고주</th>
                 {/* 썸네일 */}
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">썸네일</th>
                 {/* 관리자가 설정한 필드들 */}
                 {fieldConfigs.map(field => (
-                  <th key={field.field_key} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th key={field.field_key} className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
                     {field.label}
                   </th>
                 ))}
                 {/* 순위 */}
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">순위</th>
                 {/* URL 파싱 필드들 */}
-                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">상품ID</th>
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">상품ID</th>
                 {/* 아이템ID, 판매자ID - 주석처리
-                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">아이템ID</th>
-                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">판매자ID</th>
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">아이템ID</th>
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">판매자ID</th>
                 */}
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">시작일</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">종료일</th>
-                {/* <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">금액</th> */}
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">액션</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">시작일</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">종료일</th>
+                {/* <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">금액</th> */}
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">상태</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">액션</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {currentSlots.map(slot => (
                   <tr key={slot.id} className={mergedTheme.tableRowClass}>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-gray-900">
                     <div>
                       <div>{new Date(slot.createdAt).toLocaleDateString('ko-KR')}</div>
                       <div className="text-xs text-gray-500">
@@ -862,7 +862,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-gray-900">
                     <div>
                       <div className="font-medium text-xs">{slot.userName || '이름 없음'}</div>
                       <div className="text-xs text-gray-500">{slot.userEmail || 'user_id'}</div>
@@ -877,7 +877,10 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                         className="w-12 h-12 object-cover rounded mx-auto"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextSibling?.classList.remove('hidden');
+                          const nextElement = e.currentTarget.nextSibling as HTMLElement;
+                          if (nextElement) {
+                            nextElement.classList.remove('hidden');
+                          }
                         }}
                       />
                     ) : (
@@ -889,7 +892,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   {fieldConfigs.map(field => {
                     const fieldValue = getSlotFieldValue(slot, field.field_key);
                     return (
-                      <td key={field.field_key} className="px-3 py-2 text-sm text-gray-900">
+                      <td key={field.field_key} className="px-3 py-2 text-center text-sm text-gray-900">
                         {field.field_type === 'url' && fieldValue ? (
                           <div className="flex justify-center">
                             <button 
@@ -951,25 +954,25 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                     )}
                   </td>
                   {/* URL 파싱 필드들 - 상품ID만 표시 */}
-                  <td className="px-3 py-2 text-sm text-gray-900">
+                  <td className="px-3 py-2 text-center text-sm text-gray-900">
                     <span className="text-xs">
                       {getSlotFieldValue(slot, 'url_product_id') || '-'}
                     </span>
                   </td>
                   {/* 아이템ID, 판매자ID - 주석처리
-                  <td className="px-3 py-2 text-sm text-gray-900">
+                  <td className="px-3 py-2 text-center text-sm text-gray-900">
                     <span className="text-xs">
                       {getSlotFieldValue(slot, 'url_item_id') || '-'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-sm text-gray-900">
+                  <td className="px-3 py-2 text-center text-sm text-gray-900">
                     <span className="text-xs">
                       {getSlotFieldValue(slot, 'url_vendor_item_id') || '-'}
                     </span>
                   </td>
                   */}
                   {/* 시작일 */}
-                  <td className="px-3 py-2 text-sm text-gray-900">
+                  <td className="px-3 py-2 text-center text-sm text-gray-900">
                     {slot.startDate ? (
                       <div>
                         <div>{new Date(slot.startDate).toLocaleDateString('ko-KR', {
@@ -982,7 +985,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                     ) : '-'}
                   </td>
                   {/* 종료일 */}
-                  <td className="px-3 py-2 text-sm text-gray-900">
+                  <td className="px-3 py-2 text-center text-sm text-gray-900">
                     {slot.endDate ? (
                       <div>
                         <div>{new Date(slot.endDate).toLocaleDateString('ko-KR', {
@@ -997,7 +1000,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                     ) : '-'}
                   </td>
                   {/* 금액 - 주석처리
-                  <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                  <td className="px-3 py-2 text-center text-sm font-medium text-gray-900">
                     <div className="flex items-center gap-2">
                       {slot.approvedPrice ? `₩${Math.floor(slot.approvedPrice).toLocaleString()}` : 
                        slot.price ? `₩${Math.floor(slot.price).toLocaleString()}` :
@@ -1017,7 +1020,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                     </div>
                   </td>
                   */}
-                  <td className="px-3 py-2 text-sm">
+                  <td className="px-3 py-2 text-center text-sm">
                     <div className="flex items-center gap-2">
                       <div className="relative inline-block group">
                         <span 
@@ -1083,7 +1086,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   </div>
                 </td>
                 {/* 액션 버튼들 - 드롭다운 메뉴 */}
-                <td className="px-3 py-2 text-sm relative">
+                <td className="px-3 py-2 text-center text-sm relative">
                   <div className="flex gap-1 items-center">
                     {/* 주요 액션 버튼 (pending 상태일 때만) */}
                     {slot.status === 'pending' && (
@@ -1126,7 +1129,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                               handleEditSlot(slot);
                               setOpenDropdownId(null);
                             }}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2"
+                            className="w-full text-left px-3 py-2 text-center text-sm hover:bg-gray-100 flex items-center gap-2"
                           >
                             <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1142,7 +1145,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                               setRefundingSlot(slot.id);
                               setOpenDropdownId(null);
                             }}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2"
+                            className="w-full text-left px-3 py-2 text-center text-sm hover:bg-gray-100 flex items-center gap-2"
                           >
                             <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -1158,7 +1161,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                               openExtensionModal(slot);
                               setOpenDropdownId(null);
                             }}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2"
+                            className="w-full text-left px-3 py-2 text-center text-sm hover:bg-gray-100 flex items-center gap-2"
                           >
                             <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1173,7 +1176,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                             handleViewHistory(slot.id);
                             setOpenDropdownId(null);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-center text-sm hover:bg-gray-100 flex items-center gap-2"
                         >
                           <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1883,7 +1886,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
             id: extendingSlot.id,
             keyword: getSlotFieldValue(extendingSlot, 'keyword') || '',
             url: getSlotFieldValue(extendingSlot, 'url') || '',
-            endDate: extendingSlot.endDate || '',
+            endDate: extendingSlot.endDate ? (typeof extendingSlot.endDate === 'string' ? extendingSlot.endDate : extendingSlot.endDate.toISOString()) : '',
             isExpired: (() => {
               const endDate = extendingSlot.endDate;
               if (!endDate) return false;

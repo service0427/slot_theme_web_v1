@@ -362,7 +362,10 @@ function CombinedSlotRowComponent({
             className="w-12 h-12 object-cover rounded mx-auto"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
-              e.currentTarget.nextSibling?.classList.remove('hidden');
+              const nextElement = e.currentTarget.nextSibling as HTMLElement;
+              if (nextElement) {
+                nextElement.classList.remove('hidden');
+              }
             }}
           />
         ) : (
@@ -388,7 +391,7 @@ function CombinedSlotRowComponent({
                     onChange={(e) => handleFieldChange(field.field_key, e.target.value)}
                     onPaste={(e) => handlePaste(e, field.field_key)}
                     placeholder={field.placeholder || `${field.label} 입력`}
-                    className={`flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full min-w-0 px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       errors[field.field_key] ? 'border-red-500 bg-red-50' : 'border-gray-300'
                     }`}
                     title={`${field.label} - ${canInlineEdit ? 'Ctrl+V로 Excel 데이터를 붙여넣을 수 있습니다' : '읽기 전용'}`}

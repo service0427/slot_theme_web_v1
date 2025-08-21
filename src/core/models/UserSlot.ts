@@ -24,6 +24,7 @@ export interface UserSlot {
   slot_number?: number;
   seq?: number;
   keyword?: string;
+  product_name?: string;
   fieldValues?: any[];
   payment_completed?: boolean; // 결제 완료 상태
   // 연장 관련 필드

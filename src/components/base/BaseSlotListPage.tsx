@@ -626,7 +626,6 @@ export function BaseSlotListPage({
   const canBulkEdit = (slot: UserSlot) => {
     return (
       (slot.status === 'empty' || slot.status === 'active') &&
-      slot.status !== 'refunded' &&
       (!slot.endDate || new Date(slot.endDate) > new Date())
     );
   };
@@ -841,65 +840,62 @@ export function BaseSlotListPage({
 
       {/* 액션 바 */}
       <div className={styles.actionBar}>
-        <div className="flex gap-3">
-          {slotOperationMode === 'normal' ? (
-            <>
-              <button
-                onClick={() => setShowRegistrationModal(true)}
-                disabled={!canAffordSlot}
-                className={canAffordSlot ? styles.button.primary : styles.button.disabled}
-              >
-                {config.useCashSystem 
-                  ? `개별 등록 (${slotPrice.toLocaleString()}원)`
-                  : '개별 등록 신청'
-                }
-              </button>
-              
-              <button
-                onClick={() => setShowBulkRegistrationModal(true)}
-                className={styles.button.secondary}
-              >
-                대량 등록
-              </button>
-            </>
-          ) : user?.role === 'operator' ? (
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setShowPreAllocationForm(true)}
-                className={styles.button.primary}
-              >
-                선슬롯발행 생성
-              </button>
-              <span className="text-sm text-gray-600">
-                할당된 슬롯: {slots.length}개
-              </span>
-              <span className="text-sm text-green-600 font-medium">
-                사용 중: {slots.filter(slot => slot.status !== 'empty').length}개
-              </span>
-              <span className="text-sm text-orange-600 font-medium">
-                사용 가능: {slots.filter(slot => slot.status === 'empty').length}개
-              </span>
-            </div>
-          ) : (
-            // 일반 사용자는 선슬롯발행 모드에서 일괄 수정 버튼 표시
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setBulkEditMode(!bulkEditMode)}
-                className={bulkEditMode ? "bg-red-600 text-white px-4 py-2 rounded-lg" : "bg-gray-600 text-white px-4 py-2 rounded-lg"}
-              >
-                {bulkEditMode ? '일괄 수정 취소' : '일괄 수정 모드'}
-              </button>
-              <span className="text-sm text-gray-600">
-                할당된 슬롯: {slots.length}개
-              </span>
-              <span className="text-sm text-green-600 font-medium">
-                사용 중: {slots.filter(slot => slot.status !== 'empty').length}개
-              </span>
-              <span className="text-sm text-orange-600 font-medium">
-                사용 가능: {slots.filter(slot => slot.status === 'empty').length}개
-              </span>
-            </div>
-          )}
+        <div className="flex justify-between items-center w-full">
+          <div className="flex gap-3">
+            {slotOperationMode === 'normal' ? (
+              <>
+                <button
+                  onClick={() => setShowRegistrationModal(true)}
+                  disabled={!canAffordSlot}
+                  className={canAffordSlot ? styles.button.primary : styles.button.disabled}
+                >
+                  {config.useCashSystem 
+                    ? `개별 등록 (${slotPrice.toLocaleString()}원)`
+                    : '개별 등록 신청'
+                  }
+                </button>
+                
+                <button
+                  onClick={() => setShowBulkRegistrationModal(true)}
+                  className={styles.button.secondary}
+                >
+                  대량 등록
+                </button>
+              </>
+            ) : user?.role === 'operator' ? (
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowPreAllocationForm(true)}
+                  className={styles.button.primary}
+                >
+                  선슬롯발행 생성
+                </button>
+                <span className="text-sm text-gray-600">
+                  할당된 슬롯: {slots.length}개
+                </span>
+                <span className="text-sm text-green-600 font-medium">
+                  사용 중: {slots.filter(slot => slot.status !== 'empty').length}개
+                </span>
+                <span className="text-sm text-orange-600 font-medium">
+                  사용 가능: {slots.filter(slot => slot.status === 'empty').length}개
+                </span>
+              </div>
+            ) : (
+              // 일반 사용자는 선슬롯발행 모드에서 통계만 표시
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-600">
+                  할당된 슬롯: {slots.length}개
+                </span>
+                <span className="text-sm text-green-600 font-medium">
+                  사용 중: {slots.filter(slot => slot.status !== 'empty').length}개
+                </span>
+                <span className="text-sm text-orange-600 font-medium">
+                  사용 가능: {slots.filter(slot => slot.status === 'empty').length}개
+                </span>
+              </div>
+            )}
+          </div>
+          
         </div>
 
         {/* 뷰 타입 전환 - 삭제 */}
@@ -1169,7 +1165,17 @@ export function BaseSlotListPage({
           {/* 선슬롯발행 모드: 통합 테이블 (빈 슬롯 + 사용 중 슬롯) */}
           {slotOperationMode === 'pre-allocation' && (
             <div className="mb-6">
-              <h3 className="text-lg font-medium mb-4 text-blue-600">전체 슬롯 목록</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-blue-600">전체 슬롯 목록</h3>
+                {user?.role !== 'operator' && (
+                  <button
+                    onClick={() => setBulkEditMode(!bulkEditMode)}
+                    className={bulkEditMode ? "bg-red-600 text-white px-4 py-2 rounded-lg" : "bg-gray-600 text-white px-4 py-2 rounded-lg"}
+                  >
+                    {bulkEditMode ? '일괄 수정 취소' : '일괄 수정 모드'}
+                  </button>
+                )}
+              </div>
               <div className="bg-white rounded-lg shadow border overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full table-fixed">
@@ -1195,7 +1201,7 @@ export function BaseSlotListPage({
                         {fieldConfigs.map((field, index) => (
                           <th 
                             key={field.field_key} 
-                            className={`px-3 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider ${index < fieldConfigs.length - 1 ? 'border-r' : ''}`}
+                            className={`px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider ${index < fieldConfigs.length - 1 ? 'border-r' : ''}`}
                             style={{ 
                               width: ['url_product_id', 'url_item_id', 'url_vendor_item_id'].includes(field.field_key) 
                                 ? '80px' 
@@ -1207,7 +1213,7 @@ export function BaseSlotListPage({
                           </th>
                         ))}
                         {/* 상품명 */}
-                        <th className="w-32 px-3 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                        <th className="w-32 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           상품명
                         </th>
                         {/* 시스템 필드들 */}
@@ -1315,16 +1321,16 @@ export function BaseSlotListPage({
                         />
                       </th>
                     )}
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">번호</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">번호</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">썸네일</th>
                     {/* 관리자가 설정한 필드들 */}
                     {fieldConfigs.map(field => (
-                      <th key={field.field_key} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th key={field.field_key} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                         {field.label}
                       </th>
                     ))}
                     {/* 상품명 */}
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">상품명</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">상품명</th>
                     {/* 시스템 필드들 */}
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">순위</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">시작일</th>

@@ -138,15 +138,6 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
                     } ${isActive && theme === 'modern' ? 'relative' : ''}`
                   }
                 >
-                  {theme === 'modern' && (
-                    <span className="mr-3 text-lg">
-                      {menu.id === 'slots' && '📋'}
-                      {menu.id === 'cash' && '💰'}
-                      {menu.id === 'cash-history' && '📊'}
-                      {menu.id === 'ranking' && '🏆'}
-                      {menu.id === 'profile' && '👤'}
-                    </span>
-                  )}
                   {menu.label}
                 </NavLink>
               </li>
@@ -183,16 +174,6 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
                         } ${isActive && theme === 'modern' ? 'relative' : ''}`
                       }
                     >
-                      {theme === 'modern' && (
-                        <span className="mr-3 text-lg">
-                          {menu.id === 'admin-dashboard' && '📈'}
-                          {menu.id === 'admin-slots' && '🎰'}
-                          {menu.id === 'admin-cash-approval' && '💳'}
-                          {menu.id === 'admin-users' && '👥'}
-                          {menu.id === 'admin-settings' && '⚙️'}
-                          {menu.id === 'admin-chat' && '💬'}
-                        </span>
-                      )}
                       {menu.label}
                     </NavLink>
                   </li>
