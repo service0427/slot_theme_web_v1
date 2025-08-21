@@ -7,8 +7,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        'sans': ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
-        'inter': ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif']
+        'sans': ['Noto Sans', 'Inter', 'sans-serif'],
+        'inter': ['Noto Sans', 'Inter', 'sans-serif'],
+        'noto': ['Noto Sans', 'sans-serif']
       }
     },
   },
