@@ -335,6 +335,19 @@ function CombinedSlotRowComponent({
   return (
     <tr className={`hover:bg-gray-50 ${isEmptySlot ? 'bg-blue-50/30' : ''}`}>
       
+      {/* 체크박스 */}
+      {onSelectionChange && (
+        <td className="px-1 py-4 border-r text-center">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => onSelectionChange(slot.id, e.target.checked)}
+            className="w-4 h-4"
+            disabled={!((slot.status === 'empty' || slot.status === 'active') && slot.status !== 'refunded' && (!slot.endDate || new Date(slot.endDate) > new Date()))}
+          />
+        </td>
+      )}
+      
       {/* 번호 */}
       <td className="px-1 py-4 border-r font-medium text-center text-sm">
         #{slot.slot_number || slot.seq || slotIndex + 1}

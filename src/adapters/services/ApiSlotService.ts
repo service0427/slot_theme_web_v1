@@ -778,4 +778,42 @@ export class ApiSlotService extends BaseSlotService {
       };
     }
   }
+
+  async bulkUpdateSlots(slotIds: string[], updates: Partial<{keyword: string, url: string, mid: string}>): Promise<SlotResult<{updatedCount: number, message: string}>> {
+    try {
+      this.updateAccessToken();
+      
+      const response = await fetch(`${API_BASE_URL}/slots/user/bulk-update`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.accessToken}`
+        },
+        body: JSON.stringify({
+          slotIds,
+          updates
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || '일괄 수정에 실패했습니다.'
+        };
+      }
+
+      return {
+        success: true,
+        data: result.data
+      };
+    } catch (error) {
+      console.error('Bulk update slots error:', error);
+      return {
+        success: false,
+        error: '서버와의 통신 중 오류가 발생했습니다.'
+      };
+    }
+  }
 }

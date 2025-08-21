@@ -22,6 +22,8 @@ export interface UserSlot {
   workCount?: number;
   description?: string;
   slot_number?: number;
+  seq?: number;
+  keyword?: string;
   fieldValues?: any[];
   payment_completed?: boolean; // 결제 완료 상태
   // 연장 관련 필드
@@ -37,6 +39,15 @@ export interface UserSlot {
 export type SlotStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'expired' | 'empty' | 'refunded';
 
 export class UserSlotModel implements UserSlot {
+  // 연장 관련 필드들
+  parent_slot_id?: string;
+  extension_days?: number;
+  extended_at?: string;
+  extended_by?: string;
+  extension_type?: 'individual' | 'bulk';
+  is_extended?: boolean;
+  has_extension?: boolean;
+
   constructor(
     public id: string,
     public userId: string,

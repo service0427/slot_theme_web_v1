@@ -7,9 +7,21 @@ interface BaseUserSlotListItemProps {
   onPause?: () => void;
   onResume?: () => void;
   onEdit?: () => void;
+  showCheckbox?: boolean;
+  isSelected?: boolean;
+  onSelectionChange?: () => void;
 }
 
-export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResume, onEdit }: BaseUserSlotListItemProps) {
+export function BaseUserSlotListItem({ 
+  slot, 
+  fieldConfigs = [], 
+  onPause, 
+  onResume, 
+  onEdit,
+  showCheckbox = false,
+  isSelected = false,
+  onSelectionChange
+}: BaseUserSlotListItemProps) {
   
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -85,6 +97,16 @@ export function BaseUserSlotListItem({ slot, fieldConfigs = [], onPause, onResum
   
   return (
     <tr className="hover:bg-gray-50">
+      {showCheckbox && (
+        <td className="px-4 py-4 text-center">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onSelectionChange}
+            className="w-4 h-4"
+          />
+        </td>
+      )}
       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
         {slotNumber}
       </td>

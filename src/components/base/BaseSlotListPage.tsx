@@ -8,6 +8,8 @@ import { BaseEmptySlotCard } from './BaseEmptySlotCard';
 import { BaseSlotEditModal } from './BaseSlotEditModal';
 import { CombinedSlotRow } from './CombinedSlotRow';
 import { BasePreAllocationForm, PreAllocationData } from './BasePreAllocationForm';
+import { BaseBulkEditModal } from './BaseBulkEditModal';
+import { UserSlot } from '@/core/models/UserSlot';
 
 // 빈 슬롯 데이터 입력 행 컴포넌트
 interface EmptySlotRowProps {
@@ -468,6 +470,11 @@ export function BaseSlotListPage({
   const [editingSlot, setEditingSlot] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPreAllocationForm, setShowPreAllocationForm] = useState(false);
+  
+  // 일괄 수정 관련 state
+  const [bulkEditMode, setBulkEditMode] = useState(false);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<Set<string>>(new Set());
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
 
   useEffect(() => {
     loadUserSlots();
@@ -614,6 +621,50 @@ export function BaseSlotListPage({
   }, [filteredSlots, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredSlots.length / itemsPerPage);
+
+  // 일괄 수정 관련 함수들
+  const canBulkEdit = (slot: UserSlot) => {
+    return (
+      (slot.status === 'empty' || slot.status === 'active') &&
+      slot.status !== 'refunded' &&
+      (!slot.endDate || new Date(slot.endDate) > new Date())
+    );
+  };
+
+  const handleToggleSlotSelection = (slotId: string) => {
+    setSelectedSlotIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(slotId)) {
+        newSet.delete(slotId);
+      } else {
+        newSet.add(slotId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const editableSlots = paginatedSlots.filter(canBulkEdit);
+    if (selectedSlotIds.size === editableSlots.length) {
+      // 모두 해제
+      setSelectedSlotIds(new Set());
+    } else {
+      // 모두 선택
+      const ids = new Set(editableSlots.map(s => s.id));
+      setSelectedSlotIds(ids);
+    }
+  };
+
+  const handleBulkEditSuccess = () => {
+    setShowBulkEditModal(false);
+    setSelectedSlotIds(new Set());
+    setBulkEditMode(false);
+    loadUserSlots();
+  };
+
+  const selectedSlots = useMemo(() => {
+    return slots.filter(slot => selectedSlotIds.has(slot.id));
+  }, [slots, selectedSlotIds]);
 
   const handleSlotRegistration = async (data: { customFields: Record<string, string> }) => {
     const success = await createSlot(data);
@@ -830,8 +881,14 @@ export function BaseSlotListPage({
               </span>
             </div>
           ) : (
-            // 일반 사용자는 선슬롯발행 모드에서 아무것도 표시 안 함
+            // 일반 사용자는 선슬롯발행 모드에서 일괄 수정 버튼 표시
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => setBulkEditMode(!bulkEditMode)}
+                className={bulkEditMode ? "bg-red-600 text-white px-4 py-2 rounded-lg" : "bg-gray-600 text-white px-4 py-2 rounded-lg"}
+              >
+                {bulkEditMode ? '일괄 수정 취소' : '일괄 수정 모드'}
+              </button>
               <span className="text-sm text-gray-600">
                 할당된 슬롯: {slots.length}개
               </span>
@@ -1118,6 +1175,16 @@ export function BaseSlotListPage({
                   <table className="w-full table-fixed">
                     <thead className="bg-blue-50 border-b">
                       <tr>
+                        {bulkEditMode && (
+                          <th className="w-12 px-1 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                            <input
+                              type="checkbox"
+                              checked={selectedSlotIds.size === paginatedSlots.filter(canBulkEdit).length && paginatedSlots.filter(canBulkEdit).length > 0}
+                              onChange={handleSelectAll}
+                              className="w-4 h-4"
+                            />
+                          </th>
+                        )}
                         <th className="w-12 px-1 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           번호
                         </th>
@@ -1198,6 +1265,8 @@ export function BaseSlotListPage({
                               loadUserSlots();
                             } : undefined}
                             onBulkPaste={handleBulkPaste}
+                            isSelected={selectedSlotIds.has(slot.id)}
+                            onSelectionChange={bulkEditMode ? (slotId, checked) => handleToggleSlotSelection(slotId) : undefined}
                           />
                         );
                       })}
@@ -1236,6 +1305,16 @@ export function BaseSlotListPage({
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    {bulkEditMode && (
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        <input
+                          type="checkbox"
+                          checked={selectedSlotIds.size === paginatedSlots.filter(canBulkEdit).length && paginatedSlots.filter(canBulkEdit).length > 0}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4"
+                        />
+                      </th>
+                    )}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">번호</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">썸네일</th>
                     {/* 관리자가 설정한 필드들 */}
@@ -1266,6 +1345,9 @@ export function BaseSlotListPage({
                         setEditingSlot(slot);
                         setShowEditModal(true);
                       }}
+                      showCheckbox={bulkEditMode && canBulkEdit(slot)}
+                      isSelected={selectedSlotIds.has(slot.id)}
+                      onSelectionChange={() => handleToggleSlotSelection(slot.id)}
                     />
                   ))}
                 </tbody>
@@ -1347,6 +1429,29 @@ export function BaseSlotListPage({
         }}
         onSubmit={handleEditSlot}
         slot={editingSlot}
+      />
+
+      {/* 일괄 수정 플로팅 액션 바 */}
+      {bulkEditMode && selectedSlotIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg z-40">
+          <div className="flex items-center gap-4">
+            <span className="font-medium">{selectedSlotIds.size}개 선택됨</span>
+            <button
+              onClick={() => setShowBulkEditModal(true)}
+              className="bg-white text-blue-600 px-4 py-2 rounded-md hover:bg-gray-100"
+            >
+              일괄 수정
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 일괄 수정 모달 */}
+      <BaseBulkEditModal
+        isOpen={showBulkEditModal}
+        onClose={() => setShowBulkEditModal(false)}
+        selectedSlots={selectedSlots}
+        onSuccess={handleBulkEditSuccess}
       />
 
       {/* 선슬롯발행 생성 폼 */}

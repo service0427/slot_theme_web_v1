@@ -1769,6 +1769,15 @@ export async function extendSlot(req: AuthRequest, res: Response) {
     );
     const nextSeq = maxSeqResult.rows[0].next_seq;
 
+    // 해당 사용자의 다음 slot_number 찾기
+    const maxSlotNumberResult = await client.query(
+      `SELECT COALESCE(MAX(slot_number), 0) + 1 as next_slot_number 
+       FROM slots 
+       WHERE user_id = $1`,
+      [originalSlot.user_id]
+    );
+    const nextSlotNumber = maxSlotNumberResult.rows[0].next_slot_number;
+
     // 새 슬롯 생성 (연장 슬롯)
     const insertResult = await client.query(
       `INSERT INTO slots (
@@ -1805,7 +1814,7 @@ export async function extendSlot(req: AuthRequest, res: Response) {
         originalSlot.issue_type,
         false, // 빈 슬롯 아님
         originalSlot.allocation_id,
-        originalSlot.slot_number,
+        nextSlotNumber, // 새로운 slot_number 사용
         startDate,
         endDate,
         extensionDays,
@@ -1948,6 +1957,15 @@ export async function extendBulkSlots(req: AuthRequest, res: Response) {
         );
         const nextSeq = maxSeqResult.rows[0].next_seq;
 
+        // 해당 사용자의 다음 slot_number 찾기
+        const maxSlotNumberResult = await client.query(
+          `SELECT COALESCE(MAX(slot_number), 0) + 1 as next_slot_number 
+           FROM slots 
+           WHERE user_id = $1`,
+          [originalSlot.user_id]
+        );
+        const nextSlotNumber = maxSlotNumberResult.rows[0].next_slot_number;
+
         // 새 슬롯 생성
         const insertResult = await client.query(
           `INSERT INTO slots (
@@ -1984,7 +2002,7 @@ export async function extendBulkSlots(req: AuthRequest, res: Response) {
             originalSlot.issue_type,
             false,
             originalSlot.allocation_id,
-            originalSlot.slot_number,
+            nextSlotNumber, // 새로운 slot_number 사용
             startDate,
             endDate,
             extensionDays,
@@ -2170,6 +2188,181 @@ export async function cancelSlotPayment(req: AuthRequest, res: Response) {
     res.status(500).json({
       success: false,
       error: '결제 취소 중 오류가 발생했습니다.'
+    });
+  } finally {
+    client.release();
+  }
+}
+
+// 사용자 슬롯 일괄 수정
+export async function bulkUpdateSlots(req: AuthRequest, res: Response) {
+  const { slotIds, updates } = req.body;
+  const userId = req.user?.id;
+  
+  if (!slotIds || !Array.isArray(slotIds) || slotIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: '수정할 슬롯을 선택해주세요.'
+    });
+  }
+  
+  if (!updates || Object.keys(updates).length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: '수정할 내용을 입력해주세요.'
+    });
+  }
+  
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // 1. 수정 가능한 슬롯 검증 및 현재 값 조회
+    const validSlots = await client.query(`
+      SELECT id, keyword, url, mid, trim_keyword, status, pre_allocation_end_date
+      FROM slots 
+      WHERE id = ANY($1) 
+        AND user_id = $2
+        AND status IN ('empty', 'active')
+        AND status != 'refunded'
+        AND (pre_allocation_end_date IS NULL OR pre_allocation_end_date > NOW())
+    `, [slotIds, userId]);
+    
+    if (validSlots.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        error: '수정 가능한 슬롯이 없습니다.' 
+      });
+    }
+    
+    let totalUpdated = 0;
+    
+    // 2. 각 슬롯 업데이트
+    for (const slot of validSlots.rows) {
+      const updateFields = [];
+      const updateValues = [];
+      let paramCount = 1;
+      let hasChanges = false;
+      
+      // keyword 업데이트
+      if (updates.keyword?.trim() && updates.keyword.trim() !== slot.keyword) {
+        updateFields.push(`keyword = $${paramCount++}`);
+        updateValues.push(updates.keyword.trim());
+        
+        // trim_keyword 자동 계산
+        const trimKeywordValue = updates.keyword.trim().replace(/\s+/g, '');
+        updateFields.push(`trim_keyword = $${paramCount++}`);
+        updateValues.push(trimKeywordValue);
+        
+        // slot_field_values 업데이트
+        await client.query(`
+          INSERT INTO slot_field_values (slot_id, field_key, value)
+          VALUES ($1, 'keyword', $2)
+          ON CONFLICT (slot_id, field_key) 
+          DO UPDATE SET value = $2, updated_at = NOW()
+        `, [slot.id, updates.keyword.trim()]);
+        
+        // 변경 로그
+        await client.query(`
+          INSERT INTO slot_change_logs 
+          (slot_id, user_id, change_type, field_key, old_value, new_value, created_at)
+          VALUES ($1, $2, 'field_update', 'keyword', $3, $4, NOW())
+        `, [slot.id, userId, JSON.stringify(slot.keyword || ''), JSON.stringify(updates.keyword.trim())]);
+        
+        hasChanges = true;
+      }
+      
+      // URL 업데이트 (파싱 포함)
+      if (updates.url?.trim() && updates.url.trim() !== slot.url) {
+        updateFields.push(`url = $${paramCount++}`);
+        updateValues.push(updates.url.trim());
+        
+        // URL 파싱하여 추가 필드 생성
+        const parsedUrlFields = parseUrl(updates.url.trim());
+        
+        // slot_field_values에 URL 저장
+        await client.query(`
+          INSERT INTO slot_field_values (slot_id, field_key, value)
+          VALUES ($1, 'url', $2)
+          ON CONFLICT (slot_id, field_key) 
+          DO UPDATE SET value = $2, updated_at = NOW()
+        `, [slot.id, updates.url.trim()]);
+        
+        // 파싱된 필드들도 저장
+        for (const [key, value] of Object.entries(parsedUrlFields)) {
+          await client.query(`
+            INSERT INTO slot_field_values (slot_id, field_key, value)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (slot_id, field_key) 
+            DO UPDATE SET value = $3, updated_at = NOW()
+          `, [slot.id, key, value]);
+        }
+        
+        // 변경 로그
+        await client.query(`
+          INSERT INTO slot_change_logs 
+          (slot_id, user_id, change_type, field_key, old_value, new_value, created_at)
+          VALUES ($1, $2, 'field_update', 'url', $3, $4, NOW())
+        `, [slot.id, userId, JSON.stringify(slot.url || ''), JSON.stringify(updates.url.trim())]);
+        
+        hasChanges = true;
+      }
+      
+      // MID 업데이트
+      if (updates.mid?.trim() && updates.mid.trim() !== slot.mid) {
+        updateFields.push(`mid = $${paramCount++}`);
+        updateValues.push(updates.mid.trim());
+        
+        // slot_field_values 업데이트
+        await client.query(`
+          INSERT INTO slot_field_values (slot_id, field_key, value)
+          VALUES ($1, 'mid', $2)
+          ON CONFLICT (slot_id, field_key) 
+          DO UPDATE SET value = $2, updated_at = NOW()
+        `, [slot.id, updates.mid.trim()]);
+        
+        // 변경 로그
+        await client.query(`
+          INSERT INTO slot_change_logs 
+          (slot_id, user_id, change_type, field_key, old_value, new_value, created_at)
+          VALUES ($1, $2, 'field_update', 'mid', $3, $4, NOW())
+        `, [slot.id, userId, JSON.stringify(slot.mid || ''), JSON.stringify(updates.mid.trim())]);
+        
+        hasChanges = true;
+      }
+      
+      // slots 테이블 업데이트
+      if (updateFields.length > 0) {
+        updateFields.push(`updated_at = NOW()`);
+        updateValues.push(slot.id);
+        
+        await client.query(`
+          UPDATE slots 
+          SET ${updateFields.join(', ')}
+          WHERE id = $${paramCount}
+        `, updateValues);
+        
+        totalUpdated++;
+      }
+    }
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      data: {
+        updatedCount: totalUpdated,
+        message: `${totalUpdated}개의 슬롯이 수정되었습니다.`
+      }
+    });
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Bulk update error:', error);
+    res.status(500).json({
+      success: false,
+      error: '일괄 수정 중 오류가 발생했습니다.'
     });
   } finally {
     client.release();

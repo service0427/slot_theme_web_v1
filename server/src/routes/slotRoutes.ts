@@ -19,7 +19,8 @@ import {
   extendSlot,
   extendBulkSlots,
   cancelSlotPayment,
-  getSlotRankChain
+  getSlotRankChain,
+  bulkUpdateSlots
 } from '../controllers/slotController';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
@@ -84,6 +85,9 @@ router.post('/:id/extend', extendSlot);
 
 // 대량 슬롯 연장 (관리자 전용)
 router.post('/extend-bulk', extendBulkSlots);
+
+// 사용자 슬롯 일괄 수정
+router.put('/user/bulk-update', bulkUpdateSlots);
 
 // 슬롯 결제 취소 (관리자 전용)
 router.patch('/:id/cancel-payment', cancelSlotPayment);
