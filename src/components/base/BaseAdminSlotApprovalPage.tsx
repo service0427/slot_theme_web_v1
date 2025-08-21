@@ -976,7 +976,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                           year: 'numeric',
                           month: '2-digit',
                           day: '2-digit'
-                        }).replace(/\./g, '-').replace(/-$/, '')}</div>
+                        }).replace(/\./g, '-').replace(/\s+/g, '').replace(/-$/, '')}</div>
                         {slot.workCount && <div className="text-xs text-gray-500">작업 {slot.workCount}건</div>}
                       </div>
                     ) : '-'}
@@ -989,7 +989,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                           year: 'numeric',
                           month: '2-digit',
                           day: '2-digit'
-                        }).replace(/\./g, '-').replace(/-$/, '')}</div>
+                        }).replace(/\s+/g, '').replace(/\./g, '-').replace(/-$/, '')}</div>
                         {slot.description && <div className="text-xs text-gray-500" title={slot.description}>
                           {slot.description.length > 10 ? slot.description.substring(0, 10) + '...' : slot.description}
                         </div>}
