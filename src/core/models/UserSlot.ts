@@ -24,6 +24,14 @@ export interface UserSlot {
   slot_number?: number;
   fieldValues?: any[];
   payment_completed?: boolean; // 결제 완료 상태
+  // 연장 관련 필드
+  parent_slot_id?: string;
+  extension_days?: number;
+  extended_at?: string;
+  extended_by?: string;
+  extension_type?: 'individual' | 'bulk';
+  is_extended?: boolean;
+  has_extension?: boolean;
 }
 
 export type SlotStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'expired' | 'empty' | 'refunded';

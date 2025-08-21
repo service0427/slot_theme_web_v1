@@ -11,6 +11,7 @@ import { SystemSettingsProvider, useSystemSettings } from './contexts/SystemSett
 import { LoginPreviewPage } from './pages/LoginPreviewPage';
 import { ThemedLoadingScreen } from './components/LoadingScreen';
 import { setupAuthInterceptor } from './utils/setupAuthInterceptor';
+import { DeveloperSwitchButton } from './components/base/DeveloperSwitchButton';
 
 function AppContent() {
   const { theme, isLoading: settingsLoading, getSetting } = useSystemSettings();
@@ -60,19 +61,23 @@ function AppContent() {
   } = theme.components;
 
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          auth.isAuthenticated ? (
-            <Navigate to={(auth.user?.role === 'operator' || auth.user?.role === 'developer') ? '/admin' : '/slots'} replace />
-          ) : (
-            <AuthLayout>
-              <LoginPage />
-            </AuthLayout>
-          )
-        }
-      />
+    <>
+      {/* 개발자 전환 복귀 버튼 - 항상 최상위에 표시 */}
+      <DeveloperSwitchButton />
+      
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            auth.isAuthenticated ? (
+              <Navigate to={(auth.user?.role === 'operator' || auth.user?.role === 'developer') ? '/admin' : '/slots'} replace />
+            ) : (
+              <AuthLayout>
+                <LoginPage />
+              </AuthLayout>
+            )
+          }
+        />
       
       {/* 미리보기 전용 로그인 페이지 - 인증 없이 접근 가능 */}
       <Route path="/login-preview" element={<LoginPreviewPage />} />
@@ -117,6 +122,7 @@ function AppContent() {
           <Navigate to="/login" replace />
       } />
     </Routes>
+    </>
   );
 }
 

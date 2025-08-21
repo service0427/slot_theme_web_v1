@@ -46,7 +46,7 @@ export function BaseOperatorNotificationPage() {
       }
     };
     
-    if (user?.role === 'operator') {
+    if (user?.role === 'operator' || user?.role === 'developer') {
       loadUsers();
     }
   }, [user]);
@@ -66,11 +66,26 @@ export function BaseOperatorNotificationPage() {
   }, []);
 
   // 필터링된 사용자 목록
-  const filteredUsers = allUsers.filter(user => 
-    !selectedUsers.includes(user.id) &&
-    (user.fullName && user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     user.email.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredUsers = allUsers.filter(user => {
+    // 이미 선택된 사용자는 제외
+    if (selectedUsers.includes(user.id)) {
+      return false;
+    }
+    
+    // 검색어가 없으면 모든 사용자 표시
+    if (!searchTerm.trim()) {
+      return true;
+    }
+    
+    const searchLower = searchTerm.toLowerCase();
+    
+    // 아이디, 이름, 이메일로 검색
+    const idMatch = user.id.toLowerCase().includes(searchLower);
+    const nameMatch = user.fullName ? user.fullName.toLowerCase().includes(searchLower) : false;
+    const emailMatch = user.email.toLowerCase().includes(searchLower);
+    
+    return idMatch || nameMatch || emailMatch;
+  });
 
   // 관리자 권한 체크
   if (user?.role !== 'operator' && user?.role !== 'developer') {

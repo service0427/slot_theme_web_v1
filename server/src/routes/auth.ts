@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, refreshToken, updateProfile, getCurrentUser } from '../controllers/authController';
+import { login, refreshToken, updateProfile, getCurrentUser, switchUser } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -11,5 +11,6 @@ router.post('/refresh', refreshToken);
 // 인증 필요 라우트
 router.get('/me', authenticateToken, getCurrentUser);
 router.put('/profile', authenticateToken, updateProfile);
+router.post('/switch-user', authenticateToken, switchUser); // 개발자 전용 사용자 전환
 
 export default router;

@@ -325,11 +325,103 @@ export async function getCurrentUser(req: AuthRequest, res: Response) {
   }
 }
 
+// 개발자 전용: 사용자 전환
+export async function switchUser(req: AuthRequest, res: Response) {
+  try {
+    const currentUserId = req.user?.id;
+    const currentUserRole = req.user?.role;
+    const { targetUserId } = req.body;
+
+    // 개발자 권한 확인
+    if (currentUserRole !== 'developer') {
+      return res.status(403).json({
+        success: false,
+        error: '개발자 계정만 사용자 전환이 가능합니다.'
+      });
+    }
+
+    if (!targetUserId) {
+      return res.status(400).json({
+        success: false,
+        error: '전환할 사용자 ID를 입력해주세요.'
+      });
+    }
+
+    // 대상 사용자 조회
+    const result = await pool.query(
+      'SELECT id, email, full_name, role, is_active FROM users WHERE id = $1',
+      [targetUserId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '대상 사용자를 찾을 수 없습니다.'
+      });
+    }
+
+    const targetUser = result.rows[0];
+
+    // 계정 활성화 상태 확인
+    if (!targetUser.is_active) {
+      return res.status(400).json({
+        success: false,
+        error: '비활성화된 계정으로는 전환할 수 없습니다.'
+      });
+    }
+
+    // 대상 사용자의 JWT 토큰 생성
+    const accessToken = jwt.sign(
+      {
+        id: targetUser.id,
+        email: targetUser.email,
+        role: targetUser.role,
+        switched_from: currentUserId // 개발자 ID 저장
+      },
+      jwtConfig.secret,
+      { expiresIn: jwtConfig.expiresIn } as SignOptions
+    );
+
+    const refreshToken = jwt.sign(
+      { 
+        id: targetUser.id,
+        switched_from: currentUserId 
+      },
+      jwtConfig.secret,
+      { expiresIn: jwtConfig.refreshExpiresIn } as SignOptions
+    );
+
+    // 권한 매핑
+    const permissions = getPermissionsByRole(targetUser.role);
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: targetUser.id,
+          email: targetUser.email,
+          fullName: targetUser.full_name,
+          role: targetUser.role,
+          permissions
+        },
+        accessToken,
+        refreshToken
+      }
+    });
+  } catch (error) {
+    console.error('Switch user error:', error);
+    res.status(500).json({
+      success: false,
+      error: '사용자 전환 중 오류가 발생했습니다.'
+    });
+  }
+}
+
 function getPermissionsByRole(role: string): string[] {
   const permissionMap: Record<string, string[]> = {
     admin: ['view_all', 'edit_all', 'delete_all', 'manage_users'],
     operator: ['view_all', 'edit_all', 'manage_users'],
-    developer: ['view_all', 'edit_all', 'manage_users'], // 개발자도 운영자와 동일한 권한
+    developer: ['view_all', 'edit_all', 'manage_users', 'switch_user'], // 개발자는 사용자 전환 권한 추가
     user: ['view_own', 'edit_own']
   };
 

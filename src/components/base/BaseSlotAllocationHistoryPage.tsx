@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Calendar, ChevronDown, ChevronUp, Search, User, UserCheck } from 'lucide-react';
+import { BaseSlotExtensionModal } from './BaseSlotExtensionModal';
 
 interface AllocationHistory {
   id: string;
@@ -41,6 +42,9 @@ export function BaseSlotAllocationHistoryPage() {
   const [searchUser, setSearchUser] = useState('');
   const [searchOperator, setSearchOperator] = useState('');
   const [pageSize, setPageSize] = useState(20);
+  const [extendingAllocation, setExtendingAllocation] = useState<AllocationHistory | null>(null);
+  const [showExtensionModal, setShowExtensionModal] = useState(false);
+  const [isExtending, setIsExtending] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
@@ -165,6 +169,87 @@ export function BaseSlotAllocationHistoryPage() {
     } catch (error) {
       alert('결제 완료 처리 중 오류가 발생했습니다.');
     }
+  };
+
+  // 결제 취소 처리
+  const handlePaymentCancel = async (allocationId: string) => {
+    if (!confirm('결제를 취소하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiUrl}/slots/allocation-history/${allocationId}/payment`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ payment: false })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          alert('결제가 취소되었습니다.');
+          // 목록 새로고침
+          loadAllocations();
+        } else {
+          alert('결제 취소에 실패했습니다.');
+        }
+      } else {
+        alert('결제 취소에 실패했습니다.');
+      }
+    } catch (error) {
+      alert('결제 취소 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 대량 슬롯 연장 처리
+  const handleBulkExtension = async (extensionDays: number) => {
+    if (!extendingAllocation) return;
+    
+    setIsExtending(true);
+    try {
+      const response = await fetch(`${apiUrl}/slots/extend-bulk`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          allocationHistoryId: extendingAllocation.id,
+          extensionDays
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        const { extended, failed, total } = result.data;
+        let message = `총 ${total}개 중 ${extended}개 슬롯이 연장되었습니다.`;
+        if (failed > 0) {
+          message += `\n${failed}개 슬롯 연장 실패`;
+        }
+        alert(message);
+        
+        // 목록 새로고침
+        loadAllocations();
+        setShowExtensionModal(false);
+        setExtendingAllocation(null);
+      } else {
+        alert(result.error || '슬롯 연장에 실패했습니다.');
+      }
+    } catch (error) {
+      alert('슬롯 연장 중 오류가 발생했습니다.');
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
+  // 연장 모달 열기
+  const openExtensionModal = (allocation: AllocationHistory) => {
+    setExtendingAllocation(allocation);
+    setShowExtensionModal(true);
   };
 
   return (
@@ -339,19 +424,33 @@ export function BaseSlotAllocationHistoryPage() {
                         '-'
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      {!allocation.payment ? (
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        {/* 결제 상태 관련 버튼 */}
+                        {!allocation.payment ? (
+                          <button
+                            onClick={() => handlePaymentComplete(allocation.id)}
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
+                          >
+                            결제 완료
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handlePaymentCancel(allocation.id)}
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
+                          >
+                            결제 취소
+                          </button>
+                        )}
+                        
+                        {/* 전체 연장 버튼 */}
                         <button
-                          onClick={() => handlePaymentComplete(allocation.id)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                          onClick={() => openExtensionModal(allocation)}
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors"
                         >
-                          결제 완료
+                          전체 연장
                         </button>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          완료됨
-                        </span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -417,6 +516,25 @@ export function BaseSlotAllocationHistoryPage() {
           </div>
         )}
       </div>
+
+      {/* 대량 슬롯 연장 모달 */}
+      {showExtensionModal && extendingAllocation && (
+        <BaseSlotExtensionModal
+          isOpen={showExtensionModal}
+          onClose={() => {
+            setShowExtensionModal(false);
+            setExtendingAllocation(null);
+          }}
+          onExtend={handleBulkExtension}
+          slotInfo={{
+            id: extendingAllocation.id,
+            keyword: `${extendingAllocation.user_name}님의 ${extendingAllocation.slot_count}개 슬롯`,
+            url: '',
+            endDate: new Date().toISOString(), // 발급 내역에는 종료일이 없으므로 현재 날짜 사용
+            isExpired: false
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { ApiUserService } from '@/adapters/services/ApiUserService';
 import { User } from '@/core/models/User';
 import { UserFilter } from '@/core/services/UserService';
 import { BaseSlotAllocationModal, PreAllocationData } from './BaseSlotAllocationModal';
+import { useAuthContext } from '@/adapters/react/hooks/useAuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
@@ -81,6 +82,7 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
   });
 
   const userService = new ApiUserService();
+  const { user: currentUser, loginWithToken } = useAuthContext();
 
   // 기본 스타일
   const defaultTheme: AdminUserManageThemeProps = {
@@ -367,6 +369,80 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
     }
   };
 
+  // 사용자 전환 (개발자 전용)
+  const handleUserSwitch = async (targetUser: User) => {
+    if (currentUser?.role !== 'developer') {
+      alert('개발자 계정만 사용자 전환이 가능합니다.');
+      return;
+    }
+
+    if (!window.confirm(`${targetUser.fullName || targetUser.email}님으로 전환하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      // 개발자 토큰을 백업
+      const developerToken = localStorage.getItem('accessToken');
+      const developerRefreshToken = localStorage.getItem('refreshToken');
+      
+      // 개발자 토큰 백업 저장
+      if (developerToken) {
+        localStorage.setItem('developer_backup_token', developerToken);
+      }
+      if (developerRefreshToken) {
+        localStorage.setItem('developer_backup_refresh_token', developerRefreshToken);
+      }
+      
+      // 대상 사용자로 로그인 시도
+      const response = await fetch(`${API_BASE_URL}/auth/switch-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${developerToken}`
+        },
+        body: JSON.stringify({
+          targetUserId: targetUser.id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('사용자 전환에 실패했습니다.');
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // 새 토큰 저장
+        localStorage.setItem('accessToken', result.data.accessToken);
+        localStorage.setItem('refreshToken', result.data.refreshToken);
+        localStorage.setItem('switched_from_developer', 'true');
+        localStorage.setItem('original_user', currentUser.email);
+        
+        console.log('[사용자 전환] localStorage 설정 완료:', {
+          switched: localStorage.getItem('switched_from_developer'),
+          original: localStorage.getItem('original_user'),
+          devBackup: localStorage.getItem('developer_backup_token') ? 'exists' : 'none'
+        });
+        
+        // 로그인 상태 업데이트 (토큰으로 직접 로그인)
+        await loginWithToken(result.data.accessToken);
+        
+        alert(`${targetUser.fullName || targetUser.email}님으로 전환되었습니다.`);
+        
+        // 페이지 새로고침 대신 setTimeout으로 약간의 지연 후 이동
+        // localStorage가 TopNavigation에서 읽힐 시간을 줌
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 100);
+      } else {
+        throw new Error(result.error || '사용자 전환에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('사용자 전환 오류:', error);
+      alert('사용자 전환 중 오류가 발생했습니다.');
+    }
+  };
+
   // 사용자 편집 모달 열기
   const openEditModal = (user: User) => {
     setSelectedUser(user);
@@ -510,6 +586,15 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                   <div className="flex gap-2">
+                    {currentUser?.role === 'developer' && (
+                      <button
+                        onClick={() => handleUserSwitch(user)}
+                        className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 text-xs"
+                        title="이 사용자로 로그인"
+                      >
+                        전환
+                      </button>
+                    )}
                     <button
                       onClick={() => openSlotAllocationModal(user)}
                       className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-xs"

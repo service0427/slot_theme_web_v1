@@ -15,7 +15,11 @@ import {
   getSlotChangeLogs,
   getUserSlotChangeLogs,
   getSlotAllocationHistory,
-  updatePaymentStatus
+  updatePaymentStatus,
+  extendSlot,
+  extendBulkSlots,
+  cancelSlotPayment,
+  getSlotRankChain
 } from '../controllers/slotController';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
@@ -66,11 +70,23 @@ router.get('/:id/field-values', getSlotFieldValues);
 // 슬롯 필드 업데이트 (수정용)
 router.put('/:id/update-fields', updateSlotFields);
 
+// 슬롯 체인의 rank_daily 조회 (연장 슬롯 포함)
+router.get('/:id/rank-chain', getSlotRankChain);
+
 // 특정 슬롯의 변경 로그 조회
 router.get('/:id/logs', getSlotChangeLogs);
 
 // 사용자의 모든 슬롯 변경 로그 조회
 router.get('/user/:userId/logs', getUserSlotChangeLogs);
+
+// 슬롯 연장 (관리자 전용)
+router.post('/:id/extend', extendSlot);
+
+// 대량 슬롯 연장 (관리자 전용)
+router.post('/extend-bulk', extendBulkSlots);
+
+// 슬롯 결제 취소 (관리자 전용)
+router.patch('/:id/cancel-payment', cancelSlotPayment);
 
 // rank_daily 삭제 쿼리 반환 (실제 삭제하지 않음)
 router.get('/:id/rank-delete-query', authenticateToken, async (req: AuthRequest, res: Response) => {
