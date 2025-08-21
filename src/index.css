@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 애플 스타일 폰트 적용 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
+  font-feature-settings: "liga", "kern";
+}
+
+/* 제목 폰트 최적화 */
+h1, h2, h3, h4, h5, h6 {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif !important;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+}
+
+/* 버튼 폰트 최적화 */
+button {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif !important;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+}
+
+/* 입력 필드 폰트 최적화 */
+input, textarea, select {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif !important;
+  letter-spacing: -0.011em;
+}
+
 @keyframes slide-up {
   from {
     transform: translateY(100%);
