@@ -691,15 +691,22 @@ export function BaseSlotListPage({
   };
 
   const handleFillEmptySlot = async (data: { customFields: Record<string, string> }, slotId: string) => {
-    if (!slotId) return;
+    if (!slotId) return false;
     
     const success = await fillEmptySlot(slotId, data);
     if (success) {
       // 성공 메시지 표시
       alert('슬롯이 성공적으로 채워졌습니다!');
+      // formData 초기화
+      setSlotsFormData(prev => {
+        const newData = { ...prev };
+        delete newData[slotId];
+        return newData;
+      });
       // 슬롯 목록 새로고침
       loadUserSlots();
     }
+    return success;
   };
 
   // 선슬롯발행 모드에서 active/pending 슬롯 업데이트
@@ -1009,55 +1016,104 @@ export function BaseSlotListPage({
           {slotOperationMode === 'pre-allocation' && (
             <button
               onClick={async () => {
-                // 완료가 아닌 모든 슬롯 찾기 (input이 있는 슬롯)
+                // slotsFormData에서 데이터가 있는 슬롯 찾기
                 const editableSlots = [];
-                const rows = document.querySelectorAll('tbody tr');
                 
-                for (const row of rows) {
-                  const inputs = row.querySelectorAll('input[type="text"]');
-                  if (inputs.length > 0) {
-                    // input이 있으면 편집 가능한 슬롯
-                    const firstCell = row.querySelector('td:first-child');
-                    const slotNumberText = firstCell?.textContent || '';
-                    const slotNumber = parseInt(slotNumberText.replace('#', '')) || 0;
+                for (const slot of paginatedSlots.filter(s => s.status === 'empty' || s.status === 'active')) {
+                  const formData = slotsFormData[slot.id];
+                  
+                  // formData가 있고 데이터가 있는 경우만 처리
+                  if (formData) {
+                    const hasAnyData = Object.values(formData).some(value => value && value.toString().trim());
                     
-                    // 해당 번호의 슬롯 찾기
-                    const slot = paginatedSlots.find(s => 
-                      (s.slot_number === slotNumber) || 
-                      (s.customFields?.seq && parseInt(s.customFields.seq) === slotNumber)
-                    );
-                    
-                    if (slot) {
-                      const formData = {};
-                      let hasRequiredFields = true;
-                      let missingFields = [];
+                    if (hasAnyData) {
+                      // 필수 필드 체크
+                      const requiredFields = fieldConfigs.filter(f => f.is_required);
+                      const missingFields = [];
+                      for (const field of requiredFields) {
+                        if (!formData[field.field_key]?.trim()) {
+                          missingFields.push(field.label);
+                        }
+                      }
+                      const hasRequiredFields = missingFields.length === 0;
                       
-                      inputs.forEach((input: HTMLInputElement, index) => {
-                        if (fieldConfigs[index]) {
-                          const fieldKey = fieldConfigs[index].field_key;
-                          const value = input.value?.trim() || '';
-                          formData[fieldKey] = value;
+                      // URL 검증 추가
+                      let hasValidUrl = true;
+                      const urlField = formData.url || formData.landingUrl;
+                      if (urlField) {
+                        const isCoupangDomain = /coupang\.com/.test(urlField);
+                        
+                        if (isCoupangDomain) {
+                          const isValidCoupangUrl = /https?:\/\/(www\.)?coupang\.com\/vp\/products\/\d+/.test(urlField);
+                          const hasItemId = urlField.includes('itemId=') && /itemId=\d+/.test(urlField);
+                          const hasVendorItemId = urlField.includes('vendorItemId=') && /vendorItemId=\d+/.test(urlField);
                           
-                          // 필수 필드 체크
-                          if (fieldConfigs[index].is_required && !value) {
-                            hasRequiredFields = false;
-                            missingFields.push(fieldConfigs[index].label);
+                          if (!isValidCoupangUrl || !hasItemId || !hasVendorItemId) {
+                            hasValidUrl = false;
                           }
                         }
-                      });
+                      }
                       
-                      // 필수 필드가 모두 있을 때만 저장 대상에 추가
-                      if (hasRequiredFields) {
+                      // 필수 필드가 모두 있고 URL이 유효할 때만 저장 대상에 추가
+                      if (hasRequiredFields && hasValidUrl) {
                         editableSlots.push({ slot, formData });
-                      } else {
+                      } else if (!hasRequiredFields) {
                         console.log(`슬롯 #${slot.slot_number || (slot.customFields?.seq ? parseInt(slot.customFields.seq) : '')} 스킵 (필수 필드 누락: ${missingFields.join(', ')})`);
+                      } else if (!hasValidUrl) {
+                        console.log(`슬롯 #${slot.slot_number || (slot.customFields?.seq ? parseInt(slot.customFields.seq) : '')} 스킵 (쿠팡 URL 형식 오류)`);
                       }
                     }
                   }
                 }
                 
                 if (editableSlots.length === 0) {
-                  alert('저장할 슬롯이 없습니다.');
+                  // 어떤 문제인지 확인
+                  let hasUrlError = false;
+                  let hasMissingFields = false;
+                  
+                  for (const slot of paginatedSlots.filter(s => s.status === 'empty' || s.status === 'active')) {
+                    const formData = slotsFormData[slot.id];
+                    if (formData) {
+                      const hasAnyData = Object.values(formData).some(value => value && value.toString().trim());
+                      if (hasAnyData) {
+                        // 필수 필드 체크
+                        const requiredFields = fieldConfigs.filter(f => f.is_required);
+                        for (const field of requiredFields) {
+                          if (!formData[field.field_key]?.trim()) {
+                            hasMissingFields = true;
+                            break;
+                          }
+                        }
+                        
+                        // URL 검증
+                        const urlField = formData.url || formData.landingUrl;
+                        if (urlField) {
+                          const isCoupangDomain = /coupang\.com/.test(urlField);
+                          
+                          if (isCoupangDomain) {
+                            const isValidCoupangUrl = /https?:\/\/(www\.)?coupang\.com\/vp\/products\/\d+/.test(urlField);
+                            const hasItemId = urlField.includes('itemId=') && /itemId=\d+/.test(urlField);
+                            const hasVendorItemId = urlField.includes('vendorItemId=') && /vendorItemId=\d+/.test(urlField);
+                            
+                            if (!isValidCoupangUrl || !hasItemId || !hasVendorItemId) {
+                              hasUrlError = true;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                  
+                  // 조건에 따른 알럿 메시지
+                  if (hasUrlError && hasMissingFields) {
+                    alert('URL 형식과 필수 입력 항목을 확인해주세요.');
+                  } else if (hasUrlError) {
+                    alert('쿠팡 URL은 /products/{ID}?itemId={ID}&vendorItemId={ID} 형식이어야 합니다.');
+                  } else if (hasMissingFields) {
+                    alert('필수 입력 항목을 모두 입력해주세요.');
+                  } else {
+                    alert('저장할 슬롯이 없습니다.');
+                  }
                   return;
                 }
                 
@@ -1127,6 +1183,8 @@ export function BaseSlotListPage({
                 }
                 
                 alert('저장되었습니다.');
+                // slotsFormData 초기화
+                setSlotsFormData({});
                 loadUserSlots();
               }}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
@@ -1226,9 +1284,9 @@ export function BaseSlotListPage({
                         <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           종료일
                         </th>
-                        {/* <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
-                          상태/활성화
-                        </th> */}
+                        <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          상태
+                        </th>
                         <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
                           액션
                         </th>
@@ -1250,25 +1308,42 @@ export function BaseSlotListPage({
                             slotIndex={slotIndex}
                             fieldConfigs={fieldConfigs}
                             onSave={async (data) => {
+                              let success = false;
                               // empty 슬롯은 fillEmptySlot, 나머지는 updateSlot 사용
                               if (slot.status === 'empty') {
-                                return handleFillEmptySlot(data, slot.id);
+                                success = await handleFillEmptySlot(data, slot.id);
                               } else {
                                 // 키워드/URL 변경 체크는 이미 개별 저장 버튼에서 처리됨
-                                return updateSlot(slot.id, data);
+                                success = await updateSlot(slot.id, data);
+                                if (success) {
+                                  // updateSlot 성공 시 formData 초기화
+                                  setSlotsFormData(prev => {
+                                    const newData = { ...prev };
+                                    delete newData[slot.id];
+                                    return newData;
+                                  });
+                                  loadUserSlots();
+                                }
                               }
+                              return success;
                             }}
                             onEdit={(slot.status !== 'empty') ? () => {
                               setEditingSlot(slot);
                               setShowEditModal(true);
                             } : undefined}
                             onPause={slot.status === 'active' ? async () => {
-                              await pauseSlot(slot.id);
-                              loadUserSlots();
+                              const confirmed = confirm('슬롯을 일시정지하시겠습니까?\n\n※ 일시정지해도 만료일은 변경되지 않습니다.');
+                              if (confirmed) {
+                                await pauseSlot(slot.id);
+                                loadUserSlots();
+                              }
                             } : undefined}
                             onResume={slot.status === 'paused' ? async () => {
-                              await resumeSlot(slot.id);
-                              loadUserSlots();
+                              const confirmed = confirm('슬롯을 재개하시겠습니까?');
+                              if (confirmed) {
+                                await resumeSlot(slot.id);
+                                loadUserSlots();
+                              }
                             } : undefined}
                             onBulkPaste={handleBulkPaste}
                             isSelected={selectedSlotIds.has(slot.id)}
@@ -1301,8 +1376,20 @@ export function BaseSlotListPage({
                     <UserSlotCard
                       key={slot.id}
                       slot={slot}
-                      onPause={() => pauseSlot(slot.id)}
-                      onResume={() => resumeSlot(slot.id)}
+                      onPause={async () => {
+                        const confirmed = confirm('슬롯을 일시정지하시겠습니까?\n\n※ 일시정지해도 만료일은 변경되지 않습니다.');
+                        if (confirmed) {
+                          await pauseSlot(slot.id);
+                          loadUserSlots();
+                        }
+                      }}
+                      onResume={async () => {
+                        const confirmed = confirm('슬롯을 재개하시겠습니까?');
+                        if (confirmed) {
+                          await resumeSlot(slot.id);
+                          loadUserSlots();
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -1345,8 +1432,20 @@ export function BaseSlotListPage({
                       key={slot.id}
                       slot={slot}
                       fieldConfigs={fieldConfigs}
-                      onPause={() => pauseSlot(slot.id)}
-                      onResume={() => resumeSlot(slot.id)}
+                      onPause={async () => {
+                        const confirmed = confirm('슬롯을 일시정지하시겠습니까?\n\n※ 일시정지해도 만료일은 변경되지 않습니다.');
+                        if (confirmed) {
+                          await pauseSlot(slot.id);
+                          loadUserSlots();
+                        }
+                      }}
+                      onResume={async () => {
+                        const confirmed = confirm('슬롯을 재개하시겠습니까?');
+                        if (confirmed) {
+                          await resumeSlot(slot.id);
+                          loadUserSlots();
+                        }
+                      }}
                       onEdit={() => {
                         setEditingSlot(slot);
                         setShowEditModal(true);

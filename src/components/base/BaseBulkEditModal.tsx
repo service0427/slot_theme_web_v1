@@ -14,6 +14,7 @@ export function BaseBulkEditModal({ isOpen, onClose, selectedSlots, onSuccess }:
   const [url, setUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [urlError, setUrlError] = useState('');
   
   const slotService = new ApiSlotService();
 
@@ -29,6 +30,12 @@ export function BaseBulkEditModal({ isOpen, onClose, selectedSlots, onSuccess }:
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
+    // URL 에러가 있으면 진행 불가
+    if (urlError) {
+      alert('URL 형식을 확인해주세요.');
+      return;
+    }
+    
     // 빈 값 필터링
     const updates: any = {};
     if (keyword.trim()) updates.keyword = keyword.trim();
@@ -133,10 +140,48 @@ export function BaseBulkEditModal({ isOpen, onClose, selectedSlots, onSuccess }:
                 <input
                   type="text"
                   value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    // &q= 이후 제거
+                    if (value.includes('&q=')) {
+                      value = value.split('&q=')[0];
+                    }
+                    setUrl(value);
+                    
+                    // 쿠팡 URL 검증
+                    if (value) {
+                      // 쿠팡 도메인 체크 (coupang.com이 포함되어야 함)
+                      const isCoupangDomain = /coupang\.com/.test(value);
+                      
+                      if (isCoupangDomain) {
+                        // 정확한 URL 패턴 체크 (www는 선택사항)
+                        const isValidCoupangUrl = /https?:\/\/(www\.)?coupang\.com\/vp\/products\/\d+/.test(value);
+                        const hasItemId = value.includes('itemId=') && /itemId=\d+/.test(value);
+                        const hasVendorItemId = value.includes('vendorItemId=') && /vendorItemId=\d+/.test(value);
+                        
+                        if (!isValidCoupangUrl) {
+                          setUrlError('올바른 쿠팡 URL 형식: https://www.coupang.com/vp/products/{상품ID}');
+                        } else if (!hasItemId || !hasVendorItemId) {
+                          setUrlError('쿠팡 URL 필수 파라미터: itemId, vendorItemId');
+                        } else {
+                          setUrlError('');
+                        }
+                      } else if (value.startsWith('http')) {
+                        // 다른 도메인 URL인 경우 (쿠팡이 아닌 경우)
+                        setUrlError('');
+                      }
+                    } else {
+                      setUrlError('');
+                    }
+                  }}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    urlError ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="새로운 URL 입력"
                 />
+                {urlError && (
+                  <p className="text-xs text-red-500 mt-1">{urlError}</p>
+                )}
               </div>
 
             </div>
@@ -175,7 +220,7 @@ export function BaseBulkEditModal({ isOpen, onClose, selectedSlots, onSuccess }:
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!urlError}
                 className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 {isSubmitting ? '처리 중...' : '수정하기'}

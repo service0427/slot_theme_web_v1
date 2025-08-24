@@ -39,12 +39,11 @@ export function LoginPage() {
         <div className="backdrop-blur-xl bg-white/15 border border-white/25 rounded-3xl shadow-2xl p-12">
           {/* 로고 + 로그인 헤더 */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg mb-4">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-2">{getSetting('siteName', 'business') || 'Simple Slot'}</h1>
+            <img 
+              src="/images/cpc-logo.png" 
+              alt="CPC Logo"
+              className="h-20 w-auto mx-auto mb-6"
+            />
             <p className="text-gray-300 text-sm">계정에 로그인하여 시작하세요</p>
           </div>
           

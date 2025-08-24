@@ -14,6 +14,7 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (isOpen && slot) {
@@ -79,8 +80,64 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
     }
   };
 
+  const validateCoupangUrl = (url: string): string | null => {
+    if (!url) return null;
+    
+    const isCoupangDomain = /coupang\.com/.test(url);
+    
+    if (isCoupangDomain) {
+      // 정확한 URL 패턴 체크 (www는 선택사항)
+      const isValidCoupangUrl = /https?:\/\/(www\.)?coupang\.com\/vp\/products\/\d+/.test(url);
+      const hasItemId = url.includes('itemId=') && /itemId=\d+/.test(url);
+      const hasVendorItemId = url.includes('vendorItemId=') && /vendorItemId=\d+/.test(url);
+      
+      if (!isValidCoupangUrl) {
+        return '올바른 쿠팡 URL 형식: https://www.coupang.com/vp/products/{상품ID}';
+      } else if (!hasItemId || !hasVendorItemId) {
+        return '쿠팡 URL 필수 파라미터: itemId, vendorItemId';
+      }
+    }
+    
+    return null;
+  };
+
+  const handleFieldChange = (fieldKey: string, value: string) => {
+    let processedValue = value;
+    
+    // URL 필드인 경우 &q= 이후 제거
+    if (fieldKey === 'url' && value.includes('&q=')) {
+      processedValue = value.split('&q=')[0];
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      [fieldKey]: processedValue
+    }));
+    
+    // URL 검증
+    if (fieldKey === 'url') {
+      const error = validateCoupangUrl(processedValue);
+      if (error) {
+        setErrors(prev => ({ ...prev, url: error }));
+      } else {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.url;
+          return newErrors;
+        });
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // URL 검증
+    const urlError = validateCoupangUrl(formData.url || '');
+    if (urlError) {
+      setErrors({ url: urlError });
+      return;
+    }
     
     // 키워드나 URL 변경 체크
     const keywordChanged = (originalData.keyword || '') !== (formData.keyword || '');
@@ -148,15 +205,17 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
                   <input
                     type="text"
                     value={formData[field.field_key] || ''}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      [field.field_key]: e.target.value
-                    }))}
+                    onChange={(e) => handleFieldChange(field.field_key, e.target.value)}
                     placeholder={field.placeholder}
                     required={field.is_required}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors[field.field_key] ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
-                  {field.description && (
+                  {errors[field.field_key] && (
+                    <p className="text-xs text-red-500 mt-1">{errors[field.field_key]}</p>
+                  )}
+                  {!errors[field.field_key] && field.description && (
                     <p className="text-xs text-gray-500 mt-1">{field.description}</p>
                   )}
                 </div>
@@ -172,7 +231,7 @@ export function BaseSlotEditModal({ isOpen, onClose, onSubmit, slot }: BaseSlotE
               </button>
               <button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || Object.keys(errors).length > 0}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
               >
                 {isSaving ? '저장 중...' : '저장'}

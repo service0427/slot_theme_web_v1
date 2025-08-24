@@ -65,20 +65,24 @@ export function BaseLoginPage({
 
   return (
     <div className={styles.container}>
-      {showCompanyName && (
-        <div className="text-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">{companyName}</h2>
-        </div>
-      )}
-      <h1 className={styles.title}>{title}</h1>
-      
-      {(error || authError) && (
-        <div className={styles.errorMessage}>
-          {authError || error}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className={styles.form}>
+        <img 
+          src="/images/cpc-logo.png" 
+          alt="CPC Logo"
+          className="h-20 w-auto mx-auto mb-6 block"
+        />
+        {showCompanyName && (
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">{companyName}</h2>
+          </div>
+        )}
+        <h1 className={styles.title}>{title}</h1>
+        
+        {(error || authError) && (
+          <div className={styles.errorMessage}>
+            {authError || error}
+          </div>
+        )}
         <div className={styles.inputGroup}>
           <label className={styles.label}>
             아이디

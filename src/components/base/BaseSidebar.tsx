@@ -82,7 +82,11 @@ export function BaseSidebar({ CashChargeModal }: BaseSidebarProps = {}) {
     <aside className={styles.container}>
       {/* 상단 정보 */}
       <div className={styles.header}>
-        <h2 className={styles.title}>{getSetting('siteName', 'business') || 'Simple Slot'}</h2>
+        <img 
+          src="/images/cpc-logo.png" 
+          alt="CPC Logo"
+          className="h-12 w-auto mb-4 mx-auto"
+        />
         
         <div className={styles.userInfo}>
           <div className="text-sm text-gray-700">

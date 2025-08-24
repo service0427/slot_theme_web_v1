@@ -74,6 +74,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [extendingSlot, setExtendingSlot] = useState<UserSlot | null>(null);
   const [showExtensionModal, setShowExtensionModal] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [inactiveCount, setInactiveCount] = useState(0);
 
   // 기본 스타일
   const defaultTheme: AdminSlotApprovalThemeProps = {
@@ -142,6 +143,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
         setTotalSlots(allSlotsData);
       });
     }
+    
+    // 비활성 슬롯 카운트 로드
+    loadAllSlots('inactive').then(inactiveSlots => {
+      setInactiveCount(inactiveSlots.length);
+    });
     
     // 필터링된 슬롯 로드
     loadAllSlots(statusFilter === 'all' ? undefined : statusFilter).then(slots => {
@@ -376,6 +382,70 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const openExtensionModal = (slot: UserSlot) => {
     setExtendingSlot(slot);
     setShowExtensionModal(true);
+  };
+
+  // 일시정지 처리
+  const handlePauseSlot = async (slotId: string) => {
+    const confirmed = confirm('이 슬롯을 일시정지하시겠습니까?\n\n※ 일시정지해도 만료일은 변경되지 않습니다.');
+    if (!confirmed) return;
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      
+      const response = await fetch(`${API_BASE_URL}/slots/${slotId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'paused' })
+      });
+
+      if (response.ok) {
+        alert('슬롯이 일시정지되었습니다.');
+        // 리스트 새로고침
+        const slots = await loadAllSlots(statusFilter === 'all' ? undefined : statusFilter);
+        setAllSlots(slots);
+        setPendingSlots(slots);
+      } else {
+        alert('일시정지 처리에 실패했습니다.');
+      }
+    } catch (error) {
+      alert('일시정지 처리 중 오류가 발생했습니다.');
+    }
+  };
+  
+  // 재개 처리
+  const handleResumeSlot = async (slotId: string) => {
+    const confirmed = confirm('이 슬롯을 재개하시겠습니까?');
+    if (!confirmed) return;
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      
+      const response = await fetch(`${API_BASE_URL}/slots/${slotId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'active' })
+      });
+
+      if (response.ok) {
+        alert('슬롯이 재개되었습니다.');
+        // 리스트 새로고침
+        const slots = await loadAllSlots(statusFilter === 'all' ? undefined : statusFilter);
+        setAllSlots(slots);
+        setPendingSlots(slots);
+      } else {
+        alert('재개 처리에 실패했습니다.');
+      }
+    } catch (error) {
+      alert('재개 처리 중 오류가 발생했습니다.');
+    }
   };
 
   const handleRefund = async (slotId: string) => {
@@ -614,7 +684,8 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
       return end && now > end;
     }).length,
     paused: slotsForCount.filter(s => s.status === 'paused').length,
-    rejected: slotsForCount.filter(s => s.status === 'rejected').length
+    rejected: slotsForCount.filter(s => s.status === 'rejected').length,
+    inactive: inactiveCount // 비활성화된 사용자의 슬롯 수
   };
 
   const getStatusBadge = (status: string) => {
@@ -737,6 +808,16 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
               >
                 일시정지 ({statusCounts.paused})
               </button>
+              <button
+                onClick={() => setStatusFilter('inactive')}
+                className={`px-4 py-2 rounded-lg ${
+                  statusFilter === 'inactive' 
+                    ? 'bg-red-600 text-white' 
+                    : 'bg-red-100 text-red-800 hover:bg-red-200'
+                }`}
+              >
+                비활성 ({statusCounts.inactive})
+              </button>
             </>
           ) : (
             <>
@@ -769,6 +850,16 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 }`}
               >
                 거부됨 ({statusCounts.rejected})
+              </button>
+              <button
+                onClick={() => setStatusFilter('inactive')}
+                className={`px-4 py-2 rounded-lg ${
+                  statusFilter === 'inactive' 
+                    ? 'bg-gray-600 text-white' 
+                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                }`}
+              >
+                비활성 ({statusCounts.inactive})
               </button>
             </>
           )}

@@ -132,7 +132,8 @@ export async function getSlots(req: AuthRequest, res: Response) {
       query = `
         SELECT s.*, 
                u.email as user_email, 
-               u.full_name as user_name, 
+               u.full_name as user_name,
+               u.is_active as user_is_active, 
                s.approved_price, 
                s.product_name, 
                COALESCE(rd_today.thumbnail, s.thumbnail) as thumbnail,
@@ -208,10 +209,23 @@ export async function getSlots(req: AuthRequest, res: Response) {
 
     // 상태 필터
     if (status) {
-      params.push(status);
-      countParams.push(status);
-      query += ` AND s.status = $${params.length}`;
-      countQuery += ` AND s.status = $${countParams.length}`;
+      // 'inactive'는 비활성화된 사용자의 슬롯을 조회
+      if (status === 'inactive') {
+        query += ` AND u.is_active = false`;
+        countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = false)`;
+      } else {
+        params.push(status);
+        countParams.push(status);
+        query += ` AND s.status = $${params.length}`;
+        countQuery += ` AND s.status = $${countParams.length}`;
+        // 기본적으로 활성화된 사용자의 슬롯만 조회 (inactive가 아닌 경우)
+        query += ` AND u.is_active = true`;
+        countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = true)`;
+      }
+    } else {
+      // 상태 필터가 없을 때도 기본적으로 활성화된 사용자의 슬롯만 조회
+      query += ` AND u.is_active = true`;
+      countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = true)`;
     }
 
     // 정렬 및 페이징
@@ -916,10 +930,57 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
     );
     const fieldConfigs = configResult.rows;
 
+    // customFields 정리 (쿠팡 URL의 경우 필요한 파라미터만 남김)
+    const cleanedFields: Record<string, any> = {};
+    for (const [key, value] of Object.entries(customFields)) {
+      if (key === 'url' && value && typeof value === 'string') {
+        // URL 공백 제거
+        let cleanUrl = value.trim().replace(/\s+/g, '');
+        
+        if (cleanUrl.includes('coupang.com')) {
+          // 쿠팡 URL 검증
+          const productMatch = cleanUrl.match(/\/products\/(\d+)/);
+          const hasItemId = cleanUrl.includes('itemId=');
+          const hasVendorItemId = cleanUrl.includes('vendorItemId=');
+          
+          if (!productMatch || !hasItemId || !hasVendorItemId) {
+            return res.status(400).json({
+              success: false,
+              error: '쿠팡 URL 형식이 올바르지 않습니다. 필수 요소: /products/{상품ID}?itemId={아이템ID}&vendorItemId={판매자ID}'
+            });
+          }
+          
+          // URL 파싱하여 필요한 파라미터만 추출
+          try {
+            const urlObj = new URL(cleanUrl);
+            const itemId = urlObj.searchParams.get('itemId');
+            const vendorItemId = urlObj.searchParams.get('vendorItemId');
+            const productId = productMatch[1];
+            
+            // 새로운 URL 생성 (필요한 파라미터만 포함)
+            const finalUrl = new URL(`https://www.coupang.com/vp/products/${productId}`);
+            if (itemId) finalUrl.searchParams.set('itemId', itemId);
+            if (vendorItemId) finalUrl.searchParams.set('vendorItemId', vendorItemId);
+            
+            cleanedFields[key] = finalUrl.toString();
+          } catch (e) {
+            return res.status(400).json({
+              success: false,
+              error: 'URL 형식이 올바르지 않습니다.'
+            });
+          }
+        } else {
+          cleanedFields[key] = cleanUrl;
+        }
+      } else {
+        cleanedFields[key] = value;
+      }
+    }
+
     // 유효성 검사
     const errors: string[] = [];
     for (const config of fieldConfigs) {
-      const value = customFields[config.field_key];
+      const value = cleanedFields[config.field_key];
       
       // 필수 필드 검사
       if (config.is_required && (!value || value.trim() === '')) {
@@ -933,6 +994,11 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
         if (config.field_type === 'url') {
           try {
             new URL(value);
+            
+            // 쿠팡 URL 검증 - itemId가 필수 (이미 위에서 처리했지만 안전을 위해)
+            if (value.includes('coupang.com') && !value.includes('itemId=')) {
+              errors.push('쿠팡 URL은 itemId 파라미터가 필수입니다. (예: itemId=25423383153&vendorItemId=92416542502)');
+            }
           } catch {
             errors.push(`${config.label}은(는) 올바른 URL 형식이 아닙니다.`);
           }
@@ -1203,6 +1269,46 @@ export async function fillEmptySlot(req: AuthRequest, res: Response) {
     let urlValue = url || '';
     let keywordValue = keyword || '';
     let midValue = mid || '';
+    
+    // URL 공백 제거 및 정리
+    if (url) {
+      urlValue = url.trim().replace(/\s+/g, '');
+      
+      // 쿠팡 URL 검증 및 정리
+      if (urlValue.includes('coupang.com')) {
+        // products, itemId, vendorItemId 모두 필수
+        const productMatch = urlValue.match(/\/products\/(\d+)/);
+        const hasItemId = urlValue.includes('itemId=');
+        const hasVendorItemId = urlValue.includes('vendorItemId=');
+        
+        if (!productMatch || !hasItemId || !hasVendorItemId) {
+          return res.status(400).json({
+            success: false,
+            error: '쿠팡 URL 형식이 올바르지 않습니다. 필수 요소: /products/{상품ID}?itemId={아이템ID}&vendorItemId={판매자ID}'
+          });
+        }
+        
+        // URL 파싱하여 필요한 파라미터만 추출
+        try {
+          const urlObj = new URL(urlValue);
+          const itemId = urlObj.searchParams.get('itemId');
+          const vendorItemId = urlObj.searchParams.get('vendorItemId');
+          const productId = productMatch[1];
+          
+          // 새로운 URL 생성 (필요한 파라미터만 포함)
+          const cleanUrl = new URL(`https://www.coupang.com/vp/products/${productId}`);
+          if (itemId) cleanUrl.searchParams.set('itemId', itemId);
+          if (vendorItemId) cleanUrl.searchParams.set('vendorItemId', vendorItemId);
+          
+          urlValue = cleanUrl.toString();
+        } catch (e) {
+          return res.status(400).json({
+            success: false,
+            error: 'URL 형식이 올바르지 않습니다.'
+          });
+        }
+      }
+    }
     
     // 개별 필드와 customFields 병합
     const allFields = {

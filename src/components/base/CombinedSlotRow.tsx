@@ -6,7 +6,7 @@ interface CombinedSlotRowProps {
   slot: any;
   slotIndex: number;
   fieldConfigs: FieldConfig[];
-  onSave?: (data: { customFields: Record<string, string> }) => void;  // 빈 슬롯용
+  onSave?: (data: { customFields: Record<string, string> }) => Promise<boolean>;  // 빈 슬롯용
   onEdit?: () => void;  // 사용 중 슬롯용
   onPause?: () => void;
   onResume?: () => void;
@@ -151,6 +151,57 @@ function CombinedSlotRowComponent({
   }, [slot.id]);
 
   const handleFieldChange = (fieldKey: string, value: string) => {
+    // URL 필드인 경우 검증
+    if ((fieldKey === 'url' || fieldKey === 'landingUrl') && value) {
+      // 공백 제거
+      const cleanUrl = value.trim().replace(/\s+/g, '');
+      
+      // 쿠팡 도메인 체크
+      const isCoupangDomain = /coupang\.com/.test(cleanUrl);
+      
+      if (isCoupangDomain) {
+        // 정확한 URL 패턴 체크 (www는 선택사항)
+        const isValidCoupangUrl = /https?:\/\/(www\.)?coupang\.com\/vp\/products\/\d+/.test(cleanUrl);
+        const hasItemId = cleanUrl.includes('itemId=') && /itemId=\d+/.test(cleanUrl);
+        const hasVendorItemId = cleanUrl.includes('vendorItemId=') && /vendorItemId=\d+/.test(cleanUrl);
+        
+        if (!isValidCoupangUrl) {
+          setErrors(prev => ({
+            ...prev,
+            [fieldKey]: '올바른 쿠팡 URL 형식: https://www.coupang.com/vp/products/{상품ID}'
+          }));
+        } else if (!hasItemId || !hasVendorItemId) {
+          setErrors(prev => ({
+            ...prev,
+            [fieldKey]: '쿠팡 URL 필수 파라미터: itemId, vendorItemId'
+          }));
+        } else {
+          // 에러 제거
+          setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[fieldKey];
+            return newErrors;
+          });
+        }
+      } else if (!cleanUrl.startsWith('http')) {
+        // http로 시작하지 않는 경우 에러
+        setErrors(prev => ({
+          ...prev,
+          [fieldKey]: 'URL은 http:// 또는 https://로 시작해야 합니다'
+        }));
+      } else {
+        // 다른 정상 URL은 에러 제거
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[fieldKey];
+          return newErrors;
+        });
+      }
+      
+      // 정리된 URL로 값 설정
+      value = cleanUrl;
+    }
+    
     const newData = {
       ...formData,
       [fieldKey]: value
@@ -290,6 +341,24 @@ function CombinedSlotRowComponent({
       if (field.is_required && !formData[field.field_key]?.trim()) {
         newErrors[field.field_key] = '필수 입력';
       }
+      
+      // URL 검증 추가
+      if ((field.field_key === 'url' || field.field_key === 'landingUrl') && formData[field.field_key]) {
+        const url = formData[field.field_key];
+        const isCoupangDomain = /coupang\.com/.test(url);
+        
+        if (isCoupangDomain) {
+          const isValidCoupangUrl = /https?:\/\/(www\.)?coupang\.com\/vp\/products\/\d+/.test(url);
+          const hasItemId = url.includes('itemId=') && /itemId=\d+/.test(url);
+          const hasVendorItemId = url.includes('vendorItemId=') && /vendorItemId=\d+/.test(url);
+          
+          if (!isValidCoupangUrl) {
+            newErrors[field.field_key] = '올바른 쿠팡 URL 형식: https://www.coupang.com/vp/products/{상품ID}';
+          } else if (!hasItemId || !hasVendorItemId) {
+            newErrors[field.field_key] = '쿠팡 URL 필수 파라미터: itemId, vendorItemId';
+          }
+        }
+      }
     });
     
     setErrors(newErrors);
@@ -297,11 +366,31 @@ function CombinedSlotRowComponent({
   };
 
   const handleSave = async () => {
-    if (!validateForm() || !onSave) return;
+    if (!onSave) return;
+    
+    // 폼 검증 실행
+    if (!validateForm()) {
+      alert('필수 입력 항목을 확인해주세요.');
+      return;
+    }
+    
+    // URL 에러가 있으면 저장 불가
+    const hasUrlError = Object.keys(errors).some(key => 
+      (key === 'url' || key === 'landingUrl') && errors[key]
+    );
+    
+    if (hasUrlError) {
+      alert('URL 형식이 올바르지 않습니다. 쿠팡 URL은 필수 요소를 모두 포함해야 합니다.');
+      return;
+    }
     
     setIsSaving(true);
     try {
-      await onSave({ customFields: formData });
+      const result = await onSave({ customFields: formData });
+      if (result) {
+        // 성공시 formData 초기화
+        setFormData({});
+      }
     } catch (error) {
       alert('저장 중 오류가 발생했습니다.');
     } finally {
@@ -549,77 +638,54 @@ function CombinedSlotRowComponent({
         })() : <span className="text-gray-400">-</span>}
       </td>
       
-      {/* 상태 컬럼 - 주석처리 
+      {/* 상태 컬럼 */}
       <td className="px-3 py-4 text-center">
-        <div className="flex flex-col items-center gap-2">
-          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-            (() => {
-              if (isEmptySlot) return 'bg-orange-100 text-orange-800';
-              if (slot.status === 'pending') return 'bg-yellow-100 text-yellow-800';
-              if (slot.status === 'paused') return 'bg-gray-100 text-gray-800';
-              if (slot.status === 'rejected') return 'bg-red-100 text-red-800';
-              if (slot.status === 'refunded') return 'bg-purple-100 text-purple-800';
-              if (slot.status === 'active') {
-                const now = new Date();
-                const start = slot.startDate ? new Date(slot.startDate) : null;
-                const end = slot.endDate ? new Date(slot.endDate) : null;
-                if (start && now < start) return 'bg-blue-100 text-blue-800';
-                if (end && now > end) return 'bg-gray-100 text-gray-800';
-                return 'bg-green-100 text-green-800';
-              }
-              return 'bg-gray-100 text-gray-800';
-            })()
-          }`}>
-            {(() => {
-              if (isEmptySlot) return '입력 대기';
-              if (slot.status === 'pending') return '승인 대기';
-              if (slot.status === 'paused') return '일시정지';
-              if (slot.status === 'rejected') return '거절됨';
-              if (slot.status === 'refunded') return '환불됨';
-              if (slot.status === 'active') {
-                const now = new Date();
-                const start = slot.startDate ? new Date(slot.startDate) : null;
-                const end = slot.endDate ? new Date(slot.endDate) : null;
-                if (start && now < start) return '대기중';
-                if (end && now > end) return '완료';
-                return '활성';
-              }
-              return slot.status;
-            })()}
-          </span>
+        {(() => {
+          const now = new Date();
+          const start = slot.startDate ? new Date(slot.startDate) : null;
+          const end = slot.endDate ? new Date(slot.endDate) : null;
+          const isWaiting = slot.status === 'active' && start && now < start;
+          const isActive = slot.status === 'active' && (!start || now >= start) && (!end || now <= end);
+          const isPaused = slot.status === 'paused';
           
-          {(() => {
-            const now = new Date();
-            const start = slot.startDate ? new Date(slot.startDate) : null;
-            const end = slot.endDate ? new Date(slot.endDate) : null;
-            const isWaiting = slot.status === 'active' && start && now < start;
-            const isActive = slot.status === 'active' && (!start || now >= start) && (!end || now <= end);
-            const isPaused = slot.status === 'paused';
-            
-            if (isWaiting || isActive || isPaused) {
-              return (
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-500">활성</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={isPaused}
-                      onChange={isPaused ? onResume : onPause}
-                    />
-                    <div className={`w-6 h-3 rounded-full peer peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-blue-300 ${
-                      isPaused ? 'bg-orange-500' : 'bg-green-500'
-                    } peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-2.5 after:w-2.5 after:transition-all`}></div>
-                  </label>
-                  <span className="text-xs text-gray-500">정지</span>
-                </div>
-              );
-            }
-            return null;
-          })()}
-        </div>
+          if (isWaiting || isActive || isPaused) {
+            return (
+              <div className="flex items-center justify-center gap-1">
+                <span className="text-xs text-gray-500">활성</span>
+                <label className="relative inline-flex items-center cursor-pointer" title="일시정지해도 만료일은 변경되지 않습니다">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={isPaused}
+                    onChange={isPaused ? onResume : onPause}
+                  />
+                  <div className={`w-6 h-3 rounded-full peer peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-blue-300 ${
+                    isPaused ? 'bg-orange-500' : 'bg-green-500'
+                  } peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-2.5 after:w-2.5 after:transition-all`}></div>
+                </label>
+                <span className="text-xs text-gray-500">정지</span>
+              </div>
+            );
+          }
+          
+          // pending, rejected, refunded 상태만 배지 표시
+          if (slot.status === 'pending' || slot.status === 'rejected' || slot.status === 'refunded') {
+            return (
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                slot.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                slot.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                'bg-purple-100 text-purple-800'
+              }`}>
+                {slot.status === 'pending' ? '승인 대기' :
+                 slot.status === 'rejected' ? '거절됨' :
+                 '환불됨'}
+              </span>
+            );
+          }
+          
+          return <span className="text-gray-400">-</span>;
+        })()}
       </td>
-      */}
       
       {/* 액션 컬럼 */}
       <td className="px-3 py-4 text-center">
@@ -627,12 +693,13 @@ function CombinedSlotRowComponent({
           // empty 슬롯은 저장 버튼
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || Object.keys(errors).some(key => errors[key])}
             className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-              isSaving 
+              isSaving || Object.keys(errors).some(key => errors[key])
                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
+            title={Object.keys(errors).some(key => errors[key]) ? 'URL 형식 오류를 수정해주세요' : ''}
           >
             {isSaving ? '저장 중...' : '저장'}
           </button>

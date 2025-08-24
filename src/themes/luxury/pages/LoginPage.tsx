@@ -39,11 +39,11 @@ export function LoginPage() {
       {/* 상단 브랜드 로고 */}
       <div className="absolute top-8 left-8 z-20">
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-xl flex items-center justify-center">
-            <svg className="w-6 h-6 text-black font-bold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-          </div>
+          <img 
+            src="/images/cpc-logo.png" 
+            alt="CPC Logo"
+            className="h-12 w-auto"
+          />
           <div>
             <h1 className="text-amber-400 font-bold text-lg">{getSetting('siteName', 'business') || 'Simple Slot'}</h1>
             <p className="text-amber-600/80 text-xs">LUXURY EDITION</p>

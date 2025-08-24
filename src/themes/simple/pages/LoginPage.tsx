@@ -67,7 +67,12 @@ export function LoginPage() {
       {/* 우측 로그인 폼 영역 - 70% */}
       <div style={{width: '70%'}} className="bg-gray-50 flex flex-col justify-center px-12 py-8 min-h-screen">
         <div className="w-full">
-          <div className="mb-8">
+          <div className="mb-8 text-center">
+            <img 
+              src="/images/cpc-logo.png" 
+              alt="CPC Logo"
+              className="h-20 w-auto mx-auto mb-6"
+            />
             <h2 className="text-3xl font-bold text-gray-900 mb-2">로그인</h2>
             <p className="text-gray-600">계정에 로그인하여 관리를 시작하세요</p>
           </div>
