@@ -1197,25 +1197,31 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       <span className="text-gray-400">-</span>
                     ) : slot.status === 'pending' ? (
                       <span className="text-gray-400">-</span>
-                    ) : (slot as any).is_processing || (slot.status === 'active' && !(slot as any).rank) ? (
+                    ) : (slot as any).is_processing || (slot.status === 'active' && !(slot as any).current_rank === undefined) ? (
                       <span className="text-orange-500 font-medium animate-pulse">측정중</span>
-                    ) : (slot as any).rank && (slot as any).rank > 0 ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="font-semibold text-gray-900">{(slot as any).rank}</span>
-                        {(slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
-                          <span className={`text-xs ${
-                            (slot as any).yesterday_rank > (slot as any).rank 
-                              ? 'text-green-600' 
-                              : (slot as any).yesterday_rank < (slot as any).rank 
-                                ? 'text-red-600' 
-                                : 'text-gray-500'
-                          }`}>
-                            {(slot as any).yesterday_rank > (slot as any).rank 
-                              ? `(▲${(slot as any).yesterday_rank - (slot as any).rank})` 
-                              : (slot as any).yesterday_rank < (slot as any).rank 
-                                ? `(▼${(slot as any).rank - (slot as any).yesterday_rank})` 
-                                : '(-)'}
-                          </span>
+                    ) : (slot as any).current_rank && (slot as any).current_rank > 0 ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="font-semibold text-gray-900">{(slot as any).current_rank}</span>
+                          {(slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
+                            <span className={`text-xs ${
+                              (slot as any).yesterday_rank > (slot as any).current_rank 
+                                ? 'text-green-600' 
+                                : (slot as any).yesterday_rank < (slot as any).current_rank 
+                                  ? 'text-red-600' 
+                                  : 'text-gray-500'
+                            }`}>
+                              {(slot as any).yesterday_rank > (slot as any).current_rank 
+                                ? `(▲${(slot as any).yesterday_rank - (slot as any).current_rank})` 
+                                : (slot as any).yesterday_rank < (slot as any).current_rank 
+                                  ? `(▼${(slot as any).current_rank - (slot as any).yesterday_rank})` 
+                                  : '(-)'}
+                            </span>
+                          )}
+                        </div>
+                        {/* 개발자만 v2_rank_daily 데이터 소스 표시 */}
+                        {(slot as any).rank_source === 'v2_rank_daily' && (
+                          <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">V2</span>
                         )}
                       </div>
                     ) : (

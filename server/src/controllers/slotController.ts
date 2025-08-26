@@ -96,62 +96,147 @@ export async function getSlots(req: AuthRequest, res: Response) {
     if ((userRole === 'operator' || userRole === 'developer') && queryUserId) {
       params.push(queryUserId);
       countParams.push(queryUserId);
-      query = `
-        SELECT s.*, 
-               u.email as user_email, 
-               u.full_name as user_name, 
-               s.approved_price, 
-               s.product_name, 
-               COALESCE(rd_today.thumbnail, s.thumbnail) as thumbnail,
-               COALESCE(rd_today.rank, 0) as current_rank,
-               rd_yesterday.rank as yesterday_rank,
-               rd_today.fail_count as fail_count,
-               CASE 
-                 WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
-                 ELSE false
-               END as is_processing,
-               sah.payment as payment_completed,
-               s.parent_slot_id,
-               s.extension_days,
-               s.extended_at,
-               s.extended_by,
-               s.extension_type,
-               CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
-               EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension
-        FROM slots s
-        JOIN users u ON s.user_id = u.id
-        LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
-        LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
-        LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
-        WHERE s.user_id = $1
-      `;
+      
+      // 개발자 권한일 때는 v2_rank_daily 사용
+      if (userRole === 'developer') {
+        query = `
+          SELECT s.*, 
+                 u.email as user_email, 
+                 u.full_name as user_name, 
+                 s.approved_price, 
+                 s.product_name, 
+                 COALESCE(v2_rd.thumbnail, s.thumbnail) as thumbnail,
+                 COALESCE(v2_rd.rank, 0) as current_rank,
+                 v2_rd.prev_rank as yesterday_rank,
+                 v2_rd.rating,
+                 v2_rd.review_count,
+                 v2_rd.product_name as v2_product_name,
+                 CASE 
+                   WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND v2_rd.rank IS NULL THEN true
+                   ELSE false
+                 END as is_processing,
+                 sah.payment as payment_completed,
+                 s.parent_slot_id,
+                 s.extension_days,
+                 s.extended_at,
+                 s.extended_by,
+                 s.extension_type,
+                 CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
+                 EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension,
+                 'v2_rank_daily' as rank_source
+          FROM slots s
+          JOIN users u ON s.user_id = u.id
+          LEFT JOIN v2_rank_daily v2_rd ON 
+            v2_rd.keyword = COALESCE(s.trim_keyword, REPLACE(s.keyword, ' ', '')) 
+            AND v2_rd.product_id = SUBSTRING(s.url FROM 'products/([0-9]+)')
+            AND v2_rd.item_id = SUBSTRING(s.url FROM 'itemId=([0-9]+)')
+            AND v2_rd.vendor_item_id = SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)')
+            AND v2_rd.date = CURRENT_DATE
+          LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
+          WHERE s.user_id = $1
+        `;
+      } else {
+        // 운영자는 기존 rank_daily 사용
+        query = `
+          SELECT s.*, 
+                 u.email as user_email, 
+                 u.full_name as user_name, 
+                 s.approved_price, 
+                 s.product_name, 
+                 COALESCE(rd_today.thumbnail, s.thumbnail) as thumbnail,
+                 COALESCE(rd_today.rank, 0) as current_rank,
+                 rd_yesterday.rank as yesterday_rank,
+                 rd_today.fail_count as fail_count,
+                 CASE 
+                   WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
+                   ELSE false
+                 END as is_processing,
+                 sah.payment as payment_completed,
+                 s.parent_slot_id,
+                 s.extension_days,
+                 s.extended_at,
+                 s.extended_by,
+                 s.extension_type,
+                 CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
+                 EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension,
+                 'rank_daily' as rank_source
+          FROM slots s
+          JOIN users u ON s.user_id = u.id
+          LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
+          LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
+          LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
+          WHERE s.user_id = $1
+        `;
+      }
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
     }
     // 관리자/개발자가 모든 슬롯 조회
     else if (userRole === 'operator' || userRole === 'developer') {
-      query = `
-        SELECT s.*, 
-               u.email as user_email, 
-               u.full_name as user_name,
-               u.is_active as user_is_active, 
-               s.approved_price, 
-               s.product_name, 
-               COALESCE(rd_today.thumbnail, s.thumbnail) as thumbnail,
-               COALESCE(rd_today.rank, 0) as current_rank,
-               rd_yesterday.rank as yesterday_rank,
-               rd_today.fail_count as fail_count,
-               CASE 
-                 WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
-                 ELSE false
-               END as is_processing,
-               sah.payment as payment_completed,
-               s.parent_slot_id,
-               s.extension_days,
-               s.extended_at,
-               s.extended_by,
-               s.extension_type,
-               CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
-               EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension
+      // 개발자 권한일 때는 v2_rank_daily 사용
+      if (userRole === 'developer') {
+        query = `
+          SELECT s.*, 
+                 u.email as user_email, 
+                 u.full_name as user_name,
+                 u.is_active as user_is_active, 
+                 s.approved_price, 
+                 s.product_name, 
+                 COALESCE(v2_rd.thumbnail, s.thumbnail) as thumbnail,
+                 COALESCE(v2_rd.rank, 0) as current_rank,
+                 v2_rd.prev_rank as yesterday_rank,
+                 v2_rd.rating,
+                 v2_rd.review_count,
+                 v2_rd.product_name as v2_product_name,
+                 CASE 
+                   WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND v2_rd.rank IS NULL THEN true
+                   ELSE false
+                 END as is_processing,
+                 sah.payment as payment_completed,
+                 s.parent_slot_id,
+                 s.extension_days,
+                 s.extended_at,
+                 s.extended_by,
+                 s.extension_type,
+                 CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
+                 EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension,
+                 'v2_rank_daily' as rank_source
+        FROM slots s
+        JOIN users u ON s.user_id = u.id
+        LEFT JOIN v2_rank_daily v2_rd ON 
+          v2_rd.keyword = COALESCE(s.trim_keyword, REPLACE(s.keyword, ' ', '')) 
+          AND v2_rd.product_id = SUBSTRING(s.url FROM 'products/([0-9]+)')
+          AND v2_rd.item_id = SUBSTRING(s.url FROM 'itemId=([0-9]+)')
+          AND v2_rd.vendor_item_id = SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)')
+          AND v2_rd.date = CURRENT_DATE
+        LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
+        WHERE 1=1
+      `;
+      } else {
+        // 운영자는 기존 rank_daily 사용
+        query = `
+          SELECT s.*, 
+                 u.email as user_email, 
+                 u.full_name as user_name,
+                 u.is_active as user_is_active, 
+                 s.approved_price, 
+                 s.product_name, 
+                 COALESCE(rd_today.thumbnail, s.thumbnail) as thumbnail,
+                 COALESCE(rd_today.rank, 0) as current_rank,
+                 rd_yesterday.rank as yesterday_rank,
+                 rd_today.fail_count as fail_count,
+                 CASE 
+                   WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
+                   ELSE false
+                 END as is_processing,
+                 sah.payment as payment_completed,
+                 s.parent_slot_id,
+                 s.extension_days,
+                 s.extended_at,
+                 s.extended_by,
+                 s.extension_type,
+                 CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
+                 EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension,
+                 'rank_daily' as rank_source
         FROM slots s
         JOIN users u ON s.user_id = u.id
         LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
@@ -159,6 +244,7 @@ export async function getSlots(req: AuthRequest, res: Response) {
         LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
         WHERE 1=1
       `;
+      }
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE 1=1';
     } 
     // 일반 사용자는 자신의 슬롯만 조회
