@@ -56,7 +56,12 @@ LOCAL_PASS="Tech1324!"
 BATCH_SIZE=1000  # 배치 크기 증가 (테스트: 100 → 운영: 1000)
 CHECK_DATE=${1:-$(date +%Y-%m-%d)}  # 날짜를 인자로 받을 수 있음 (기본: 오늘)
 TEMP_DIR="/tmp/v2_rank_sync"
-LOG_FILE="/var/log/v2_rank_sync_$(date +%Y%m%d_%H%M%S).log"
+
+# 로그 디렉토리 자동 감지
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"  # scripts의 부모 디렉토리
+LOG_DIR="$PROJECT_DIR/logs"
+LOG_FILE="$LOG_DIR/sync_$(date +%Y%m%d_%H%M%S).log"
 DEBUG=${DEBUG:-false}  # 디버그 모드 (환경변수로 설정 가능)
 
 # 통계 변수
@@ -140,8 +145,10 @@ EOF
             CONTINUE=0
             log_info "상품정보 동기화 완료: 총 ${SUCCESS_COUNT}건 저장, ${SKIP_COUNT}건 건너뜀"
         else
-            # 각 레코드 처리
-            echo "$RESULT" | while IFS='|' read -r product_id item_id vendor_item_id product_name thumbnail keyword; do
+            # 각 레코드 처리 (파일을 통해 변수 공유)
+            echo "$RESULT" > $TEMP_DIR/batch_data.txt
+            
+            while IFS='|' read -r product_id item_id vendor_item_id product_name thumbnail keyword; do
                 # 중복 체크
                 CHECK_KEY="${keyword}|${product_id}|${item_id}|${vendor_item_id}"
                 
@@ -175,7 +182,7 @@ EOF
                 else
                     log_error "저장 실패: $keyword - $product_id"
                 fi
-            done
+            done < $TEMP_DIR/batch_data.txt
             
             OFFSET=$((OFFSET + BATCH_SIZE))
             BATCH_COUNT=$((BATCH_COUNT + 1))
@@ -230,7 +237,10 @@ EOF
             CONTINUE=0
             log_info "순위정보 동기화 완료: 총 ${SUCCESS_COUNT}건 저장, ${SKIP_COUNT}건 건너뜀"
         else
-            echo "$RESULT" | while IFS='|' read -r keyword product_id item_id vendor_item_id rank rating review_count; do
+            # 각 레코드 처리 (파일을 통해 변수 공유)
+            echo "$RESULT" > $TEMP_DIR/rank_batch_data.txt
+            
+            while IFS='|' read -r keyword product_id item_id vendor_item_id rank rating review_count; do
                 # 중복 체크
                 CHECK_KEY="${keyword}|${product_id}|${item_id}|${vendor_item_id}"
                 
@@ -264,7 +274,7 @@ EOF
                 else
                     log_error "저장 실패: $keyword - $product_id"
                 fi
-            done
+            done < $TEMP_DIR/rank_batch_data.txt
             
             OFFSET=$((OFFSET + BATCH_SIZE))
             BATCH_COUNT=$((BATCH_COUNT + 1))
@@ -356,8 +366,8 @@ main() {
     log_info "동기화 프로세스 완료"
 }
 
-# 로그 파일로 출력 리디렉션
-mkdir -p $(dirname "$LOG_FILE")
+# 로그 디렉토리 생성 및 파일로 출력 리디렉션
+mkdir -p "$LOG_DIR"
 exec 1> >(tee -a "$LOG_FILE")
 exec 2>&1
 
