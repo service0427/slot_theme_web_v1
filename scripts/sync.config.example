@@ -1,0 +1,20 @@
+# v2_rank_daily 동기화 설정 파일 예시
+# sync.config로 복사한 후 실제 값을 입력하세요
+
+# 외부 DB (순위 및 상품정보가 있는 DB)
+EXTERNAL_HOST="your_external_server_ip"
+EXTERNAL_PORT="5432"
+EXTERNAL_DB="your_external_db_name"
+EXTERNAL_USER="your_external_user"
+EXTERNAL_PASS="your_external_password"
+
+# 로컬 DB (v2_rank_daily가 있는 DB)
+LOCAL_HOST="localhost"
+LOCAL_PORT="5432"
+LOCAL_DB="simple"
+LOCAL_USER="simple"
+LOCAL_PASS="Tech1324!"
+
+# 동기화 설정
+BATCH_SIZE=1000
+DEBUG=false

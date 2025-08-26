@@ -33,27 +33,34 @@ log_debug() {
 }
 
 # ========================================
-# DB 연결 정보
+# 설정 파일 로드
 # ========================================
 
-# 외부 DB (순위 및 상품정보가 있는 DB)
-EXTERNAL_HOST="외부서버IP"
-EXTERNAL_PORT="5432"
-EXTERNAL_DB="외부DB명"
-EXTERNAL_USER="외부사용자"
-EXTERNAL_PASS="외부비밀번호"
+# 스크립트 디렉토리 확인
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/sync.config"
 
-# 로컬 DB (v2_rank_daily가 있는 DB)
-LOCAL_HOST="localhost"
-LOCAL_PORT="5432"
-LOCAL_DB="simple"
-LOCAL_USER="simple"
-LOCAL_PASS="Tech1324!"
+# 설정 파일 존재 확인
+if [ ! -f "$CONFIG_FILE" ]; then
+    log_error "설정 파일이 없습니다: $CONFIG_FILE"
+    log_error "sync.config.example을 복사해서 sync.config로 만들고 실제 값을 입력하세요"
+    exit 1
+fi
+
+# 설정 파일 로드
+source "$CONFIG_FILE"
+
+# 필수 설정값 확인
+if [ -z "$EXTERNAL_HOST" ] || [ "$EXTERNAL_HOST" = "외부서버IP" ]; then
+    log_error "EXTERNAL_HOST가 설정되지 않았습니다. sync.config 파일을 확인하세요"
+    exit 1
+fi
+
+log_info "설정 파일 로드 완료: $CONFIG_FILE"
 
 # ========================================
-# 설정값
+# 추가 설정값
 # ========================================
-BATCH_SIZE=1000  # 배치 크기 증가 (테스트: 100 → 운영: 1000)
 CHECK_DATE=${1:-$(date +%Y-%m-%d)}  # 날짜를 인자로 받을 수 있음 (기본: 오늘)
 TEMP_DIR="/tmp/v2_rank_sync"
 

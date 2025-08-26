@@ -36,3 +36,7 @@ server/uploads/
 # Database dumps (백업 파일만 제외)
 *.dump
 *.bak
+
+# Sync configuration (환경별로 다름)
+scripts/sync.config
+scripts/test_sync.config
