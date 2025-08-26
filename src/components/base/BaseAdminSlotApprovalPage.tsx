@@ -5,6 +5,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 import { fieldConfigService, FieldConfig } from '@/adapters/services/ApiFieldConfigService';
 import { BaseSlotExtensionModal } from './BaseSlotExtensionModal';
+import { BaseAdvancedSearchDropdown, SearchFilters } from './BaseAdvancedSearchDropdown';
 
 interface AdminSlotApprovalThemeProps {
   containerClass?: string;
@@ -59,6 +60,8 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [editingPriceSlot, setEditingPriceSlot] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [advancedFilters, setAdvancedFilters] = useState<SearchFilters | null>(null);
+  const [resetAdvancedSearch, setResetAdvancedSearch] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -221,8 +224,107 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     });
   }, [statusFilter, isPreAllocationMode]);
 
+  // 상세 검색 필터 적용 함수
+  const applySearchFilters = (filters: SearchFilters) => {
+    let filtered = [...allSlots];
+    
+    // 날짜 범위 필터 (시작일/종료일 기준)
+    if (filters.dateRange.startDate && filters.dateRange.endDate) {
+      const searchStartDate = new Date(filters.dateRange.startDate);
+      const searchEndDate = new Date(filters.dateRange.endDate);
+      searchEndDate.setHours(23, 59, 59, 999);
+      
+      filtered = filtered.filter(slot => {
+        const slotStartDate = slot.startDate ? new Date(slot.startDate) : null;
+        const slotEndDate = slot.endDate ? new Date(slot.endDate) : null;
+        
+        // 시작일 또는 종료일이 검색 범위 내에 있는지 체크
+        if (slotStartDate && slotEndDate) {
+          // 슬롯의 기간이 검색 범위와 겹치는지 확인
+          return !(slotEndDate < searchStartDate || slotStartDate > searchEndDate);
+        } else if (slotStartDate) {
+          // 시작일만 있는 경우
+          return slotStartDate >= searchStartDate && slotStartDate <= searchEndDate;
+        } else if (slotEndDate) {
+          // 종료일만 있는 경우
+          return slotEndDate >= searchStartDate && slotEndDate <= searchEndDate;
+        }
+        return true; // 날짜가 없는 경우 포함
+      });
+    }
+    
+    // 검색 조건에 따른 필터
+    if (filters.searchQuery) {
+      const searchLower = filters.searchQuery.toLowerCase();
+      filtered = filtered.filter(slot => {
+        switch(filters.searchType) {
+          case 'keyword':
+            return getSlotFieldValue(slot, 'keyword')?.toLowerCase().includes(searchLower);
+          case 'url':
+            return getSlotFieldValue(slot, 'url')?.toLowerCase().includes(searchLower);
+          case 'productName':
+            return slot.product_name?.toLowerCase().includes(searchLower);
+          case 'userId':
+            return slot.userName?.toLowerCase().includes(searchLower) || 
+                   slot.userEmail?.toLowerCase().includes(searchLower);
+          case 'slotNumber':
+            return slot.slot_number?.toString().includes(searchLower);
+          default:
+            return (
+              getSlotFieldValue(slot, 'keyword')?.toLowerCase().includes(searchLower) ||
+              slot.userName?.toLowerCase().includes(searchLower) ||
+              slot.userEmail?.toLowerCase().includes(searchLower) ||
+              getSlotFieldValue(slot, 'url')?.toLowerCase().includes(searchLower) ||
+              slot.product_name?.toLowerCase().includes(searchLower)
+            );
+        }
+      });
+    }
+    
+    // 상태 필터
+    if (filters.status && filters.status !== 'all') {
+      const filterStatus = filters.status;
+      const now = new Date();
+      
+      filtered = filtered.filter(slot => {
+        const start = slot.startDate ? new Date(slot.startDate) : null;
+        const end = slot.endDate ? new Date(slot.endDate) : null;
+        
+        let actualStatus = '';
+        
+        if (slot.status === 'empty') {
+          actualStatus = 'empty';
+        } else if (slot.status === 'pending') {
+          actualStatus = 'pending';
+        } else if (slot.status === 'paused') {
+          actualStatus = 'paused';
+        } else if (slot.status === 'rejected') {
+          actualStatus = 'rejected';
+        } else if (slot.status === 'active') {
+          if (start && now < start) {
+            actualStatus = 'waiting';
+          } else if (end && now > end) {
+            actualStatus = 'completed';
+          } else {
+            actualStatus = 'active';
+          }
+        }
+        
+        return actualStatus === filterStatus;
+      });
+    }
+    
+    
+    setPendingSlots(filtered);
+    setCurrentPage(1);
+    setSearchQuery(filters.searchQuery);
+  };
+
   // 검색 및 가격 필터링
   useEffect(() => {
+    // 상세 검색 사용 중이면 일반 검색 무시
+    if (advancedFilters) return;
+    
     let filtered = [...allSlots];
     
     // 텍스트 검색
@@ -747,7 +849,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
         {/* 상태 필터 */}
         <div className="flex gap-2">
           <button
-            onClick={() => setStatusFilter('all')}
+            onClick={() => {
+              setStatusFilter('all');
+              setAdvancedFilters(null);
+              setResetAdvancedSearch(true);
+            }}
             className={`px-4 py-2 rounded-lg ${
               statusFilter === 'all' 
                 ? 'bg-blue-600 text-white' 
@@ -759,7 +865,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           {isPreAllocationMode ? (
             <>
               <button
-                onClick={() => setStatusFilter('empty')}
+                onClick={() => {
+                  setStatusFilter('empty');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'empty' 
                     ? 'bg-blue-600 text-white' 
@@ -769,7 +879,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 대기 ({statusCounts.empty})
               </button>
               <button
-                onClick={() => setStatusFilter('waiting')}
+                onClick={() => {
+                  setStatusFilter('waiting');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'waiting' 
                     ? 'bg-orange-600 text-white' 
@@ -779,7 +893,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 진행대기 ({statusCounts.waiting})
               </button>
               <button
-                onClick={() => setStatusFilter('active')}
+                onClick={() => {
+                  setStatusFilter('active');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'active' 
                     ? 'bg-green-600 text-white' 
@@ -789,7 +907,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 진행중 ({statusCounts.active})
               </button>
               <button
-                onClick={() => setStatusFilter('completed')}
+                onClick={() => {
+                  setStatusFilter('completed');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'completed' 
                     ? 'bg-gray-600 text-white' 
@@ -799,7 +921,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 완료 ({statusCounts.completed})
               </button>
               <button
-                onClick={() => setStatusFilter('paused')}
+                onClick={() => {
+                  setStatusFilter('paused');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'paused' 
                     ? 'bg-purple-600 text-white' 
@@ -809,7 +935,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 일시정지 ({statusCounts.paused})
               </button>
               <button
-                onClick={() => setStatusFilter('inactive')}
+                onClick={() => {
+                  setStatusFilter('inactive');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'inactive' 
                     ? 'bg-red-600 text-white' 
@@ -822,7 +952,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           ) : (
             <>
               <button
-                onClick={() => setStatusFilter('pending')}
+                onClick={() => {
+                  setStatusFilter('pending');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'pending' 
                     ? 'bg-yellow-600 text-white' 
@@ -832,7 +966,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 승인대기 ({statusCounts.pending})
               </button>
               <button
-                onClick={() => setStatusFilter('active')}
+                onClick={() => {
+                  setStatusFilter('active');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'active' 
                     ? 'bg-green-600 text-white' 
@@ -842,7 +980,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 승인됨 ({statusCounts.active})
               </button>
               <button
-                onClick={() => setStatusFilter('rejected')}
+                onClick={() => {
+                  setStatusFilter('rejected');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'rejected' 
                     ? 'bg-red-600 text-white' 
@@ -852,7 +994,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 거부됨 ({statusCounts.rejected})
               </button>
               <button
-                onClick={() => setStatusFilter('inactive')}
+                onClick={() => {
+                  setStatusFilter('inactive');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'inactive' 
                     ? 'bg-gray-600 text-white' 
@@ -867,12 +1013,44 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
 
         {/* 검색 바 */}
         <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="키워드, 광고주명, 아이디, URL로 검색..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder={advancedFilters ? "상세 검색을 사용 중입니다" : "키워드, 광고주명, 아이디, URL로 검색..."}
+              value={searchQuery}
+              onChange={(e) => {
+                if (!advancedFilters) {
+                  setSearchQuery(e.target.value);
+                }
+              }}
+              disabled={!!advancedFilters}
+              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                advancedFilters ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
+            />
+            {advancedFilters && (
+              <button
+                onClick={() => {
+                  setAdvancedFilters(null);
+                  setSearchQuery('');
+                  setStatusFilter('all');
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm text-purple-600 hover:text-purple-700 font-medium"
+              >
+                상세 검색 초기화
+              </button>
+            )}
+          </div>
+          
+          {/* 상세 검색 버튼 */}
+          <BaseAdvancedSearchDropdown 
+            onSearch={(filters) => {
+              setAdvancedFilters(filters);
+              applySearchFilters(filters);
+            }}
+            isAdmin={true}
+            reset={resetAdvancedSearch}
+            onResetComplete={() => setResetAdvancedSearch(false)}
           />
           {/* 금액 필터 - 주석처리
           <input

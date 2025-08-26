@@ -10,6 +10,7 @@ import { CombinedSlotRow } from './CombinedSlotRow';
 import { BasePreAllocationForm, PreAllocationData } from './BasePreAllocationForm';
 import { BaseBulkEditModal } from './BaseBulkEditModal';
 import { UserSlot } from '@/core/models/UserSlot';
+import { BaseAdvancedSearchDropdown, SearchFilters } from './BaseAdvancedSearchDropdown';
 
 // 빈 슬롯 데이터 입력 행 컴포넌트
 interface EmptySlotRowProps {
@@ -459,7 +460,9 @@ export function BaseSlotListPage({
     return saved ? Number(saved) : 10;
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [advancedFilters, setAdvancedFilters] = useState<SearchFilters | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [resetAdvancedSearch, setResetAdvancedSearch] = useState(false);
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [fieldConfigsLoading, setFieldConfigsLoading] = useState(true);
   const [emptySlotsForms, setEmptySlotsForms] = useState<Record<string, Record<string, string>>>({});
@@ -534,39 +537,134 @@ export function BaseSlotListPage({
 
   // 필터링 및 검색
   const filteredSlots = useMemo(() => {
-    const filtered = slots.filter(slot => {
+    let filtered = slots.filter(slot => {
       // 환불된 슬롯 제외 (관리자가 아닌 경우)
       if (slot.status === 'refunded' && user?.role !== 'operator' && user?.role !== 'developer') {
         return false;
       }
-      
-      // 검색어 필터
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
+      return true;
+    });
+    
+    // 상세 검색 필터 적용
+    if (advancedFilters) {
+      // 날짜 범위 필터 (시작일/종료일 기준)
+      if (advancedFilters.dateRange.startDate && advancedFilters.dateRange.endDate) {
+        const searchStartDate = new Date(advancedFilters.dateRange.startDate);
+        const searchEndDate = new Date(advancedFilters.dateRange.endDate);
+        searchEndDate.setHours(23, 59, 59, 999);
         
-        // 키워드 검색 - 여러 필드에서 검색
-        const keywordMatch = 
-          slot.customFields?.keyword?.toLowerCase().includes(query) ||
-          slot.customFields?.keywords?.toLowerCase().includes(query);
+        filtered = filtered.filter(slot => {
+          const slotStartDate = slot.startDate ? new Date(slot.startDate) : null;
+          const slotEndDate = slot.endDate ? new Date(slot.endDate) : null;
           
-        // URL 검색 - 여러 URL 필드에서 검색  
-        const urlMatch = 
-          slot.customFields?.url?.toLowerCase().includes(query) ||
-          slot.customFields?.landingUrl?.toLowerCase().includes(query);
-          
-        // 기타 필드 검색
-        const otherMatch = 
-          slot.customFields?.description?.toLowerCase().includes(query) ||
-          slot.customFields?.mid?.toLowerCase().includes(query);
-        
-        if (!keywordMatch && !urlMatch && !otherMatch) {
+          // 시작일 또는 종료일이 검색 범위 내에 있는지 체크
+          if (slotStartDate && slotEndDate) {
+            // 슬롯의 기간이 검색 범위와 겹치는지 확인
+            return !(slotEndDate < searchStartDate || slotStartDate > searchEndDate);
+          } else if (slotStartDate) {
+            // 시작일만 있는 경우
+            return slotStartDate >= searchStartDate && slotStartDate <= searchEndDate;
+          } else if (slotEndDate) {
+            // 종료일만 있는 경우
+            return slotEndDate >= searchStartDate && slotEndDate <= searchEndDate;
+          }
           return false;
-        }
+        });
       }
       
-      // 상태 필터
-      if (statusFilter !== 'all') {
+      // 검색 조건에 따른 필터
+      if (advancedFilters.searchQuery) {
+        const query = advancedFilters.searchQuery.toLowerCase();
+        filtered = filtered.filter(slot => {
+          switch(advancedFilters.searchType) {
+            case 'keyword':
+              return slot.customFields?.keyword?.toLowerCase().includes(query) || 
+                     slot.customFields?.keywords?.toLowerCase().includes(query);
+            case 'url':
+              return slot.customFields?.url?.toLowerCase().includes(query) || 
+                     slot.customFields?.landingUrl?.toLowerCase().includes(query);
+            case 'productName':
+              return slot.product_name?.toLowerCase().includes(query);
+            default: // 'all'
+              return (
+                slot.customFields?.keyword?.toLowerCase().includes(query) || 
+                slot.customFields?.keywords?.toLowerCase().includes(query) ||
+                slot.customFields?.url?.toLowerCase().includes(query) || 
+                slot.customFields?.landingUrl?.toLowerCase().includes(query) ||
+                slot.product_name?.toLowerCase().includes(query) ||
+                slot.customFields?.title?.toLowerCase().includes(query) ||
+                slot.customFields?.description?.toLowerCase().includes(query)
+              );
+          }
+        });
+      }
+      
+      // 상태 필터 (상세 검색에서 설정한 경우)
+      if (advancedFilters.status && advancedFilters.status !== 'all') {
+        // statusFilter를 직접 사용하지 않고 여기서 처리
+        const filterStatus = advancedFilters.status;
         const now = new Date();
+        
+        filtered = filtered.filter(slot => {
+          const start = slot.startDate ? new Date(slot.startDate) : null;
+          const end = slot.endDate ? new Date(slot.endDate) : null;
+          
+          let actualStatus = '';
+          
+          if (slot.status === 'empty') {
+            actualStatus = 'empty';
+          } else if (slot.status === 'pending') {
+            actualStatus = 'pending';
+          } else if (slot.status === 'paused') {
+            actualStatus = 'paused';
+          } else if (slot.status === 'rejected') {
+            actualStatus = 'rejected';
+          } else if (slot.status === 'active') {
+            if (start && now < start) {
+              actualStatus = 'waiting';
+            } else if (end && now > end) {
+              actualStatus = 'completed';
+            } else {
+              actualStatus = 'active';
+            }
+          }
+          
+          return actualStatus === filterStatus;
+        });
+      }
+    } 
+    // 일반 검색 (상세 검색을 사용하지 않는 경우)
+    else {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter(slot => {
+          // 키워드 검색 - 여러 필드에서 검색
+          const keywordMatch = 
+            slot.customFields?.keyword?.toLowerCase().includes(query) ||
+            slot.customFields?.keywords?.toLowerCase().includes(query);
+            
+          // URL 검색 - 여러 URL 필드에서 검색  
+          const urlMatch = 
+            slot.customFields?.url?.toLowerCase().includes(query) ||
+            slot.customFields?.landingUrl?.toLowerCase().includes(query);
+          
+          // 기타 필드 검색
+          const otherMatch = 
+            slot.customFields?.description?.toLowerCase().includes(query) ||
+            slot.customFields?.mid?.toLowerCase().includes(query);
+          
+          if (!keywordMatch && !urlMatch && !otherMatch) {
+            return false;
+          }
+        });
+      }
+      
+    }
+    
+    // 상태 필터 (일반 검색 모드에서만 - 상세 검색을 사용하지 않을 때)
+    if (!advancedFilters && statusFilter !== 'all') {
+      const now = new Date();
+      filtered = filtered.filter(slot => {
         const start = slot.startDate ? new Date(slot.startDate) : null;
         const end = slot.endDate ? new Date(slot.endDate) : null;
         
@@ -590,13 +688,9 @@ export function BaseSlotListPage({
           }
         }
         
-        if (actualStatus !== statusFilter) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
+        return actualStatus === statusFilter;
+      });
+    }
 
     // 정렬: 슬롯 번호 순으로 정렬
     return filtered.sort((a, b) => {
@@ -604,7 +698,7 @@ export function BaseSlotListPage({
       const bNumber = b.slot_number || (b.customFields?.seq ? parseInt(b.customFields.seq) : 0) || 0;
       return aNumber - bNumber;
     });
-  }, [slots, searchQuery, statusFilter]);
+  }, [slots, searchQuery, statusFilter, advancedFilters]);
   
   // 빈 슬롯 필터링 (선슬롯발행 모드용)
   const emptySlots = useMemo(() => {
@@ -962,24 +1056,57 @@ export function BaseSlotListPage({
       {/* 검색 및 필터 영역 */}
       <div className={styles.searchContainer}>
         <div className="flex gap-4">
-          <div className="flex-1">
+          <div className="flex-1 relative">
             <input
               type="text"
-              placeholder="키워드, URL로 검색..."
+              placeholder={advancedFilters ? "상세 검색을 사용 중입니다" : "키워드, URL로 검색..."}
               value={searchQuery}
               onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
+                if (!advancedFilters) {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }
               }}
-              className={styles.searchInput}
+              disabled={!!advancedFilters}
+              className={`${styles.searchInput} ${advancedFilters ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             />
+            {advancedFilters && (
+              <button
+                onClick={() => {
+                  setAdvancedFilters(null);
+                  setSearchQuery('');
+                  setStatusFilter('all');
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm text-purple-600 hover:text-purple-700 font-medium"
+              >
+                상세 검색 초기화
+              </button>
+            )}
           </div>
+          
+          {/* 상세 검색 버튼 */}
+          <BaseAdvancedSearchDropdown 
+            onSearch={(filters: SearchFilters) => {
+              // 상세 검색 필터 적용
+              setAdvancedFilters(filters);
+              setSearchQuery(''); // 일반 검색 초기화
+              if (filters.status) {
+                setStatusFilter(filters.status);
+              }
+              setCurrentPage(1);
+            }}
+            isAdmin={false}
+            reset={resetAdvancedSearch}
+            onResetComplete={() => setResetAdvancedSearch(false)}
+          />
           
           {/* 먼저 상태 드롭박스를 표시 */}
           <select
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
+              setAdvancedFilters(null); // 상세 검색 초기화
+              setResetAdvancedSearch(true); // 상세 검색 컴포넌트 리셋
               setCurrentPage(1);
             }}
             className={styles.select}
@@ -1200,7 +1327,7 @@ export function BaseSlotListPage({
         <div className="text-center py-8">로딩 중...</div>
       ) : filteredSlots.length === 0 ? (
         <div className={styles.emptyState}>
-          {searchQuery || statusFilter !== 'all' ? (
+          {searchQuery || statusFilter !== 'all' || advancedFilters ? (
             // 검색 조건이 있을 때
             <>
               <p className="text-gray-600 mb-4 text-lg font-medium">검색결과가 없습니다.</p>
@@ -1211,9 +1338,9 @@ export function BaseSlotListPage({
           ) : (
             // 전체 상태에서 슬롯이 없을 때
             <>
-              <p className="text-gray-600 mb-4 text-lg font-medium">운영자가 슬롯을 발급해줘야 합니다.</p>
+              <p className="text-gray-600 mb-4 text-lg font-medium">검색결과가 없습니다.</p>
               <p className="text-sm text-gray-500">
-                관리자에게 문의하여 슬롯을 발급받으세요.
+                다른 검색 조건으로 다시 시도해보세요.
               </p>
             </>
           )}
