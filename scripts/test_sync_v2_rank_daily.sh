@@ -129,9 +129,10 @@ analyze_our_slots() {
     log_test "=== 우리 slots 데이터 분석 ==="
     
     # slots 데이터 추출 (URL에서 파싱)
+    # trim_keyword 사용 (공백 제거된 버전)
     PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -F'|' -c "
         SELECT DISTINCT 
-            keyword,
+            COALESCE(trim_keyword, REPLACE(keyword, ' ', '')) as keyword,
             SUBSTRING(url FROM 'products/([0-9]+)') as product_id,
             SUBSTRING(url FROM 'itemId=([0-9]+)') as item_id,
             SUBSTRING(url FROM 'vendorItemId=([0-9]+)') as vendor_item_id
@@ -192,9 +193,10 @@ test_sync_sample() {
     fi
     
     # 테스트할 데이터 추출
+    # trim_keyword 사용 (공백 제거된 버전)
     PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -F'|' -c "
         SELECT DISTINCT 
-            keyword,
+            COALESCE(trim_keyword, REPLACE(keyword, ' ', '')) as keyword,
             SUBSTRING(url FROM 'products/([0-9]+)') as product_id,
             SUBSTRING(url FROM 'itemId=([0-9]+)') as item_id,
             SUBSTRING(url FROM 'vendorItemId=([0-9]+)') as vendor_item_id
@@ -249,7 +251,7 @@ EOF
         
         # 외부 DB에서 순위 정보 가져오기 (상세 정보 포함)
         log_debug "순위 정보 조회 중..."
-        RANK_DEBUG_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF 2>/dev/null
+        RANK_DEBUG_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF
         WITH rank_history AS (
             SELECT 
                 *,
@@ -276,7 +278,7 @@ EOF
                 review_count,
                 check_count
             FROM rank_history
-            WHERE check_date = '$CHECK_DATE'::date
+            WHERE check_date = '$CHECK_DATE'
               AND check_count > 9
             ORDER BY check_count DESC
             LIMIT 1
