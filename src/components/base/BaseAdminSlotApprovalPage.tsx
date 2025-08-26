@@ -1193,6 +1193,13 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   })}
                   {/* 순위 */}
                   <td className="px-3 py-2 text-center text-sm">
+                    {console.log('슬롯 데이터:', slot)}
+                    {console.log('순위 체크:', {
+                      current_rank: (slot as any).current_rank,
+                      rank: (slot as any).rank,
+                      rank_source: (slot as any).rank_source,
+                      조건체크: ((slot as any).current_rank > 0 || (slot as any).rank > 0)
+                    })}
                     {slot.status === 'empty' ? (
                       <span className="text-gray-400">-</span>
                     ) : slot.status === 'pending' ? (
