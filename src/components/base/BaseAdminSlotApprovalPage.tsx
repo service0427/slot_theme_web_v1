@@ -1197,24 +1197,22 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       <span className="text-gray-400">-</span>
                     ) : slot.status === 'pending' ? (
                       <span className="text-gray-400">-</span>
-                    ) : (slot as any).is_processing || (slot.status === 'active' && !(slot as any).current_rank === undefined) ? (
-                      <span className="text-orange-500 font-medium animate-pulse">측정중</span>
-                    ) : (slot as any).current_rank && (slot as any).current_rank > 0 ? (
+                    ) : ((slot as any).current_rank > 0 || (slot as any).rank > 0) ? (
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center justify-center gap-1">
-                          <span className="font-semibold text-gray-900">{(slot as any).current_rank}</span>
+                          <span className="font-semibold text-gray-900">{(slot as any).current_rank || (slot as any).rank}</span>
                           {(slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
                             <span className={`text-xs ${
-                              (slot as any).yesterday_rank > (slot as any).current_rank 
+                              (slot as any).yesterday_rank > ((slot as any).current_rank || (slot as any).rank)
                                 ? 'text-green-600' 
-                                : (slot as any).yesterday_rank < (slot as any).current_rank 
+                                : (slot as any).yesterday_rank < ((slot as any).current_rank || (slot as any).rank)
                                   ? 'text-red-600' 
                                   : 'text-gray-500'
                             }`}>
-                              {(slot as any).yesterday_rank > (slot as any).current_rank 
-                                ? `(▲${(slot as any).yesterday_rank - (slot as any).current_rank})` 
-                                : (slot as any).yesterday_rank < (slot as any).current_rank 
-                                  ? `(▼${(slot as any).current_rank - (slot as any).yesterday_rank})` 
+                              {(slot as any).yesterday_rank > ((slot as any).current_rank || (slot as any).rank)
+                                ? `(▲${(slot as any).yesterday_rank - ((slot as any).current_rank || (slot as any).rank)})` 
+                                : (slot as any).yesterday_rank < ((slot as any).current_rank || (slot as any).rank)
+                                  ? `(▼${((slot as any).current_rank || (slot as any).rank) - (slot as any).yesterday_rank})` 
                                   : '(-)'}
                             </span>
                           )}
