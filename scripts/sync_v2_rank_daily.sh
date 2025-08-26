@@ -84,24 +84,21 @@ mkdir -p $TEMP_DIR
 extract_our_slots() {
     log_info "우리 slots 데이터 추출 중..."
     
+    # URL에서 product_id, item_id, vendor_item_id 추출
     PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -F'|' -c "
         SELECT DISTINCT 
-            sfv.value as keyword,
-            s.product_id::text,
-            s.item_id::text,
-            s.vendor_item_id::text
-        FROM slots s
-        JOIN slot_field_values sfv ON s.id = sfv.slot_id
-        JOIN slot_fields sf ON sfv.field_id = sf.id
-        WHERE sf.name = 'keyword'
-          AND s.product_id IS NOT NULL
-          AND s.product_id != ''
-          AND s.item_id IS NOT NULL
-          AND s.item_id != ''
-          AND s.vendor_item_id IS NOT NULL
-          AND s.vendor_item_id != ''
-          AND sfv.value IS NOT NULL
-          AND sfv.value != '';
+            keyword,
+            SUBSTRING(url FROM 'products/([0-9]+)') as product_id,
+            SUBSTRING(url FROM 'itemId=([0-9]+)') as item_id,
+            SUBSTRING(url FROM 'vendorItemId=([0-9]+)') as vendor_item_id
+        FROM slots
+        WHERE url IS NOT NULL
+          AND url LIKE '%coupang.com%'
+          AND url LIKE '%products/%'
+          AND url LIKE '%itemId=%'
+          AND url LIKE '%vendorItemId=%'
+          AND keyword IS NOT NULL
+          AND keyword != '';
     " > $TEMP_DIR/our_slots.txt
     
     TOTAL_SLOTS=$(wc -l < $TEMP_DIR/our_slots.txt)

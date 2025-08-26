@@ -128,21 +128,21 @@ test_tables() {
 analyze_our_slots() {
     log_test "=== 우리 slots 데이터 분석 ==="
     
-    # slots 데이터 추출
+    # slots 데이터 추출 (URL에서 파싱)
     PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -F'|' -c "
         SELECT DISTINCT 
-            sfv.value as keyword,
-            s.product_id::text,
-            s.item_id::text,
-            s.vendor_item_id::text
-        FROM slots s
-        JOIN slot_field_values sfv ON s.id = sfv.slot_id
-        JOIN slot_fields sf ON sfv.field_id = sf.id
-        WHERE sf.name = 'keyword'
-          AND s.product_id IS NOT NULL AND s.product_id != ''
-          AND s.item_id IS NOT NULL AND s.item_id != ''
-          AND s.vendor_item_id IS NOT NULL AND s.vendor_item_id != ''
-          AND sfv.value IS NOT NULL AND sfv.value != '';
+            keyword,
+            SUBSTRING(url FROM 'products/([0-9]+)') as product_id,
+            SUBSTRING(url FROM 'itemId=([0-9]+)') as item_id,
+            SUBSTRING(url FROM 'vendorItemId=([0-9]+)') as vendor_item_id
+        FROM slots
+        WHERE url IS NOT NULL
+          AND url LIKE '%coupang.com%'
+          AND url LIKE '%products/%'
+          AND url LIKE '%itemId=%'
+          AND url LIKE '%vendorItemId=%'
+          AND keyword IS NOT NULL
+          AND keyword != '';
     " > $TEMP_DIR/our_slots.txt
     
     local TOTAL_SLOTS=$(wc -l < $TEMP_DIR/our_slots.txt)
@@ -151,13 +151,11 @@ analyze_our_slots() {
     # 키워드별 통계
     log_info "키워드별 통계:"
     PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -c "
-        SELECT sfv.value as keyword, COUNT(*) as count
-        FROM slots s
-        JOIN slot_field_values sfv ON s.id = sfv.slot_id
-        JOIN slot_fields sf ON sfv.field_id = sf.id
-        WHERE sf.name = 'keyword'
-          AND s.product_id IS NOT NULL
-        GROUP BY sfv.value
+        SELECT keyword, COUNT(*) as count
+        FROM slots
+        WHERE keyword IS NOT NULL
+          AND url IS NOT NULL
+        GROUP BY keyword
         ORDER BY count DESC
         LIMIT 10;
     "
@@ -186,7 +184,7 @@ test_sync_sample() {
     
     if [[ "$CHOICE" == "1" ]]; then
         read -p "키워드 입력: " TEST_KEYWORD
-        FILTER_CONDITION="AND sfv.value = '$TEST_KEYWORD'"
+        FILTER_CONDITION="AND keyword = '$TEST_KEYWORD'"
         log_info "선택된 키워드: $TEST_KEYWORD"
     else
         FILTER_CONDITION=""
@@ -196,17 +194,17 @@ test_sync_sample() {
     # 테스트할 데이터 추출
     PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -F'|' -c "
         SELECT DISTINCT 
-            sfv.value as keyword,
-            s.product_id::text,
-            s.item_id::text,
-            s.vendor_item_id::text
-        FROM slots s
-        JOIN slot_field_values sfv ON s.id = sfv.slot_id
-        JOIN slot_fields sf ON sfv.field_id = sf.id
-        WHERE sf.name = 'keyword'
-          AND s.product_id IS NOT NULL AND s.product_id != ''
-          AND s.item_id IS NOT NULL AND s.item_id != ''
-          AND s.vendor_item_id IS NOT NULL AND s.vendor_item_id != ''
+            keyword,
+            SUBSTRING(url FROM 'products/([0-9]+)') as product_id,
+            SUBSTRING(url FROM 'itemId=([0-9]+)') as item_id,
+            SUBSTRING(url FROM 'vendorItemId=([0-9]+)') as vendor_item_id
+        FROM slots
+        WHERE url IS NOT NULL
+          AND url LIKE '%coupang.com%'
+          AND url LIKE '%products/%'
+          AND url LIKE '%itemId=%'
+          AND url LIKE '%vendorItemId=%'
+          AND keyword IS NOT NULL
           $FILTER_CONDITION
         LIMIT $TEST_COUNT;
     " > $TEMP_DIR/test_slots.txt
