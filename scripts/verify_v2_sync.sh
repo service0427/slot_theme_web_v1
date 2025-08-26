@@ -199,6 +199,63 @@ verify_rank_consistency() {
     else
         log_fail "비정상 순위 발견: ${INVALID_RANK}건"
         FAIL_COUNT=$((FAIL_COUNT + 1))
+        
+        # 비정상 순위 상세 정보
+        echo ""
+        log_warn "===== 비정상 순위 상세 정보 ====="
+        log_info "rank=0 또는 rank>100인 레코드:"
+        PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -c "
+            SELECT keyword, product_id, rank, 
+                   SUBSTRING(product_name FROM 1 FOR 30) || '...' as product_name
+            FROM v2_rank_daily
+            WHERE date = '$CHECK_DATE'
+              AND rank IS NOT NULL
+              AND (rank < 1 OR rank > 100)
+            ORDER BY rank, keyword
+            LIMIT 15;
+        "
+        
+        # rank=0인 경우 외부 DB 확인
+        echo ""
+        log_warn "외부 DB에서 rank=0인 샘플 확인:"
+        ZERO_SAMPLE=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -F'|' -c "
+            SELECT keyword, product_id, item_id, vendor_item_id
+            FROM v2_rank_daily
+            WHERE date = '$CHECK_DATE' AND rank = 0
+            LIMIT 3;
+        ")
+        
+        if [ ! -z "$ZERO_SAMPLE" ]; then
+            echo "$ZERO_SAMPLE" | while IFS='|' read -r kw pid iid vid; do
+                log_info "확인: $kw (product_id=$pid)"
+                PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -c "
+                    SELECT 
+                        keyword,
+                        check_count,
+                        latest_rank,
+                        CASE 
+                            WHEN rank_data IS NULL THEN 'NULL'
+                            WHEN rank_data::text = '[]' THEN '빈 배열'
+                            ELSE '데이터 있음'
+                        END as rank_data_status,
+                        ARRAY(
+                            SELECT DISTINCT (elem->>'rank')::integer 
+                            FROM jsonb_array_elements(rank_data) elem 
+                            WHERE elem->>'rank' IS NOT NULL
+                            ORDER BY (elem->>'rank')::integer
+                            LIMIT 5
+                        )::text as sample_ranks
+                    FROM v2_rank_history
+                    WHERE keyword = '$kw'
+                      AND product_id = '$pid'
+                      AND check_date = '$CHECK_DATE'
+                    ORDER BY check_count DESC
+                    LIMIT 1;
+                " 2>/dev/null || echo "  외부 DB 조회 실패: $kw"
+                echo ""
+            done
+        fi
+        echo ""
     fi
     
     # 키워드별 순위 중복 체크
