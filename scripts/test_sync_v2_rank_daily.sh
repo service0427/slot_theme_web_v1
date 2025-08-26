@@ -30,22 +30,30 @@ log_test() {
 }
 
 # ========================================
-# DB 연결 정보 (테스트용)
+# 설정 파일 로드
 # ========================================
 
-# 외부 DB (실제 정보로 교체 필요)
-EXTERNAL_HOST="외부서버IP"
-EXTERNAL_PORT="5432"
-EXTERNAL_DB="외부DB명"
-EXTERNAL_USER="외부사용자"
-EXTERNAL_PASS="외부비밀번호"
+# 스크립트 디렉토리 확인
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/sync.config"
 
-# 로컬 DB
-LOCAL_HOST="localhost"
-LOCAL_PORT="5432"
-LOCAL_DB="simple"
-LOCAL_USER="simple"
-LOCAL_PASS="Tech1324!"
+# 설정 파일 존재 확인
+if [ ! -f "$CONFIG_FILE" ]; then
+    log_error "설정 파일이 없습니다: $CONFIG_FILE"
+    log_error "sync.config.example을 복사해서 sync.config로 만들고 실제 값을 입력하세요"
+    exit 1
+fi
+
+# 설정 파일 로드
+source "$CONFIG_FILE"
+
+# 필수 설정값 확인
+if [ -z "$EXTERNAL_HOST" ] || [ "$EXTERNAL_HOST" = "외부서버IP" ]; then
+    log_error "EXTERNAL_HOST가 설정되지 않았습니다. sync.config 파일을 확인하세요"
+    exit 1
+fi
+
+log_test "설정 파일 로드 완료: $CONFIG_FILE"
 
 # ========================================
 # 설정값

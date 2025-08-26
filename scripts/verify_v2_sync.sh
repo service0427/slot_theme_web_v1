@@ -34,12 +34,25 @@ log_fail() {
     echo -e "${RED}[✗]${NC} $1"
 }
 
-# DB 연결 정보
-LOCAL_HOST="localhost"
-LOCAL_PORT="5432"
-LOCAL_DB="simple"
-LOCAL_USER="simple"
-LOCAL_PASS="Tech1324!"
+# ========================================
+# 설정 파일 로드
+# ========================================
+
+# 스크립트 디렉토리 확인
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/sync.config"
+
+# 설정 파일 존재 확인
+if [ ! -f "$CONFIG_FILE" ]; then
+    log_error "설정 파일이 없습니다: $CONFIG_FILE"
+    log_error "sync.config.example을 복사해서 sync.config로 만들고 실제 값을 입력하세요"
+    exit 1
+fi
+
+# 설정 파일 로드 (로컬 DB 정보만 필요)
+source "$CONFIG_FILE"
+
+log_info "설정 파일 로드 완료: $CONFIG_FILE"
 
 # 검증 날짜 (인자로 받거나 오늘 날짜)
 CHECK_DATE=${1:-$(date +%Y-%m-%d)}
