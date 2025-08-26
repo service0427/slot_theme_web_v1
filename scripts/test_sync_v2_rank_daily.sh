@@ -423,44 +423,77 @@ test_small_batch() {
         WHERE date = '$CHECK_DATE';
     " > /tmp/existing_v2_keys.txt 2>/dev/null
     
-    # 모든 외부 데이터를 가져와서 필터링
+    # 모든 외부 데이터를 가져와서 필터링 (rank_data 처리 로직 포함)
     ALL_EXTERNAL_DATA=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF 2>/dev/null
+        WITH rank_calc AS (
+            SELECT 
+                r.*,
+                p.product_data,
+                -- 어제 순위 가져오기
+                LAG(r.latest_rank) OVER (PARTITION BY r.keyword, r.product_id, r.item_id, r.vendor_item_id ORDER BY r.check_date) as yesterday_rank,
+                -- rank_data에서 모든 순위 추출
+                ARRAY(
+                    SELECT DISTINCT (elem->>'rank')::integer 
+                    FROM jsonb_array_elements(r.rank_data) elem 
+                    WHERE elem->>'rank' IS NOT NULL
+                    ORDER BY (elem->>'rank')::integer
+                ) as ranks_array
+            FROM v2_rank_history r
+            JOIN v2_products p ON 
+                p.product_id = r.product_id AND
+                p.item_id = r.item_id AND
+                p.vendor_item_id = r.vendor_item_id
+            WHERE r.check_date = CURRENT_DATE
+              $KEYWORD_FILTER
+        )
         SELECT 
-            r.keyword,
-            p.product_id,
-            p.item_id,
-            p.vendor_item_id,
-            REPLACE(COALESCE(p.product_data->>'title', 'Unknown Product'), '|', ' ') as product_name,
-            COALESCE(p.product_data->'thumbnailImages'->0->>'url', '') as thumbnail,
-            COALESCE(r.latest_rank, 0) as rank,
-            COALESCE(r.rating, 0) as rating,
-            COALESCE(r.review_count, 0) as review_count
-        FROM v2_products p
-        JOIN v2_rank_history r ON 
-            p.product_id = r.product_id AND
-            p.item_id = r.item_id AND
-            p.vendor_item_id = r.vendor_item_id
-        WHERE r.check_date = CURRENT_DATE
-          AND r.check_count > 9
-          AND r.latest_rank IS NOT NULL
-          $KEYWORD_FILTER
-        ORDER BY r.keyword, r.latest_rank;
+            keyword,
+            product_id,
+            item_id,
+            vendor_item_id,
+            REPLACE(COALESCE(product_data->>'title', 'Unknown Product'), '|', ' ') as product_name,
+            COALESCE(product_data->'thumbnailImages'->0->>'url', '') as thumbnail,
+            -- 계산된 순위
+            COALESCE(
+                CASE 
+                    WHEN array_length(ranks_array, 1) > 0 THEN
+                        CASE
+                            WHEN yesterday_rank IS NOT NULL THEN
+                                (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                            ELSE
+                                (SELECT MAX(r) FROM unnest(ranks_array) r)
+                        END
+                    ELSE latest_rank
+                END, 0
+            ) as calculated_rank,
+            COALESCE(rating, 0) as rating,
+            COALESCE(review_count, 0) as review_count,
+            -- 디버그용 추가 정보
+            COALESCE(yesterday_rank, 0) as yesterday_rank,
+            ARRAY_TO_STRING(ranks_array, ',') as available_ranks,
+            CASE 
+                WHEN yesterday_rank IS NOT NULL THEN '어제 순위 있음'
+                ELSE '어제 순위 없음'
+            END as rank_selection_reason
+        FROM rank_calc
+        WHERE check_count > 9
+        ORDER BY keyword, calculated_rank NULLS LAST;
 EOF
     )
     
-    # Shell에서 필터링
+    # Shell에서 필터링 (rank 정보 포함)
     NEW_DATA=""
     COUNT=0
-    while IFS='|' read -r keyword product_id item_id vendor_item_id product_name thumbnail rank rating review_count; do
+    while IFS='|' read -r keyword product_id item_id vendor_item_id product_name thumbnail rank rating review_count yesterday_rank available_ranks rank_reason; do
         CHECK_KEY="${keyword}|${product_id}|${item_id}|${vendor_item_id}"
         
         # 이미 있는지 체크
         if ! grep -q "^${CHECK_KEY}$" /tmp/existing_v2_keys.txt 2>/dev/null; then
             if [ $COUNT -lt $DATA_COUNT ]; then
                 if [ -z "$NEW_DATA" ]; then
-                    NEW_DATA="${keyword}|${product_id}|${item_id}|${vendor_item_id}|${product_name}|${thumbnail}|${rank}|${rating}|${review_count}"
+                    NEW_DATA="${keyword}|${product_id}|${item_id}|${vendor_item_id}|${product_name}|${thumbnail}|${rank}|${rating}|${review_count}|${yesterday_rank}|${available_ranks}|${rank_reason}"
                 else
-                    NEW_DATA="${NEW_DATA}\n${keyword}|${product_id}|${item_id}|${vendor_item_id}|${product_name}|${thumbnail}|${rank}|${rating}|${review_count}"
+                    NEW_DATA="${NEW_DATA}\n${keyword}|${product_id}|${item_id}|${vendor_item_id}|${product_name}|${thumbnail}|${rank}|${rating}|${review_count}|${yesterday_rank}|${available_ranks}|${rank_reason}"
                 fi
                 COUNT=$((COUNT + 1))
             fi
@@ -491,14 +524,26 @@ EOF
     # 각 데이터 처리 (이미 Shell에서 필터링했으므로 중복 체크 불필요)
     PROCESSED_COUNT=0
     SUCCESS_COUNT=0
-    echo "$NEW_DATA" | while IFS='|' read -r keyword product_id item_id vendor_item_id product_name thumbnail rank rating review_count; do
+    echo "$NEW_DATA" | while IFS='|' read -r keyword product_id item_id vendor_item_id product_name thumbnail rank rating review_count yesterday_rank available_ranks rank_reason; do
         PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
         
         log_info "[${PROCESSED_COUNT}/${ACTUAL_COUNT}] 처리 중:"
         echo "  키워드: $keyword"
         echo "  상품ID: $product_id / $item_id / $vendor_item_id"
         echo "  상품명: ${product_name:0:50}$([ ${#product_name} -gt 50 ] && echo '...')"
-        echo "  순위: $rank (평점: $rating, 리뷰: $review_count)"
+        echo ""
+        echo -e "  ${YELLOW}📊 순위 계산 과정:${NC}"
+        echo "  - rank_data 순위들: [${available_ranks}]"
+        echo "  - 어제 순위: ${yesterday_rank}$([ "$yesterday_rank" = "0" ] && echo ' (없음)')"
+        echo "  - 선택 이유: ${rank_reason}"
+        if [ "$yesterday_rank" != "0" ]; then
+            echo "  - 계산 로직: 어제 순위($yesterday_rank)보다 바로 높은 순위 선택"
+        else
+            echo "  - 계산 로직: 어제 순위 없음 → 최대값(가장 낮은 순위) 선택"
+        fi
+        echo -e "  ${GREEN}→ 최종 선택된 순위: ${rank}${NC}"
+        echo ""
+        echo "  기타 정보: 평점 $rating, 리뷰 $review_count"
         
         # 1. 상품정보 INSERT
         PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -c "

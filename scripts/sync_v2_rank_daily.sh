@@ -94,12 +94,16 @@ check_existing_data() {
     if [ "$EXISTING_COUNT" -gt 0 ]; then
         log_warn "이미 동기화된 데이터: ${EXISTING_COUNT}건"
         
-        # 기존 데이터 키 목록을 파일로 저장 (대량 처리를 위해)
-        log_info "기존 데이터 키 목록 생성 중..."
+        # 기존 데이터 키 목록을 파일로 저장 (완전한 데이터만)
+        log_info "완전한 기존 데이터 확인 중..."
         PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -c "
+            -- 완전한 데이터만 선택 (상품명, 썸네일, 순위가 모두 있는 경우)
             SELECT keyword || '|' || product_id || '|' || item_id || '|' || vendor_item_id
             FROM v2_rank_daily 
-            WHERE date = '$CHECK_DATE';
+            WHERE date = '$CHECK_DATE'
+              AND product_name IS NOT NULL AND product_name != ''
+              AND thumbnail IS NOT NULL AND thumbnail != ''
+              AND rank IS NOT NULL AND rank > 0;
         " > $TEMP_DIR/existing_keys.txt
         
         log_info "중복 제외 모드로 실행합니다."
@@ -156,7 +160,7 @@ EOF
             echo "$RESULT" > $TEMP_DIR/batch_data.txt
             
             while IFS='|' read -r product_id item_id vendor_item_id product_name thumbnail keyword; do
-                # 중복 체크
+                # 중복 체크 (기본 키만 사용)
                 CHECK_KEY="${keyword}|${product_id}|${item_id}|${vendor_item_id}"
                 
                 if grep -q "^${CHECK_KEY}$" $TEMP_DIR/existing_keys.txt 2>/dev/null; then
@@ -217,6 +221,21 @@ sync_rank_info() {
         log_debug "Batch ${BATCH_COUNT}: OFFSET=$OFFSET, LIMIT=$BATCH_SIZE"
         
         RESULT=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF
+        WITH rank_calc AS (
+            SELECT 
+                r.*,
+                -- 어제 순위 가져오기
+                LAG(r.latest_rank) OVER (PARTITION BY r.keyword, r.product_id, r.item_id, r.vendor_item_id ORDER BY r.check_date) as yesterday_rank,
+                -- rank_data에서 모든 순위 추출하여 배열로 변환
+                ARRAY(
+                    SELECT DISTINCT (elem->>'rank')::integer 
+                    FROM jsonb_array_elements(r.rank_data) elem 
+                    WHERE elem->>'rank' IS NOT NULL
+                    ORDER BY (elem->>'rank')::integer
+                ) as ranks_array
+            FROM v2_rank_history r
+            WHERE r.check_date = '$CHECK_DATE'
+        )
         SELECT 
             keyword,
             product_id::text,
@@ -224,16 +243,24 @@ sync_rank_info() {
             vendor_item_id::text,
             COALESCE(
                 CASE 
-                    WHEN jsonb_array_length(rank_data) > 0 THEN 
-                        (rank_data->-1->>'rank')::integer
+                    -- rank_data가 있을 때
+                    WHEN array_length(ranks_array, 1) > 0 THEN
+                        CASE
+                            -- 어제 순위가 있으면: 어제보다 바로 높은 순위 (큰 숫자) 선택
+                            WHEN yesterday_rank IS NOT NULL THEN
+                                (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                            -- 어제 순위가 없으면: 최대값 (가장 낮은 순위)
+                            ELSE
+                                (SELECT MAX(r) FROM unnest(ranks_array) r)
+                        END
+                    -- rank_data가 없으면 latest_rank 사용
                     ELSE latest_rank
                 END, 0
             ) as rank,
             COALESCE(rating, 0) as rating,
             COALESCE(review_count, 0) as review_count
-        FROM v2_rank_history
-        WHERE check_date = '$CHECK_DATE'
-          AND keyword IS NOT NULL
+        FROM rank_calc
+        WHERE keyword IS NOT NULL
           AND check_count > 9
         ORDER BY keyword, latest_rank NULLS LAST
         LIMIT $BATCH_SIZE OFFSET $OFFSET;
@@ -248,14 +275,8 @@ EOF
             echo "$RESULT" > $TEMP_DIR/rank_batch_data.txt
             
             while IFS='|' read -r keyword product_id item_id vendor_item_id rank rating review_count; do
-                # 중복 체크
-                CHECK_KEY="${keyword}|${product_id}|${item_id}|${vendor_item_id}"
-                
-                if grep -q "^${CHECK_KEY}$" $TEMP_DIR/existing_keys.txt 2>/dev/null; then
-                    SKIP_COUNT=$((SKIP_COUNT + 1))
-                    log_debug "건너뜀: $keyword - Rank: $rank"
-                    continue
-                fi
+                # 중복 체크 (순위정보 포함)
+                CHECK_KEY="${keyword}|${product_id}|${item_id}|${vendor_item_id}|${rank}|${rating}|${review_count}"
                 
                 # v2_upsert_rank_info 함수 호출
                 PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -c "
