@@ -389,10 +389,13 @@ export async function getSlots(req: AuthRequest, res: Response) {
     }
     
     // current_rank를 rank로 맵핑 (프론트엔드 호환성)
-    slots.forEach(slot => {
-      slot.rank = slot.current_rank;
-      delete slot.current_rank;
-    });
+    // 개발자는 current_rank를 유지, 다른 권한은 rank로 맵핑
+    if (userRole !== 'developer') {
+      slots.forEach(slot => {
+        slot.rank = slot.current_rank;
+        delete slot.current_rank;
+      });
+    }
     
     // 맵핑 후 데이터 확인
     const targetSlotAfter = slots.find(s => s.id === '68d62365-d548-452c-aecf-ccc7af611ad7');
