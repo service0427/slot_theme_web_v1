@@ -96,6 +96,8 @@ export function BaseUserSlotCard({ slot, onPause, onResume, onOpenRankHistory }:
         <div className="border-t pt-4 mb-4">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-700">순위</span>
+            <span className="text-gray-400">준비중</span>
+            {/* 임시 주석처리
             <div className="flex items-center gap-2">
               {onOpenRankHistory ? (
                 <button
@@ -151,6 +153,7 @@ export function BaseUserSlotCard({ slot, onPause, onResume, onOpenRankHistory }:
                 </span>
               )}
             </div>
+            */}
           </div>
         </div>
 

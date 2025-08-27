@@ -1244,6 +1244,8 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       <span className="text-gray-400">-</span>
                     ) : (
                       <div className="flex flex-col items-center gap-1">
+                        <span className="text-gray-400">준비중</span>
+                        {/* 임시 주석처리
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => handleOpenRankHistory(slot)}
@@ -1282,10 +1284,12 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                             </span>
                           )}
                         </div>
-                        {/* v2_rank_daily 데이터 소스 표시 */}
+                        */}
+                        {/* v2_rank_daily 데이터 소스 표시 - 임시 주석처리
                         {(slot as any).rank_source === 'v2_rank_daily' && (
                           <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">V2</span>
                         )}
+                        */}
                       </div>
                     )}
                   </td>
@@ -2242,7 +2246,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
         />
       )}
 
-      {/* 순위 히스토리 모달 */}
+      {/* 순위 히스토리 모달 - 임시 주석처리
       <BaseRankHistoryModal
         isOpen={rankHistoryModal.isOpen}
         onClose={handleCloseRankHistory}
@@ -2251,6 +2255,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
         startDate={rankHistoryModal.startDate}
         endDate={rankHistoryModal.endDate}
       />
+      */}
 
     </div>
   );

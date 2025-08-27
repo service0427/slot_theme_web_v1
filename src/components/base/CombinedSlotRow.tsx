@@ -571,6 +571,9 @@ function CombinedSlotRowComponent({
         ) : slot.status === 'pending' ? (
           <span className="text-gray-400">-</span>
         ) : (
+          <span className="text-gray-400">준비중</span>
+        )}
+        {/* 임시 주석처리
           <div className="flex items-center justify-center gap-1">
             {onOpenRankHistory ? (
               <button
@@ -629,7 +632,7 @@ function CombinedSlotRowComponent({
               </span>
             )}
           </div>
-        )}
+        */}
       </td>
       <td className="px-2 py-4 text-center border-r text-gray-400 text-xs">
         {slot.startDate ? new Date(slot.startDate).toLocaleDateString('ko-KR', {

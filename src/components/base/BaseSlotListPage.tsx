@@ -1734,7 +1734,7 @@ export function BaseSlotListPage({
         onSubmit={handlePreAllocationCreate}
       />
 
-      {/* 순위 히스토리 모달 */}
+      {/* 순위 히스토리 모달 - 임시 주석처리
       <BaseRankHistoryModal
         isOpen={rankHistoryModal.isOpen}
         onClose={handleCloseRankHistory}
@@ -1743,6 +1743,7 @@ export function BaseSlotListPage({
         startDate={rankHistoryModal.startDate}
         endDate={rankHistoryModal.endDate}
       />
+      */}
 
     </div>
   );

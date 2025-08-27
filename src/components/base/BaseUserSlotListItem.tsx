@@ -208,6 +208,8 @@ export function BaseUserSlotListItem({
       {/* 시스템 필드들 */}
       {/* 순위 */}
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
+        <span className="text-gray-400">준비중</span>
+        {/* 임시 주석처리
         {slot.status === 'empty' ? (
           <span className="text-gray-400">-</span>
         ) : (
@@ -270,6 +272,7 @@ export function BaseUserSlotListItem({
             )}
           </div>
         )}
+        */}
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-500">
         {slot.customFields.startDate ? new Date(slot.customFields.startDate).toLocaleDateString() : '-'}

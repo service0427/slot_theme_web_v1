@@ -218,7 +218,14 @@ EOF
         ),
         today_data AS (
             SELECT 
-                -- rank_data JSON에서 순위 배열 추출
+                -- rank_data JSON에서 순위 배열 추출 (0 포함)
+                ARRAY(
+                    SELECT DISTINCT (elem->>'rank')::integer 
+                    FROM jsonb_array_elements(rank_data) elem 
+                    WHERE elem->>'rank' IS NOT NULL
+                    ORDER BY (elem->>'rank')::integer
+                ) as all_ranks_array,
+                -- 0 제외한 순위 배열
                 ARRAY(
                     SELECT DISTINCT (elem->>'rank')::integer 
                     FROM jsonb_array_elements(rank_data) elem 
@@ -243,37 +250,37 @@ EOF
             LIMIT 1
         )
         SELECT 
-            COALESCE(
-                CASE 
-                    -- rank_data 배열이 있을 때
-                    WHEN array_length(ranks_array, 1) > 0 THEN
-                        CASE
-                            -- 어제 순위가 있고 0이 아닐 때
-                            WHEN yesterday_rank IS NOT NULL AND yesterday_rank > 0 THEN
-                                CASE
-                                    -- 5등 이하일 때: 어제 순위와 동일한 순위 제외하고 낮은 순위 중 최대값
-                                    WHEN yesterday_rank > 5 THEN
-                                        COALESCE(
-                                            (SELECT MAX(r) FROM unnest(ranks_array) r WHERE r < yesterday_rank),
-                                            -- 어제보다 낮은 순위가 없으면 가장 가까운 값(최소값)
-                                            (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
-                                        )
-                                    -- 5등 이내일 때: 어제 순위 포함해서 낮거나 같은 순위 중 최대값
-                                    ELSE
-                                        COALESCE(
-                                            (SELECT MAX(r) FROM unnest(ranks_array) r WHERE r <= yesterday_rank),
-                                            -- 어제보다 낮거나 같은 순위가 없으면 가장 가까운 값(최소값)
-                                            (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
-                                        )
-                                END
-                            -- 어제 순위가 없거나 0이면: 최대값 (가장 낮은 순위)
-                            ELSE
-                                (SELECT MAX(r) FROM unnest(ranks_array) r)
-                        END
-                    -- rank_data가 없으면 latest_rank 사용
-                    ELSE latest_rank
-                END, 0
-            ) as calculated_rank,
+            CASE 
+                -- rank_data에 0만 있을 때
+                WHEN array_length(all_ranks_array, 1) > 0 AND array_length(ranks_array, 1) = 0 THEN 0
+                -- rank_data에 양수 순위가 있을 때
+                WHEN array_length(ranks_array, 1) > 0 THEN
+                    CASE
+                        -- 어제 순위가 있고 0이 아닐 때
+                        WHEN yesterday_rank IS NOT NULL AND yesterday_rank > 0 THEN
+                            CASE
+                                -- 5등 이하일 때: 어제 순위와 동일한 순위 제외하고 낮은 순위 중 최대값
+                                WHEN yesterday_rank > 5 THEN
+                                    COALESCE(
+                                        (SELECT MAX(r) FROM unnest(ranks_array) r WHERE r < yesterday_rank),
+                                        -- 어제보다 낮은 순위가 없으면 가장 가까운 값(최소값)
+                                        (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                                    )
+                                -- 5등 이내일 때: 어제 순위 포함해서 낮거나 같은 순위 중 최대값
+                                ELSE
+                                    COALESCE(
+                                        (SELECT MAX(r) FROM unnest(ranks_array) r WHERE r <= yesterday_rank),
+                                        -- 어제보다 낮거나 같은 순위가 없으면 가장 가까운 값(최소값)
+                                        (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                                    )
+                            END
+                        -- 어제 순위가 없거나 0이면: 최대값 (가장 낮은 순위)
+                        ELSE
+                            (SELECT MAX(r) FROM unnest(ranks_array) r)
+                    END
+                -- rank_data가 아예 없으면 NULL
+                ELSE NULL
+            END as calculated_rank,
             COALESCE(rating, 0) as rating,
             COALESCE(review_count, 0) as review_count
         FROM today_data;
