@@ -119,6 +119,7 @@ export async function getSlots(req: AuthRequest, res: Response) {
                  s.extension_type,
                  CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
                  EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension,
+                 s.is_test,
                  'v2_rank_daily' as rank_source
           FROM slots s
           JOIN users u ON s.user_id = u.id
@@ -164,6 +165,7 @@ export async function getSlots(req: AuthRequest, res: Response) {
                  s.extension_type,
                  CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
                  EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension,
+                 s.is_test,
                  'v2_rank_daily' as rank_source
         FROM slots s
         JOIN users u ON s.user_id = u.id
@@ -758,7 +760,7 @@ export async function updateSlot(req: AuthRequest, res: Response) {
 export async function allocateSlots(req: AuthRequest, res: Response) {
   try {
     const { userId } = req.params;
-    const { slotCount, startDate, endDate, workCount, amount, description } = req.body;
+    const { slotCount, startDate, endDate, workCount, amount, description, isTest } = req.body;
     const adminRole = req.user?.role;
     const adminId = req.user?.id;
 
@@ -798,6 +800,20 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
         [adminId]
       );
       
+      // 테스트 슬롯일 경우 3일로 자동 설정
+      let finalStartDate = startDate;
+      let finalEndDate = endDate;
+      let finalWorkCount = workCount;
+      
+      if (isTest) {
+        const today = new Date();
+        finalStartDate = today.toISOString().split('T')[0];
+        const threeDaysLater = new Date(today);
+        threeDaysLater.setDate(today.getDate() + 2); // 오늘 포함 3일
+        finalEndDate = threeDaysLater.toISOString().split('T')[0];
+        finalWorkCount = 3;
+      }
+      
       const historyResult = await client.query(
         `INSERT INTO slot_allocation_history (
           operator_id,
@@ -808,8 +824,9 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
           slot_count,
           price_per_slot,
           reason,
-          memo
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+          memo,
+          payment
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
         [
           adminId,
           adminResult.rows[0]?.full_name || 'Admin',
@@ -818,8 +835,9 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
           userResult.rows[0]?.email || '',
           slotCount,
           amount || 0,
-          `선슬롯 ${slotCount}개 발행`,
-          description || null
+          isTest ? `테스트(3일) 슬롯 ${slotCount}개 발행` : `선슬롯 ${slotCount}개 발행`,
+          description || null,
+          false // 슬롯 발행 시 기본적으로 결제 대기 상태
         ]
       );
       const allocationHistoryId = historyResult.rows[0].id;
@@ -886,20 +904,22 @@ export async function allocateSlots(req: AuthRequest, res: Response) {
             pre_allocation_work_count,
             pre_allocation_amount,
             pre_allocation_description,
+            is_test,
             created_at
-          ) VALUES ($1, $2, $3, $4, $5, true, $6, NULL, NULL, NULL, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)`,
+          ) VALUES ($1, $2, $3, $4, $5, true, $6, NULL, NULL, NULL, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)`,
           [
             userId, 
             nextSeq, 
             allocationId,
-            allocationHistoryId,  // 새로 추가
+            allocationHistoryId,
             startNumber + i, 
             slotStatus,
-            startDate || null,
-            endDate || null,
-            workCount || null,
+            finalStartDate || null,
+            finalEndDate || null,
+            finalWorkCount || null,
             amount || null,
-            description || null
+            description || null,
+            isTest || false
           ]
         );
       }
@@ -975,7 +995,7 @@ export async function getUserSlotAllocation(req: AuthRequest, res: Response) {
 export async function updateSlotFields(req: AuthRequest, res: Response) {
   try {
     const { id } = req.params;
-    const { customFields } = req.body;
+    const { customFields, startDate, endDate } = req.body;
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
@@ -1010,7 +1030,11 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
 
     // customFields 정리 (쿠팡 URL의 경우 필요한 파라미터만 남김)
     const cleanedFields: Record<string, any> = {};
-    for (const [key, value] of Object.entries(customFields)) {
+    for (const [key, value] of Object.entries(customFields || {})) {
+      // startDate, endDate는 customFields가 아니라 slots 테이블에 직접 저장
+      if (key === 'startDate' || key === 'endDate') {
+        continue;
+      }
       if (key === 'url' && value && typeof value === 'string') {
         // URL 공백 제거
         let cleanUrl = value.trim().replace(/\s+/g, '');
@@ -1164,8 +1188,11 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
       let keywordValue = '';
       let midValue = '';
       
+      // field_configs에 있는 필드만 처리
+      const validFieldKeys = new Set(fieldConfigs.map(c => c.field_key));
+      
       for (const [fieldKey, value] of Object.entries(finalFields)) {
-        if (value !== undefined && value !== null) {
+        if (value !== undefined && value !== null && validFieldKeys.has(fieldKey)) {
           const oldValue = existingFields[fieldKey];
           const newValue = String(value);
           
@@ -1201,46 +1228,137 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
         const parsedUrlFields = parseUrl(urlValue);
         
         for (const [parsedKey, parsedValue] of Object.entries(parsedUrlFields)) {
-          await client.query(
-            `INSERT INTO slot_field_values (slot_id, field_key, value)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (slot_id, field_key) 
-             DO UPDATE SET value = $3, updated_at = CURRENT_TIMESTAMP`,
-            [id, parsedKey, parsedValue]
-          );
+          if (validFieldKeys.has(parsedKey)) {
+            await client.query(
+              `INSERT INTO slot_field_values (slot_id, field_key, value)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (slot_id, field_key) 
+               DO UPDATE SET value = $3, updated_at = CURRENT_TIMESTAMP`,
+              [id, parsedKey, parsedValue]
+            );
+          }
         }
       }
 
-      // slots 테이블의 기본 필드도 업데이트
-      await client.query(
-        `UPDATE slots 
+      // slots 테이블의 기본 필드도 업데이트 (시작일/종료일 포함)
+      let updateQuery = `UPDATE slots 
          SET url = $2,
              keyword = $3,
              trim_keyword = $4,
              mid = $5,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1`,
-        [id, urlValue, keywordValue, trimKeywordValue, midValue]
-      );
+             updated_at = CURRENT_TIMESTAMP`;
+      let updateParams = [id, urlValue, keywordValue, trimKeywordValue, midValue];
+      
+      // 시작일/종료일 업데이트가 있으면 추가
+      if (startDate) {
+        updateQuery += `, pre_allocation_start_date = $6`;
+        updateParams.push(startDate);
+      }
+      if (endDate) {
+        const paramIndex = startDate ? '$7' : '$6';
+        updateQuery += `, pre_allocation_end_date = ${paramIndex}`;
+        updateParams.push(endDate);
+      }
+      
+      updateQuery += ` WHERE id = $1`;
+      
+      // 시작일/종료일 변경 사항도 changes에 추가 (COMMIT 전에)
+      if (startDate) {
+        const oldStartDate = existingSlot.pre_allocation_start_date ? 
+          (() => {
+            const date = new Date(existingSlot.pre_allocation_start_date);
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            return date.toISOString().split('T')[0];
+          })() : null;
+        
+        if (startDate !== oldStartDate) {
+          changes.push({
+            field: '시작일',
+            oldValue: oldStartDate,
+            newValue: startDate
+          });
+        }
+      }
+      if (endDate) {
+        const oldEndDate = existingSlot.pre_allocation_end_date ? 
+          (() => {
+            const date = new Date(existingSlot.pre_allocation_end_date);
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            return date.toISOString().split('T')[0];
+          })() : null;
+        
+        if (endDate !== oldEndDate) {
+          changes.push({
+            field: '종료일',
+            oldValue: oldEndDate,
+            newValue: endDate
+          });
+        }
+      }
+      
+      await client.query(updateQuery, updateParams);
 
       await client.query('COMMIT');
-
+      
       // 변경 사항이 있을 경우에만 로그 기록
       if (changes.length > 0) {
-        const fieldKeys = changes.map(c => c.field);
-        const oldValues = changes.reduce((acc, c) => ({ ...acc, [c.field]: c.oldValue }), {});
-        const newValues = changes.reduce((acc, c) => ({ ...acc, [c.field]: c.newValue }), {});
+        // 날짜 변경(시작일/종료일)과 다른 필드 변경 분리
+        const dateChanges = changes.filter(c => c.field === '시작일' || c.field === '종료일');
+        const fieldChanges = changes.filter(c => c.field !== '시작일' && c.field !== '종료일');
         
-        await logSlotChange(
-          id,
-          userId!,
-          'field_update',
-          JSON.stringify(fieldKeys), // 여러 필드 변경시 JSON 배열로 저장
-          oldValues,
-          newValues,
-          `${changes.length}개 필드 수정: ${fieldKeys.join(', ')}`,
-          req
-        );
+        // 날짜 변경이 있으면 한 로그로 합쳐서 저장
+        if (dateChanges.length > 0) {
+          const startDateChange = dateChanges.find(c => c.field === '시작일');
+          const endDateChange = dateChanges.find(c => c.field === '종료일');
+          
+          let description = '';
+          if (startDateChange && endDateChange) {
+            // 날짜 포맷팅 함수
+            const formatDate = (dateStr: string) => {
+              const date = new Date(dateStr);
+              return `${date.getMonth() + 1}/${date.getDate()}`;
+            };
+            
+            description = `📅 작업 기간이 변경되었습니다\n${formatDate(startDateChange.oldValue)} ~ ${formatDate(endDateChange.oldValue)} → ${formatDate(startDateChange.newValue)} ~ ${formatDate(endDateChange.newValue)}`;
+          } else if (startDateChange) {
+            const formatDate = (dateStr: string) => {
+              const date = new Date(dateStr);
+              return `${date.getMonth() + 1}/${date.getDate()}`;
+            };
+            description = `🟢 시작일 변경: ${formatDate(startDateChange.oldValue)} → ${formatDate(startDateChange.newValue)}`;
+          } else if (endDateChange) {
+            const formatDate = (dateStr: string) => {
+              const date = new Date(dateStr);
+              return `${date.getMonth() + 1}/${date.getDate()}`;
+            };
+            description = `🔴 종료일 변경: ${formatDate(endDateChange.oldValue)} → ${formatDate(endDateChange.newValue)}`;
+          }
+          
+          await logSlotChange(
+            id,
+            userId!,
+            'field_update',
+            '기간설정',
+            dateChanges.reduce((acc, c) => ({ ...acc, [c.field]: c.oldValue }), {}),
+            dateChanges.reduce((acc, c) => ({ ...acc, [c.field]: c.newValue }), {}),
+            description,
+            req
+          );
+        }
+        
+        // 다른 필드 변경은 각각 별도 로그로 저장
+        for (const change of fieldChanges) {
+          await logSlotChange(
+            id,
+            userId!,
+            'field_update',
+            change.field,
+            change.oldValue,
+            change.newValue,
+            `${change.field}이(가) ${change.oldValue}에서 ${change.newValue}(으)로 변경되었습니다.`,
+            req
+          );
+        }
       }
 
       res.json({
@@ -1254,10 +1372,11 @@ export async function updateSlotFields(req: AuthRequest, res: Response) {
       client.release();
     }
   } catch (error) {
-    // Update slot fields error: error
+    console.error('Update slot fields error:', error);
     res.status(500).json({
       success: false,
-      error: '슬롯 수정 중 오류가 발생했습니다.'
+      error: '슬롯 수정 중 오류가 발생했습니다.',
+      details: error instanceof Error ? error.message : String(error)
     });
   }
 }
@@ -1962,6 +2081,27 @@ export async function extendSlot(req: AuthRequest, res: Response) {
     );
     const nextSlotNumber = maxSlotNumberResult.rows[0].next_slot_number;
 
+    // 연장을 위한 새로운 allocation_history 먼저 생성
+    const newAllocationHistoryResult = await client.query(
+      `INSERT INTO slot_allocation_history (
+        operator_id, operator_name, user_id, user_name, user_email, 
+        slot_count, price_per_slot, reason, payment
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [
+        userId, // 연장 처리자 ID
+        req.user?.name || req.user?.email || '관리자', // 연장 처리자 이름
+        originalSlot.user_id,
+        originalSlot.user_name || '',
+        originalSlot.user_email || '',
+        1, // 개별 연장이므로 1개
+        originalSlot.pre_allocation_amount || 0,
+        `연장: ${extensionDays}일`,
+        !originalSlot.is_test // 테스트 슬롯이 아닌 경우에만 payment=true
+      ]
+    );
+    
+    const newAllocationHistoryId = newAllocationHistoryResult.rows[0].id;
+    
     // 새 슬롯 생성 (연장 슬롯)
     const insertResult = await client.query(
       `INSERT INTO slots (
@@ -2001,9 +2141,9 @@ export async function extendSlot(req: AuthRequest, res: Response) {
         nextSlotNumber, // 새로운 slot_number 사용
         startDate,
         endDate,
-        extensionDays,
-        originalSlot.pre_allocation_amount,
-        originalSlot.allocation_history_id,
+        null, // 연장 슬롯은 pre_allocation_work_count 불필요
+        null, // 연장 슬롯은 pre_allocation_amount 불필요
+        newAllocationHistoryId, // 새로 생성된 allocation_history_id 사용
         id, // parent_slot_id
         extensionDays,
         new Date(), // extended_at
@@ -2030,15 +2170,6 @@ export async function extendSlot(req: AuthRequest, res: Response) {
       }
     }
 
-    // allocation_history의 payment를 true로 설정 (연장은 결제완료 상태)
-    if (originalSlot.allocation_history_id) {
-      await client.query(
-        `UPDATE slot_allocation_history 
-         SET payment = true 
-         WHERE id = $1`,
-        [originalSlot.allocation_history_id]
-      );
-    }
 
     await client.query('COMMIT');
 
@@ -2244,6 +2375,8 @@ export async function extendBulkSlots(req: AuthRequest, res: Response) {
   const { allocationHistoryId, extensionDays } = req.body;
   const userId = req.user?.id;
   const userRole = req.user?.role;
+  const operatorId = req.user?.id;
+  const operatorName = req.user?.name || req.user?.email || '관리자';
 
   // 권한 체크
   if (userRole !== 'operator' && userRole !== 'developer') {
@@ -2291,6 +2424,30 @@ export async function extendBulkSlots(req: AuthRequest, res: Response) {
     const extendedSlots = [];
     const failedSlots = [];
 
+    // 대량 연장을 위한 새로운 allocation_history 생성 (테스트 슬롯 여부 체크)
+    const hasTestSlot = slots.some(slot => slot.is_test);
+    const firstSlot = slots[0];
+    
+    const newAllocationHistoryResult = await client.query(
+      `INSERT INTO slot_allocation_history (
+        operator_id, operator_name, user_id, user_name, user_email, 
+        slot_count, price_per_slot, reason, payment
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [
+        operatorId,
+        operatorName,
+        firstSlot.user_id,
+        firstSlot.user_name || '',
+        firstSlot.user_email || '',
+        slots.length,
+        firstSlot.pre_allocation_amount || 0,
+        `대량연장: ${slots.length}개 슬롯 ${extensionDays}일 연장`,
+        !hasTestSlot // 테스트 슬롯이 없는 경우에만 payment=true
+      ]
+    );
+    
+    const newAllocationHistoryId = newAllocationHistoryResult.rows[0].id;
+    
     // 각 슬롯 연장 처리
     for (const originalSlot of slots) {
       try {
@@ -2368,9 +2525,9 @@ export async function extendBulkSlots(req: AuthRequest, res: Response) {
             nextSlotNumber, // 새로운 slot_number 사용
             startDate,
             endDate,
-            extensionDays,
-            originalSlot.pre_allocation_amount,
-            originalSlot.allocation_history_id,
+            null, // 연장 슬롯은 pre_allocation_work_count 불필요
+            null, // 연장 슬롯은 pre_allocation_amount 불필요
+            newAllocationHistoryId, // 새로 생성된 allocation_history_id 사용
             originalSlot.id, // parent_slot_id
             extensionDays,
             new Date(),
@@ -2406,13 +2563,7 @@ export async function extendBulkSlots(req: AuthRequest, res: Response) {
       }
     }
 
-    // allocation_history의 payment를 true로 설정
-    await client.query(
-      `UPDATE slot_allocation_history 
-       SET payment = true 
-       WHERE id = $1`,
-      [allocationHistoryId]
-    );
+    // 새로운 allocation_history를 이미 생성했으므로 별도의 payment 업데이트 불필요
 
     await client.query('COMMIT');
 
@@ -2729,5 +2880,41 @@ export async function bulkUpdateSlots(req: AuthRequest, res: Response) {
     });
   } finally {
     client.release();
+  }
+}
+// allocation_history_id로 슬롯 조회
+export async function getSlotsByAllocation(req: AuthRequest, res: Response) {
+  try {
+    const { allocationHistoryId } = req.params;
+    const userRole = req.user?.role;
+
+    // 권한 확인
+    if (userRole !== "operator" && userRole !== "developer") {
+      return res.status(403).json({
+        success: false,
+        error: "관리자/개발자 권한이 필요합니다."
+      });
+    }
+
+    const result = await pool.query(`
+      SELECT s.*, 
+             u.email as user_email, 
+             u.full_name as user_name
+      FROM slots s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.allocation_history_id = $1
+      ORDER BY s.slot_number ASC, s.created_at ASC
+    `, [allocationHistoryId]);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error("Get slots by allocation error:", error);
+    res.status(500).json({
+      success: false,
+      error: "슬롯 조회 중 오류가 발생했습니다."
+    });
   }
 }

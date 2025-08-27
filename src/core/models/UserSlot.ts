@@ -35,6 +35,8 @@ export interface UserSlot {
   extension_type?: 'individual' | 'bulk';
   is_extended?: boolean;
   has_extension?: boolean;
+  // 테스트 슬롯 여부
+  is_test?: boolean;
 }
 
 export type SlotStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'expired' | 'empty' | 'refunded';
@@ -48,6 +50,7 @@ export class UserSlotModel implements UserSlot {
   extension_type?: 'individual' | 'bulk';
   is_extended?: boolean;
   has_extension?: boolean;
+  is_test?: boolean;
 
   constructor(
     public id: string,
@@ -65,7 +68,8 @@ export class UserSlotModel implements UserSlot {
     public expiredAt?: Date,
     public approvedPrice?: number,
     public userName?: string,
-    public userEmail?: string
+    public userEmail?: string,
+    public is_test?: boolean
   ) {}
 
   get ctr(): number {

@@ -744,7 +744,9 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          customFields: editFormData
+          customFields: editFormData,
+          startDate: editFormData.startDate,
+          endDate: editFormData.endDate
         })
       });
 
@@ -1218,6 +1220,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                           </div>
                         ) : (
                           <span className={field.field_key === 'keyword' ? 'font-medium' : ''}>
+                            {field.field_key === 'keyword' && (slot as any).is_test && (
+                              <span className="inline-flex px-1.5 py-0.5 text-xs bg-orange-100 text-orange-800 rounded mr-1">
+                                테스트
+                              </span>
+                            )}
                             {field.field_key === 'keyword' && (slot.is_extended || slot.parent_slot_id) && (
                               <span className="inline-flex px-1.5 py-0.5 text-xs bg-rose-100 text-rose-800 rounded mr-1">
                                 연장
@@ -1837,6 +1844,23 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                             {(() => {
                               // 변경 타입별 메시지 생성
                               if (log.change_type === 'field_update' && log.field_key) {
+                                // description이 있으면 우선적으로 사용
+                                if (log.description) {
+                                  return (
+                                    <div className={
+                                      currentTheme === 'luxury'
+                                        ? "text-sm text-gray-200"
+                                        : "text-sm text-gray-700"
+                                    }>
+                                      {log.description.split('\n').map((line: string, i: number) => (
+                                        <div key={i} className={i === 0 ? "font-medium" : "font-mono text-xs mt-1 pl-6"}>
+                                          {line}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                }
+                                
                                 // URL 파싱 필드들은 히스토리에서 제외
                                 if (['url_product_id', 'url_item_id', 'url_vendor_item_id'].includes(log.field_key)) {
                                   return null;
@@ -2158,6 +2182,49 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   )}
                 </div>
               ))}
+            </div>
+            
+            {/* 시작일/종료일 수정 */}
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">기간 설정</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    시작일
+                  </label>
+                  <input
+                    type="date"
+                    value={editFormData.startDate || (editingSlot.startDate ? (() => {
+                      const date = new Date(editingSlot.startDate);
+                      date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+                      return date.toISOString().split('T')[0];
+                    })() : '')}
+                    onChange={(e) => setEditFormData(prev => ({
+                      ...prev,
+                      startDate: e.target.value
+                    }))}
+                    className={mergedTheme.modalInputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    종료일
+                  </label>
+                  <input
+                    type="date"
+                    value={editFormData.endDate || (editingSlot.endDate ? (() => {
+                      const date = new Date(editingSlot.endDate);
+                      date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+                      return date.toISOString().split('T')[0];
+                    })() : '')}
+                    onChange={(e) => setEditFormData(prev => ({
+                      ...prev,
+                      endDate: e.target.value
+                    }))}
+                    className={mergedTheme.modalInputClass}
+                  />
+                </div>
+              </div>
             </div>
             
             <div className="flex justify-end gap-2 mt-6">

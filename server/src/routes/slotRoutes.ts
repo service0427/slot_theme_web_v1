@@ -21,7 +21,8 @@ import {
   cancelSlotPayment,
   getSlotRankChain,
   bulkUpdateSlots,
-  getSlotRankHistory
+  getSlotRankHistory,
+  getSlotsByAllocation
 } from '../controllers/slotController';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
@@ -166,5 +167,8 @@ router.delete('/:id/rank-data', authenticateToken, async (req: AuthRequest, res:
     });
   }
 });
+
+// allocation_history_id로 슬롯 조회 (관리자 전용)
+router.get('/by-allocation/:allocationHistoryId', getSlotsByAllocation);
 
 export { router as slotRoutes };

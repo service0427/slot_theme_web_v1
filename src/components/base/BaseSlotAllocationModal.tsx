@@ -9,6 +9,7 @@ export interface PreAllocationData {
   workCount?: number;
   amount?: number;
   description?: string;
+  isTest?: boolean;
 }
 
 interface SlotAllocationModalProps {
@@ -41,7 +42,8 @@ export function BaseSlotAllocationModal({
     endDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 10일 후 (기본값)
     workCount: undefined,
     amount: undefined,
-    description: ''
+    description: '',
+    isTest: false
   });
   
   const [selectedDuration, setSelectedDuration] = useState<number>(10); // 기본 10일
@@ -135,7 +137,8 @@ export function BaseSlotAllocationModal({
       return;
     }
 
-    const confirmMessage = `${userName}님에게 ${formData.slotCount}개의 선슬롯을 발행하시겠습니까?\n기간: ${formData.startDate} ~ ${formData.endDate}`;
+    const slotType = formData.isTest ? '테스트 슬롯 (3일 무료)' : '선슬롯';
+    const confirmMessage = `${userName}님에게 ${formData.slotCount}개의 ${slotType}을 발행하시겠습니까?\n기간: ${formData.startDate} ~ ${formData.endDate}`;
     if (!confirm(confirmMessage)) {
       return;
     }
@@ -152,7 +155,8 @@ export function BaseSlotAllocationModal({
         endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         workCount: undefined,
         amount: undefined,
-        description: ''
+        description: '',
+        isTest: false
       });
       setSelectedDuration(7);
     } catch (error) {
@@ -173,7 +177,16 @@ export function BaseSlotAllocationModal({
       // 시작일이 변경되면 종료일 재계산
       if (field === 'startDate') {
         const startDate = new Date(value);
-        startDate.setDate(startDate.getDate() + selectedDuration);
+        const duration = newData.isTest ? 3 : selectedDuration;
+        startDate.setDate(startDate.getDate() + duration);
+        newData.endDate = startDate.toISOString().split('T')[0];
+      }
+      
+      // 테스트 슬롯 옵션이 변경되면 종료일 재계산
+      if (field === 'isTest') {
+        const startDate = new Date(newData.startDate);
+        const duration = value ? 3 : selectedDuration;
+        startDate.setDate(startDate.getDate() + duration);
         newData.endDate = startDate.toISOString().split('T')[0];
       }
       
@@ -193,6 +206,11 @@ export function BaseSlotAllocationModal({
   // 기간 선택 핸들러
   const handleDurationChange = (duration: number) => {
     setSelectedDuration(duration);
+    
+    // 테스트 슬롯이면 무조건 3일
+    if (formData.isTest) {
+      duration = 3;
+    }
     
     // 종료일 재계산
     if (formData.startDate) {
@@ -283,12 +301,15 @@ export function BaseSlotAllocationModal({
                 기간 선택 <span className="text-red-500">*</span>
               </label>
               <select
-                value={selectedDuration}
+                value={formData.isTest ? 3 : selectedDuration}
                 onChange={(e) => handleDurationChange(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isLoading}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  formData.isTest ? 'bg-gray-100 border-gray-300 text-gray-500' : 'border-gray-300'
+                }`}
+                disabled={isLoading || formData.isTest}
               >
                 <option value={1}>1일</option>
+                <option value={3}>3일</option>
                 <option value={7}>7일</option>
                 <option value={10}>10일</option>
                 <option value={30}>30일</option>
@@ -296,7 +317,30 @@ export function BaseSlotAllocationModal({
             </div>
           </div>
 
-          {/* 종료일 자동 표시 */}
+          {/* 테스트 슬롯 옵션 */}
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="isTest"
+              checked={formData.isTest}
+              onChange={(e) => handleInputChange('isTest', e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              disabled={isLoading}
+            />
+            <label htmlFor="isTest" className="ml-2 text-sm text-gray-700">
+              테스트 슬롯 (3일 무료 체험)
+            </label>
+          </div>
+          
+          {formData.isTest && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+              <p className="text-sm text-yellow-800">
+                테스트 슬롯은 3일간 무료로 제공되며, 연장 시에도 결제가 필요하지 않습니다.
+              </p>
+            </div>
+          )}
+
+          {/* 종룼일 자동 표시 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               종료일 (자동 계산)
@@ -309,7 +353,7 @@ export function BaseSlotAllocationModal({
               }) : '-'}
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              시작일로부터 {selectedDuration}일 후
+              시작일로부터 {formData.isTest ? '3' : selectedDuration}일 후
             </p>
           </div>
 
@@ -367,7 +411,7 @@ export function BaseSlotAllocationModal({
             <h4 className="font-medium text-blue-900 mb-2">발행 요약</h4>
             <ul className="text-blue-800 space-y-1">
               <li>• 대상자: <strong>{userName}</strong></li>
-              <li>• 발행할 슬롯: <strong>{formData.slotCount}개</strong></li>
+              <li>• 발행할 슬롯: <strong>{formData.slotCount}개{formData.isTest ? ' (테스트)' : ''}</strong></li>
               <li>• 운영 기간: <strong>{formData.startDate} ~ {formData.endDate}</strong></li>
               {/* {formData.workCount && (
                 <li>• 예상 작업 수: <strong>{formData.workCount}개</strong></li>

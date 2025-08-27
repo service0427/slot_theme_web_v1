@@ -67,7 +67,10 @@ export class ApiSlotService extends BaseSlotService {
             undefined, // rejectedAt
             item.rejection_reason,
             undefined, // expiredAt
-            undefined  // approvedPrice
+            undefined, // approvedPrice
+            item.user_name,
+            item.user_email,
+            item.is_test
           );
           
           // fieldValues를 별도로 저장
@@ -501,7 +504,8 @@ export class ApiSlotService extends BaseSlotService {
             undefined,
             item.approved_price,
             item.user_name,
-            item.user_email
+            item.user_email,
+            item.is_test
           );
 
           // fieldValues를 별도로 저장

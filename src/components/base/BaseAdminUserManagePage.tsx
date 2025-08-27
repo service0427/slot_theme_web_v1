@@ -339,7 +339,8 @@ export const BaseAdminUserManagePage: React.FC<BaseAdminUserManagePageProps> = (
           endDate: data.endDate,
           workCount: data.workCount,
           amount: data.amount,
-          description: data.description
+          description: data.description,
+          isTest: data.isTest
         })
       });
       

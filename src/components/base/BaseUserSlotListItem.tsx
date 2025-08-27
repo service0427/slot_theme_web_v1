@@ -110,7 +110,14 @@ export function BaseUserSlotListItem({
         </td>
       )}
       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-        {slotNumber}
+        <div className="flex items-center gap-2">
+          <span>{slotNumber}</span>
+          {slot.is_test && (
+            <span className="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+              테스트
+            </span>
+          )}
+        </div>
       </td>
       {/* 썸네일 */}
       <td className="px-4 py-4 text-center">

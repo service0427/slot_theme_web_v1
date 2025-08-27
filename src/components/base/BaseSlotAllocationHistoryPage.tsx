@@ -45,6 +45,12 @@ export function BaseSlotAllocationHistoryPage() {
   const [extendingAllocation, setExtendingAllocation] = useState<AllocationHistory | null>(null);
   const [showExtensionModal, setShowExtensionModal] = useState(false);
   const [isExtending, setIsExtending] = useState(false);
+  
+  // 슬롯 확인 모달 상태
+  const [viewingAllocation, setViewingAllocation] = useState<AllocationHistory | null>(null);
+  const [showSlotsModal, setShowSlotsModal] = useState(false);
+  const [allocationSlots, setAllocationSlots] = useState<any[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
@@ -252,6 +258,38 @@ export function BaseSlotAllocationHistoryPage() {
     setShowExtensionModal(true);
   };
 
+  // 슬롯 확인 함수
+  const loadAllocationSlots = async (allocationHistoryId: string) => {
+    setLoadingSlots(true);
+    try {
+      const response = await fetch(`${apiUrl}/slots/by-allocation/${allocationHistoryId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        setAllocationSlots(result.data || []);
+      } else {
+        alert(result.error || '슬롯 정보를 불러오는데 실패했습니다.');
+        setAllocationSlots([]);
+      }
+    } catch (error) {
+      alert('슬롯 정보를 불러오는 중 오류가 발생했습니다.');
+      setAllocationSlots([]);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  // 슬롯 확인 모달 열기
+  const openSlotsModal = async (allocation: AllocationHistory) => {
+    setViewingAllocation(allocation);
+    setShowSlotsModal(true);
+    await loadAllocationSlots(allocation.id);
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow-sm border">
@@ -443,6 +481,14 @@ export function BaseSlotAllocationHistoryPage() {
                           </button>
                         )}
                         
+                        {/* 슬롯 확인 버튼 */}
+                        <button
+                          onClick={() => openSlotsModal(allocation)}
+                          className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors mr-2"
+                        >
+                          슬롯 확인
+                        </button>
+                        
                         {/* 전체 연장 버튼 */}
                         <button
                           onClick={() => openExtensionModal(allocation)}
@@ -534,6 +580,119 @@ export function BaseSlotAllocationHistoryPage() {
             isExpired: false
           }}
         />
+      )}
+
+      {/* 슬롯 확인 모달 */}
+      {showSlotsModal && viewingAllocation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+            {/* 헤더 */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-500 to-indigo-600">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-white">슬롯 상세 정보</h3>
+                  <p className="text-blue-100 text-sm mt-1">
+                    {viewingAllocation.user_name}님의 {viewingAllocation.slot_count}개 슬롯 ({viewingAllocation.reason})
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSlotsModal(false);
+                    setViewingAllocation(null);
+                    setAllocationSlots([]);
+                  }}
+                  className="text-white hover:text-blue-200 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* 본문 */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingSlots ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="ml-3 text-gray-600">슬롯 정보를 불러오는 중...</span>
+                </div>
+              ) : allocationSlots.length > 0 ? (
+                <div className="space-y-4">
+                  {allocationSlots.map((slot, index) => (
+                    <div key={slot.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">슬롯 번호</span>
+                          <p className="font-semibold">#{slot.slot_number || index + 1}</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">키워드</span>
+                          <p className="font-semibold">{slot.keyword || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">상태</span>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            slot.status === 'active' ? 'bg-green-100 text-green-800' :
+                            slot.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            slot.status === 'paused' ? 'bg-gray-100 text-gray-800' :
+                            slot.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {slot.status === 'active' ? '활성' :
+                             slot.status === 'pending' ? '대기중' :
+                             slot.status === 'paused' ? '일시정지' :
+                             slot.status === 'rejected' ? '거절됨' :
+                             slot.status}
+                          </span>
+                        </div>
+                        {slot.url && (
+                          <div className="md:col-span-2">
+                            <span className="text-sm font-medium text-gray-500">URL</span>
+                            <p className="text-blue-600 text-sm break-all">{slot.url}</p>
+                          </div>
+                        )}
+                        {(slot.pre_allocation_start_date || slot.pre_allocation_end_date) && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">작업 기간</span>
+                            <p className="text-sm">
+                              {slot.pre_allocation_start_date ? new Date(slot.pre_allocation_start_date).toLocaleDateString('ko-KR') : '-'} ~ 
+                              {slot.pre_allocation_end_date ? new Date(slot.pre_allocation_end_date).toLocaleDateString('ko-KR') : '-'}
+                            </p>
+                          </div>
+                        )}
+                        {slot.parent_slot_id && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">연장 정보</span>
+                            <p className="text-sm">
+                              <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                                {slot.extension_days}일 연장
+                              </span>
+                            </p>
+                          </div>
+                        )}
+                        {slot.is_test && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">슬롯 타입</span>
+                            <p className="text-sm">
+                              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">
+                                테스트 슬롯
+                              </span>
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="text-6xl mb-4">📭</div>
+                  <div className="text-xl font-medium text-gray-600 mb-2">슬롯이 없습니다</div>
+                  <div className="text-sm text-gray-400">해당 발급 내역과 연결된 슬롯을 찾을 수 없습니다</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

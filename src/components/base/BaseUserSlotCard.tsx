@@ -47,9 +47,18 @@ export function BaseUserSlotCard({ slot, onPause, onResume, onOpenRankHistory }:
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="p-6">
         <div className="flex justify-between items-start mb-4">
-          <h3 className="text-lg font-bold">
-            {slot.customFields.keywords || '키워드 없음'}
-          </h3>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-bold">
+                {slot.customFields.keywords || '키워드 없음'}
+              </h3>
+              {slot.is_test && (
+                <span className="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+                  테스트
+                </span>
+              )}
+            </div>
+          </div>
           {getStatusBadge(slot.status)}
         </div>
 
