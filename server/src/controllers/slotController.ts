@@ -2089,7 +2089,7 @@ export async function extendSlot(req: AuthRequest, res: Response) {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
       [
         userId, // 연장 처리자 ID
-        req.user?.name || req.user?.email || '관리자', // 연장 처리자 이름
+        req.user?.email || '관리자', // 연장 처리자 이름
         originalSlot.user_id,
         originalSlot.user_name || '',
         originalSlot.user_email || '',
@@ -2376,7 +2376,7 @@ export async function extendBulkSlots(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   const userRole = req.user?.role;
   const operatorId = req.user?.id;
-  const operatorName = req.user?.name || req.user?.email || '관리자';
+  const operatorName = req.user?.email || '관리자';
 
   // 권한 체크
   if (userRole !== 'operator' && userRole !== 'developer') {
