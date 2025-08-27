@@ -96,8 +96,6 @@ export function BaseUserSlotCard({ slot, onPause, onResume, onOpenRankHistory }:
         <div className="border-t pt-4 mb-4">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-700">순위</span>
-            <span className="text-gray-400">준비중</span>
-            {/* 임시 주석처리
             <div className="flex items-center gap-2">
               {onOpenRankHistory ? (
                 <button
@@ -115,9 +113,6 @@ export function BaseUserSlotCard({ slot, onPause, onResume, onOpenRankHistory }:
                       return (slot as any).rank;
                     }
                     // rank가 없는 경우 (null, undefined, 빈값)
-                    if ((slot as any).yesterday_rank > 0) {
-                      return `측정중 (어제: ${(slot as any).yesterday_rank}위)`;
-                    }
                     return '측정중';
                   })()}
                 </button>
@@ -137,6 +132,7 @@ export function BaseUserSlotCard({ slot, onPause, onResume, onOpenRankHistory }:
                   })()}
                 </span>
               )}
+              {/* 전날 대비 상승/하락 표시 - 주석처리
               {(slot as any).rank > 0 && (slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
                 <span className={`text-xs ${
                   (slot as any).yesterday_rank > (slot as any).rank 
@@ -152,8 +148,8 @@ export function BaseUserSlotCard({ slot, onPause, onResume, onOpenRankHistory }:
                       : '-'}
                 </span>
               )}
+              */}
             </div>
-            */}
           </div>
         </div>
 

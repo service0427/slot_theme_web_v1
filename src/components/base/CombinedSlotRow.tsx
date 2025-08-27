@@ -571,9 +571,6 @@ function CombinedSlotRowComponent({
         ) : slot.status === 'pending' ? (
           <span className="text-gray-400">-</span>
         ) : (
-          <span className="text-gray-400">준비중</span>
-        )}
-        {/* 임시 주석처리
           <div className="flex items-center justify-center gap-1">
             {onOpenRankHistory ? (
               <button
@@ -585,37 +582,32 @@ function CombinedSlotRowComponent({
                 title="순위 히스토리 보기"
               >
                 {(() => {
-                  // rank가 숫자이고 0보다 크면 순위 표시
-                  if (slot.rank && slot.rank > 0) {
-                    return slot.rank;
-                  }
                   // rank가 명시적으로 0이면 "순위없음"
                   if (slot.rank === 0) {
                     return '순위없음';
                   }
-                  // rank가 null, undefined인 경우 "측정중"
-                  if (slot.yesterday_rank && slot.yesterday_rank > 0) {
-                    return `측정중 (어제: ${slot.yesterday_rank}위)`;
+                  // rank가 숫자이고 0보다 크면 순위 표시
+                  if (slot.rank && slot.rank > 0) {
+                    return slot.rank;
                   }
+                  // rank가 null, undefined인 경우 "측정중"
                   return '측정중';
                 })()}
               </button>
             ) : (
               <span className={slot.rank && slot.rank > 0 ? "font-semibold text-gray-900" : "text-gray-400"}>
                 {(() => {
-                  if (slot.rank && slot.rank > 0) {
-                    return slot.rank;
-                  }
                   if (slot.rank === 0) {
                     return '순위없음';
                   }
-                  if (slot.yesterday_rank && slot.yesterday_rank > 0) {
-                    return `측정중 (어제: ${slot.yesterday_rank}위)`;
+                  if (slot.rank && slot.rank > 0) {
+                    return slot.rank;
                   }
                   return '측정중';
                 })()}
               </span>
             )}
+            {/* 전날 대비 상승/하락 표시 - 주석처리
             {slot.rank > 0 && slot.yesterday_rank !== null && slot.yesterday_rank !== undefined && slot.yesterday_rank > 0 && (
               <span className={`text-xs ${
                 slot.yesterday_rank > slot.rank 
@@ -631,8 +623,9 @@ function CombinedSlotRowComponent({
                     : '(-)'}
               </span>
             )}
+            */}
           </div>
-        */}
+        )}
       </td>
       <td className="px-2 py-4 text-center border-r text-gray-400 text-xs">
         {slot.startDate ? new Date(slot.startDate).toLocaleDateString('ko-KR', {

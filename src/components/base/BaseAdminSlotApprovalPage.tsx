@@ -1244,8 +1244,6 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       <span className="text-gray-400">-</span>
                     ) : (
                       <div className="flex flex-col items-center gap-1">
-                        <span className="text-gray-400">준비중</span>
-                        {/* 임시 주석처리
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => handleOpenRankHistory(slot)}
@@ -1262,12 +1260,10 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                                 return (slot as any).rank;
                               }
                               // rank가 없는 경우 (null, undefined, 빈값)
-                              if ((slot as any).yesterday_rank > 0) {
-                                return `측정중 (어제: ${(slot as any).yesterday_rank}위)`;
-                              }
                               return '측정중';
                             })()}
                           </button>
+                          {/* 전날 대비 상승/하락 표시 - 주석처리
                           {(slot as any).rank > 0 && (slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
                             <span className={`text-xs ${
                               (slot as any).yesterday_rank > (slot as any).rank
@@ -1283,9 +1279,9 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                                   : '(-)'}
                             </span>
                           )}
+                          */}
                         </div>
-                        */}
-                        {/* v2_rank_daily 데이터 소스 표시 - 임시 주석처리
+                        {/* v2_rank_daily 데이터 소스 표시
                         {(slot as any).rank_source === 'v2_rank_daily' && (
                           <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">V2</span>
                         )}

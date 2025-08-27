@@ -208,8 +208,6 @@ export function BaseUserSlotListItem({
       {/* 시스템 필드들 */}
       {/* 순위 */}
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
-        <span className="text-gray-400">준비중</span>
-        {/* 임시 주석처리
         {slot.status === 'empty' ? (
           <span className="text-gray-400">-</span>
         ) : (
@@ -233,9 +231,6 @@ export function BaseUserSlotListItem({
                     return (slot as any).rank;
                   }
                   // rank가 없는 경우 (null, undefined, 빈값)
-                  if ((slot as any).yesterday_rank > 0) {
-                    return `측정중 (어제: ${(slot as any).yesterday_rank}위)`;
-                  }
                   return '측정중';
                 })()}
               </button>
@@ -255,6 +250,7 @@ export function BaseUserSlotListItem({
                 })()}
               </span>
             )}
+            {/* 전날 대비 상승/하락 표시 - 주석처리
             {(slot as any).rank > 0 && (slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
               <span className={`text-xs ${
                 (slot as any).yesterday_rank > (slot as any).rank 
@@ -270,9 +266,9 @@ export function BaseUserSlotListItem({
                     : '(-)'}
               </span>
             )}
+            */}
           </div>
         )}
-        */}
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-500">
         {slot.customFields.startDate ? new Date(slot.customFields.startDate).toLocaleDateString() : '-'}
