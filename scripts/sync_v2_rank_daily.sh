@@ -196,20 +196,25 @@ EOF
         
         # 외부 DB에서 순위 정보 가져오기 (rank_data JSON 처리 포함)
         RANK_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF 2>/dev/null
-        WITH rank_history AS (
+        WITH yesterday_data AS (
+            -- 어제 rank_data에서 최대 순위 추출
             SELECT 
-                *,
-                -- 어제 순위 가져오기
-                LAG(latest_rank) OVER (ORDER BY check_date) as yesterday_rank
-            FROM v2_rank_history
+                MAX(r) as yesterday_rank
+            FROM v2_rank_history,
+            LATERAL (
+                SELECT (elem->>'rank')::integer as r
+                FROM jsonb_array_elements(rank_data) elem 
+                WHERE elem->>'rank' IS NOT NULL
+                  AND (elem->>'rank')::integer > 0
+            ) ranks
             WHERE keyword = '$keyword'
               AND product_id = '$product_id'
               AND item_id = '$item_id'
               AND vendor_item_id = '$vendor_item_id'
-              AND check_date >= '$CHECK_DATE'::date - interval '1 day'
-              AND check_date <= '$CHECK_DATE'::date
+              AND check_date = '$CHECK_DATE'::date - interval '1 day'
               AND site_code = 'cpck'
               AND is_check_completed = true
+              AND check_count > 9
         ),
         today_data AS (
             SELECT 
@@ -218,14 +223,19 @@ EOF
                     SELECT DISTINCT (elem->>'rank')::integer 
                     FROM jsonb_array_elements(rank_data) elem 
                     WHERE elem->>'rank' IS NOT NULL
+                      AND (elem->>'rank')::integer > 0
                     ORDER BY (elem->>'rank')::integer
                 ) as ranks_array,
-                yesterday_rank,
+                (SELECT yesterday_rank FROM yesterday_data) as yesterday_rank,
                 latest_rank,
                 rating,
                 review_count
-            FROM rank_history
-            WHERE check_date = '$CHECK_DATE'
+            FROM v2_rank_history
+            WHERE keyword = '$keyword'
+              AND product_id = '$product_id'
+              AND item_id = '$item_id'
+              AND vendor_item_id = '$vendor_item_id'
+              AND check_date = '$CHECK_DATE'
               AND check_count > 9
               AND site_code = 'cpck'
               AND is_check_completed = true
@@ -238,8 +248,8 @@ EOF
                     -- rank_data 배열이 있을 때
                     WHEN array_length(ranks_array, 1) > 0 THEN
                         CASE
-                            -- 어제 순위가 있으면
-                            WHEN yesterday_rank IS NOT NULL THEN
+                            -- 어제 순위가 있고 0이 아닐 때
+                            WHEN yesterday_rank IS NOT NULL AND yesterday_rank > 0 THEN
                                 CASE
                                     -- 5등 이하일 때: 어제 순위와 동일한 순위 제외하고 낮은 순위 중 최대값
                                     WHEN yesterday_rank > 5 THEN
@@ -256,7 +266,7 @@ EOF
                                             (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
                                         )
                                 END
-                            -- 어제 순위가 없으면: 최대값 (가장 낮은 순위)
+                            -- 어제 순위가 없거나 0이면: 최대값 (가장 낮은 순위)
                             ELSE
                                 (SELECT MAX(r) FROM unnest(ranks_array) r)
                         END
