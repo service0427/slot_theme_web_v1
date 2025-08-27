@@ -206,8 +206,8 @@ export function BaseUserSlotListItem({
         </div>
       </td>
       {/* 시스템 필드들 */}
-      {/* 순위 */}
-      <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
+      {/* 순위 (500등까지 측정) */}
+      <td className="px-4 py-4 whitespace-nowrap text-center text-sm" title="500등까지 순위를 측정합니다">
         {slot.status === 'empty' ? (
           <span className="text-gray-400">-</span>
         ) : (
@@ -219,7 +219,7 @@ export function BaseUserSlotListItem({
                   onOpenRankHistory();
                 }}
                 className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
-                title="순위 히스토리 보기"
+                title="순위 히스토리 보기 (500등까지 측정)"
               >
                 {(() => {
                   // rank가 명시적으로 0이면 "순위없음"

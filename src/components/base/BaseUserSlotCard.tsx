@@ -95,13 +95,13 @@ export function BaseUserSlotCard({ slot, onPause, onResume, onOpenRankHistory }:
         {/* 순위 정보 추가 */}
         <div className="border-t pt-4 mb-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-700">순위</span>
+            <span className="text-sm font-medium text-gray-700" title="500등까지 순위를 측정합니다">순위</span>
             <div className="flex items-center gap-2">
               {onOpenRankHistory ? (
                 <button
                   onClick={onOpenRankHistory}
                   className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
-                  title="순위 히스토리 보기"
+                  title="순위 히스토리 보기 (500등까지 측정)"
                 >
                   {(() => {
                     // rank가 명시적으로 0이면 "순위없음"

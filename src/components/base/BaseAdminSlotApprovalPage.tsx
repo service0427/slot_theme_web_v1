@@ -1229,8 +1229,8 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       </td>
                     );
                   })}
-                  {/* 순위 */}
-                  <td className="px-3 py-2 text-center text-sm">
+                  {/* 순위 (500등까지 측정) */}
+                  <td className="px-3 py-2 text-center text-sm" title="500등까지 순위를 측정합니다">
                     {(slot as any).keyword?.includes('갤럭시s25울트라') && console.log('🎯 갤럭시 슬롯:', {
                       keyword: (slot as any).keyword,
                       current_rank: (slot as any).current_rank,
@@ -1248,7 +1248,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                           <button
                             onClick={() => handleOpenRankHistory(slot)}
                             className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
-                            title="순위 히스토리 보기"
+                            title="순위 히스토리 보기 (500등까지 측정)"
                           >
                             {(() => {
                               // rank가 명시적으로 0이면 "순위없음"

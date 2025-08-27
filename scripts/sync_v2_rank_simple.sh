@@ -194,48 +194,30 @@ EOF
             " > /dev/null 2>&1
         fi
         
-        # 외부 DB에서 순위 정보 가져오기 (단순 로직)
+        # 외부 DB에서 순위 정보 가져오기 (best_rank 사용)
         RANK_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF 2>/dev/null
-        WITH today_data AS (
-            SELECT 
-                -- rank_data JSON에서 순위 배열 추출 (모든 순위 포함)
-                ARRAY(
-                    SELECT DISTINCT (elem->>'rank')::integer 
-                    FROM jsonb_array_elements(rank_data) elem 
-                    WHERE elem->>'rank' IS NOT NULL
-                    ORDER BY (elem->>'rank')::integer
-                ) as all_ranks,
-                rating,
-                review_count
-            FROM v2_rank_history
-            WHERE keyword = '$keyword'
-              AND product_id = '$product_id'
-              AND item_id = '$item_id'
-              AND vendor_item_id = '$vendor_item_id'
-              AND check_date = '$CHECK_DATE'
-              AND check_count > 9
-              AND site_code = 'cpck'
-              AND is_check_completed = true
-            ORDER BY check_count DESC
-            LIMIT 1
-        )
         SELECT 
             CASE 
-                -- 배열에 값이 있을 때
-                WHEN array_length(all_ranks, 1) > 0 THEN
-                    CASE
-                        -- 0이 아닌 순위가 있으면 그 중 최소값 (가장 높은 순위)
-                        WHEN EXISTS (SELECT 1 FROM unnest(all_ranks) r WHERE r > 0) THEN
-                            (SELECT MIN(r) FROM unnest(all_ranks) r WHERE r > 0)
-                        -- 0만 있으면 0 반환
-                        ELSE 0
-                    END
-                -- 배열이 비어있으면 NULL
-                ELSE NULL
+                -- best_rank가 NULL이면 NULL (측정중)
+                WHEN best_rank IS NULL THEN NULL
+                -- best_rank가 500 초과면 0 (순위 없음)
+                WHEN best_rank > 500 THEN 0
+                -- 그 외에는 best_rank 그대로 사용
+                ELSE best_rank
             END as calculated_rank,
             COALESCE(rating, 0) as rating,
             COALESCE(review_count, 0) as review_count
-        FROM today_data;
+        FROM v2_rank_history
+        WHERE keyword = '$keyword'
+          AND product_id = '$product_id'
+          AND item_id = '$item_id'
+          AND vendor_item_id = '$vendor_item_id'
+          AND check_date = '$CHECK_DATE'
+          AND check_count > 9
+          AND site_code = 'cpck'
+          AND is_check_completed = true
+        ORDER BY check_count DESC
+        LIMIT 1;
 EOF
         )
         
@@ -339,7 +321,7 @@ main() {
     log_info "========================================="
     log_info "v2_rank_daily 단순 동기화 시작"
     log_info "대상 날짜: $CHECK_DATE"
-    log_info "로직: 0이 아닌 가장 높은 순위(MIN) 선택"
+    log_info "로직: best_rank 사용 (500 초과 시 0, NULL은 측정중)"
     log_info "========================================="
     
     # 0. 우리 slots 데이터 추출
