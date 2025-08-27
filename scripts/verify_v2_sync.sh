@@ -504,6 +504,85 @@ EOF
             if [ "$valid_check" -eq 0 ]; then
                 log_fail "  ⚠️  check_count>9 조건 미충족!"
             fi
+            
+            # rank_data JSON에서 순위 추출
+            log_info ""
+            log_info "[3-1단계] rank_data 상세 분석..."
+            RANK_DATA_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+                WITH rank_arrays AS (
+                    SELECT 
+                        check_count,
+                        latest_rank,
+                        ARRAY(
+                            SELECT DISTINCT (elem->>'rank')::integer 
+                            FROM jsonb_array_elements(rank_data) elem 
+                            WHERE elem->>'rank' IS NOT NULL
+                            ORDER BY (elem->>'rank')::integer
+                        ) as ranks_array
+                    FROM v2_rank_history
+                    WHERE keyword = '$debug_keyword'
+                      AND product_id = '$debug_product_id'
+                      AND item_id = '$item_id'
+                      AND vendor_item_id = '$vendor_item_id'
+                      AND check_date = '$CHECK_DATE'
+                      AND site_code = 'cpck'
+                      AND is_check_completed = true
+                      AND check_count > 9
+                    ORDER BY check_count DESC
+                    LIMIT 1
+                )
+                SELECT 
+                    check_count,
+                    latest_rank,
+                    array_to_string(ranks_array, ',') as all_ranks,
+                    array_length(ranks_array, 1) as rank_count,
+                    (SELECT MIN(r) FROM unnest(ranks_array) r) as min_rank,
+                    (SELECT MAX(r) FROM unnest(ranks_array) r) as max_rank
+                FROM rank_arrays;
+EOF
+            )
+            
+            if [ ! -z "$RANK_DATA_INFO" ]; then
+                IFS='|' read -r check_cnt latest all_ranks rank_cnt min_rank max_rank <<< "$RANK_DATA_INFO"
+                log_info "  - check_count: $check_cnt"
+                log_info "  - latest_rank: $latest"
+                log_info "  - 추출된 순위 개수: ${rank_cnt:-0}개"
+                log_info "  - 최소 순위: ${min_rank:-없음}"
+                log_info "  - 최대 순위: ${max_rank:-없음}"
+                log_info "  - 모든 순위 (중복제거): [${all_ranks:-없음}]"
+                
+                # 어제 순위 확인
+                YESTERDAY_RANK=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+                    SELECT latest_rank
+                    FROM v2_rank_history
+                    WHERE keyword = '$debug_keyword'
+                      AND product_id = '$debug_product_id'
+                      AND item_id = '$item_id'
+                      AND vendor_item_id = '$vendor_item_id'
+                      AND check_date = '$CHECK_DATE'::date - INTERVAL '1 day'
+                      AND site_code = 'cpck'
+                      AND is_check_completed = true
+                    ORDER BY check_count DESC
+                    LIMIT 1;
+EOF
+                )
+                
+                if [ ! -z "$YESTERDAY_RANK" ]; then
+                    log_info "  - 어제 순위: $YESTERDAY_RANK"
+                    
+                    # 순위 선택 로직 설명
+                    if [ "$YESTERDAY_RANK" -gt 5 ]; then
+                        log_info "  - 선택 규칙: 5등 이하 - 어제($YESTERDAY_RANK)보다 낮은 순위 중 최대값 (동일 제외)"
+                    else
+                        log_info "  - 선택 규칙: 5등 이내 - 어제($YESTERDAY_RANK) 이하 순위 중 최대값 (동일 포함)"
+                    fi
+                else
+                    log_info "  - 어제 순위: 없음"
+                    log_info "  - 선택 규칙: 최대값 선택"
+                fi
+            else
+                log_fail "  ❌ rank_data 추출 실패"
+            fi
         fi
     fi
     
