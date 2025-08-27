@@ -2125,8 +2125,8 @@ export async function getSlotRankHistory(req: AuthRequest, res: Response) {
 
     // 날짜 범위 생성
     const dates = [];
-    const start = new Date(actualStartDate);
-    const end = new Date(actualEndDate);
+    const start = new Date(String(actualStartDate));
+    const end = new Date(String(actualEndDate));
     
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       dates.push(new Date(d).toISOString().split('T')[0]);
