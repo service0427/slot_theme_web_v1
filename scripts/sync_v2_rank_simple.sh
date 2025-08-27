@@ -61,6 +61,7 @@ log_info "설정 파일 로드 완료: $CONFIG_FILE"
 # 추가 설정값
 # ========================================
 CHECK_DATE=${1:-$(date +%Y-%m-%d)}  # 날짜를 인자로 받을 수 있음 (기본: 오늘)
+DEBUG=${DEBUG:-false}  # DEBUG=true ./sync_v2_rank_simple.sh 형태로 실행 가능
 TEMP_DIR="/tmp/v2_rank_sync_simple_$$"
 
 # 로그 디렉토리 설정
@@ -194,38 +195,57 @@ EOF
             " > /dev/null 2>&1
         fi
         
-        # 외부 DB에서 순위 정보 가져오기 (best_rank 사용)
+        # 외부 DB에서 순위 정보 가져오기 (best_rank 우선, rank_data 보조)
         RANK_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF 2>/dev/null
+        WITH rank_analysis AS (
+            SELECT 
+                best_rank,
+                rank_data,
+                -- rank_data에서 0이 있는지 확인
+                CASE 
+                    WHEN rank_data IS NOT NULL AND jsonb_array_length(rank_data) > 0 THEN
+                        (SELECT COUNT(*) FROM jsonb_array_elements(rank_data) elem 
+                         WHERE (elem->>'rank')::integer = 0) > 0
+                    ELSE false
+                END as has_zero_rank,
+                rating,
+                review_count
+            FROM v2_rank_history
+            WHERE keyword = '$keyword'
+              AND product_id = '$product_id'
+              AND item_id = '$item_id'
+              AND vendor_item_id = '$vendor_item_id'
+              AND check_date = '$CHECK_DATE'
+              AND check_count > 9
+              AND site_code = 'cpck'
+              AND is_check_completed = true
+            ORDER BY check_count DESC
+            LIMIT 1
+        )
         SELECT 
             CASE 
-                -- best_rank가 NULL이면 NULL (측정중)
-                WHEN best_rank IS NULL THEN NULL
-                -- best_rank가 500 초과면 0 (순위 없음)
-                WHEN best_rank > 500 THEN 0
-                -- 그 외에는 best_rank 그대로 사용
-                ELSE best_rank
+                -- best_rank가 있고 500 이하면 사용
+                WHEN best_rank IS NOT NULL AND best_rank > 0 AND best_rank <= 500 THEN best_rank
+                -- best_rank가 500 초과면 0
+                WHEN best_rank IS NOT NULL AND best_rank > 500 THEN 0
+                -- best_rank가 NULL/빈값이고 rank_data에 0이 있으면 0
+                WHEN (best_rank IS NULL OR best_rank = 0) AND has_zero_rank THEN 0
+                -- 그 외는 NULL (측정중)
+                ELSE NULL
             END as calculated_rank,
             COALESCE(rating, 0) as rating,
             COALESCE(review_count, 0) as review_count
-        FROM v2_rank_history
-        WHERE keyword = '$keyword'
-          AND product_id = '$product_id'
-          AND item_id = '$item_id'
-          AND vendor_item_id = '$vendor_item_id'
-          AND check_date = '$CHECK_DATE'
-          AND check_count > 9
-          AND site_code = 'cpck'
-          AND is_check_completed = true
-        ORDER BY check_count DESC
-        LIMIT 1;
+        FROM rank_analysis;
 EOF
         )
         
         if [ ! -z "$RANK_INFO" ]; then
             IFS='|' read -r rank rating review_count <<< "$RANK_INFO"
             
+            log_debug "순위 정보 찾음: keyword=$keyword, rank=${rank:-NULL}, rating=$rating, review=$review_count"
+            
             # 순위 정보 저장
-            PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -c "
+            SAVE_RESULT=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -c "
                 SELECT v2_upsert_rank_info(
                     '$CHECK_DATE'::date,
                     '$keyword',
@@ -236,18 +256,44 @@ EOF
                     ${rating:-0},
                     ${review_count:-0}
                 );
-            " > /dev/null 2>&1
+            " 2>&1)
             
             if [ $? -eq 0 ]; then
                 SUCCESS=$((SUCCESS + 1))
                 log_debug "저장 성공: $keyword - 순위: ${rank:-NULL}"
             else
                 FAILED=$((FAILED + 1))
-                log_error "저장 실패: $keyword - $product_id"
+                log_error "저장 실패: $keyword - $product_id - 오류: $SAVE_RESULT"
             fi
         else
-            log_debug "외부 DB에 순위 정보 없음: $keyword - $product_id"
-            FAILED=$((FAILED + 1))
+            # 데이터가 전혀 없는 경우에도 빈 레코드 생성 (상품 정보만 있으면)
+            if [ ! -z "$product_name" ] || [ ! -z "$thumbnail" ]; then
+                log_debug "순위 정보 없지만 상품 정보 있음: $keyword - 빈 레코드 생성"
+                
+                SAVE_RESULT=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -c "
+                    SELECT v2_upsert_rank_info(
+                        '$CHECK_DATE'::date,
+                        '$keyword',
+                        '$product_id',
+                        '$item_id',
+                        '$vendor_item_id',
+                        NULL,  -- rank는 NULL (측정중)
+                        0,     -- rating
+                        0      -- review_count
+                    );
+                " 2>&1)
+                
+                if [ $? -eq 0 ]; then
+                    SUCCESS=$((SUCCESS + 1))
+                    log_debug "빈 레코드 저장 성공: $keyword"
+                else
+                    FAILED=$((FAILED + 1))
+                    log_error "빈 레코드 저장 실패: $keyword - 오류: $SAVE_RESULT"
+                fi
+            else
+                log_debug "외부 DB에 데이터 전혀 없음: $keyword - $product_id"
+                FAILED=$((FAILED + 1))
+            fi
         fi
         
     done < $TEMP_DIR/our_slots.txt
