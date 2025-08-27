@@ -20,7 +20,8 @@ import {
   extendBulkSlots,
   cancelSlotPayment,
   getSlotRankChain,
-  bulkUpdateSlots
+  bulkUpdateSlots,
+  getSlotRankHistory
 } from '../controllers/slotController';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
@@ -73,6 +74,9 @@ router.put('/:id/update-fields', updateSlotFields);
 
 // 슬롯 체인의 rank_daily 조회 (연장 슬롯 포함)
 router.get('/:id/rank-chain', getSlotRankChain);
+
+// 슬롯 순위 히스토리 조회 (개발자 전용)
+router.get('/:id/rank-history', getSlotRankHistory);
 
 // 특정 슬롯의 변경 로그 조회
 router.get('/:id/logs', getSlotChangeLogs);

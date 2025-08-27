@@ -263,6 +263,8 @@ EOF
               AND vendor_item_id = '$vendor_item_id'
               AND check_date >= '$CHECK_DATE'::date - interval '1 day'
               AND check_date <= '$CHECK_DATE'::date
+              AND site_code = 'cpck'
+              AND is_check_completed = true
         ),
         today_data AS (
             SELECT 
@@ -280,6 +282,8 @@ EOF
             FROM rank_history
             WHERE check_date = '$CHECK_DATE'
               AND check_count > 9
+              AND site_code = 'cpck'
+              AND is_check_completed = true
             ORDER BY check_count DESC
             LIMIT 1
         )
@@ -293,7 +297,10 @@ EOF
                     WHEN array_length(ranks_array, 1) > 0 THEN
                         CASE
                             WHEN yesterday_rank IS NOT NULL THEN
-                                (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                                COALESCE(
+                                    (SELECT MAX(r) FROM unnest(ranks_array) r WHERE r <= yesterday_rank),
+                                    (SELECT MIN(r) FROM unnest(ranks_array) r)  -- 어제보다 높은 순위만 있으면 그 중 최소값
+                                )
                             ELSE
                                 (SELECT MAX(r) FROM unnest(ranks_array) r)
                         END

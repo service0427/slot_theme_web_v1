@@ -13,6 +13,7 @@ interface CombinedSlotRowProps {
   onBulkPaste?: (slotIndex: number, fieldKey: string, values: string[]) => void;
   isSelected?: boolean;
   onSelectionChange?: (slotId: string, checked: boolean) => void;
+  onOpenRankHistory?: () => void;  // 순위 히스토리 모달 열기
 }
 
 function CombinedSlotRowComponent({ 
@@ -25,7 +26,8 @@ function CombinedSlotRowComponent({
   onResume,
   onBulkPaste, 
   isSelected, 
-  onSelectionChange 
+  onSelectionChange,
+  onOpenRankHistory 
 }: CombinedSlotRowProps) {
   const { getSetting } = useSystemSettings();
   const slotOperationMode = getSetting('slotOperationMode', 'business') || 'normal';
@@ -443,7 +445,7 @@ function CombinedSlotRowComponent({
       </td>
       
       {/* 썸네일 */}
-      <td className="px-3 py-4 text-center border-r">
+      <td className="px-2 py-4 text-center border-r">
         {slot.thumbnail ? (
           <img 
             src={slot.thumbnail} 
@@ -555,25 +557,63 @@ function CombinedSlotRowComponent({
         );
       })}
       
-      {/* 상품명 (읽기 전용) */}
+      {/* 상품명 (읽기 전용) - v2_rank_daily의 product_name 우선 */}
       <td className="px-3 py-4 border-r">
-        <div className="text-sm text-gray-900">
-          {slot.product_name || '-'}
+        <div className="text-sm text-gray-900" title={slot.v2_product_name || slot.product_name || '상품명없음'}>
+          {slot.v2_product_name || slot.product_name || '상품명없음'}
         </div>
       </td>
       
       {/* 시스템 필드들 */}
-      <td className="px-3 py-4 text-center border-r text-sm">
+      <td className="px-2 py-4 text-center border-r text-sm">
         {slot.status === 'empty' ? (
           <span className="text-gray-400">-</span>
         ) : slot.status === 'pending' ? (
           <span className="text-gray-400">-</span>
-        ) : slot.is_processing || (slot.status === 'active' && !slot.rank) ? (
-          <span className="text-orange-500 font-medium animate-pulse">측정중</span>
-        ) : slot.rank && slot.rank > 0 ? (
+        ) : (
           <div className="flex items-center justify-center gap-1">
-            <span className="font-semibold text-gray-900">{slot.rank}</span>
-            {slot.yesterday_rank !== null && slot.yesterday_rank !== undefined && slot.yesterday_rank > 0 && (
+            {onOpenRankHistory ? (
+              <button
+                onClick={() => {
+                  console.log('[CombinedSlotRow] 순위 클릭됨:', slot.id, slot.keyword);
+                  onOpenRankHistory();
+                }}
+                className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
+                title="순위 히스토리 보기"
+              >
+                {(() => {
+                  // rank가 숫자이고 0보다 크면 순위 표시
+                  if (slot.rank && slot.rank > 0) {
+                    return slot.rank;
+                  }
+                  // rank가 명시적으로 0이면 "순위없음"
+                  if (slot.rank === 0) {
+                    return '순위없음';
+                  }
+                  // rank가 null, undefined인 경우 "측정중"
+                  if (slot.yesterday_rank && slot.yesterday_rank > 0) {
+                    return `측정중 (어제: ${slot.yesterday_rank}위)`;
+                  }
+                  return '측정중';
+                })()}
+              </button>
+            ) : (
+              <span className={slot.rank && slot.rank > 0 ? "font-semibold text-gray-900" : "text-gray-400"}>
+                {(() => {
+                  if (slot.rank && slot.rank > 0) {
+                    return slot.rank;
+                  }
+                  if (slot.rank === 0) {
+                    return '순위없음';
+                  }
+                  if (slot.yesterday_rank && slot.yesterday_rank > 0) {
+                    return `측정중 (어제: ${slot.yesterday_rank}위)`;
+                  }
+                  return '측정중';
+                })()}
+              </span>
+            )}
+            {slot.rank > 0 && slot.yesterday_rank !== null && slot.yesterday_rank !== undefined && slot.yesterday_rank > 0 && (
               <span className={`text-xs ${
                 slot.yesterday_rank > slot.rank 
                   ? 'text-green-600' 
@@ -589,18 +629,16 @@ function CombinedSlotRowComponent({
               </span>
             )}
           </div>
-        ) : (
-          <span className="text-gray-400">순위없음</span>
         )}
       </td>
-      <td className="px-3 py-4 text-center border-r text-gray-400 text-sm">
+      <td className="px-2 py-4 text-center border-r text-gray-400 text-xs">
         {slot.startDate ? new Date(slot.startDate).toLocaleDateString('ko-KR', {
-          year: 'numeric',
+          year: '2-digit',
           month: '2-digit',
           day: '2-digit'
         }).replace(/\./g, '').replace(/ /g, '-') : '-'}
       </td>
-      <td className="px-3 py-4 text-center border-r text-sm">
+      <td className="px-2 py-4 text-center border-r text-xs">
         {slot.endDate ? (() => {
           const now = new Date();
           const end = new Date(slot.endDate);
@@ -628,18 +666,18 @@ function CombinedSlotRowComponent({
           return (
             <span className={colorClass}>
               {end.toLocaleDateString('ko-KR', {
-                year: 'numeric',
+                year: '2-digit',
                 month: '2-digit',
                 day: '2-digit'
               }).replace(/\./g, '').replace(/ /g, '-')}
-              {daysText && <span className="ml-1">{daysText}</span>}
+              {daysText && <span className="ml-1 text-xs">{daysText}</span>}
             </span>
           );
         })() : <span className="text-gray-400">-</span>}
       </td>
       
       {/* 상태 컬럼 */}
-      <td className="px-3 py-4 text-center">
+      <td className="px-2 py-4 text-center border-r">
         {(() => {
           const now = new Date();
           const start = slot.startDate ? new Date(slot.startDate) : null;
@@ -688,7 +726,7 @@ function CombinedSlotRowComponent({
       </td>
       
       {/* 액션 컬럼 */}
-      <td className="px-3 py-4 text-center">
+      <td className="px-2 py-4 text-center">
         {isEmptySlot && onSave ? (
           // empty 슬롯은 저장 버튼
           <button

@@ -97,24 +97,20 @@ export async function getSlots(req: AuthRequest, res: Response) {
       params.push(queryUserId);
       countParams.push(queryUserId);
       
-      // 개발자 권한일 때는 v2_rank_daily 사용
-      if (userRole === 'developer') {
-        query = `
+      // 모든 권한이 v2_rank_daily 사용
+      query = `
           SELECT s.*, 
                  u.email as user_email, 
                  u.full_name as user_name, 
                  s.approved_price, 
                  s.product_name, 
                  COALESCE(v2_rd.thumbnail, s.thumbnail) as thumbnail,
-                 COALESCE(v2_rd.rank, 0) as current_rank,
-                 v2_rd.prev_rank as yesterday_rank,
+                 v2_rd.rank as current_rank,
+                 COALESCE(v2_rd_yesterday.rank, 0) as yesterday_rank,
                  v2_rd.rating,
                  v2_rd.review_count,
-                 v2_rd.product_name as v2_product_name,
-                 CASE 
-                   WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND v2_rd.rank IS NULL THEN true
-                   ELSE false
-                 END as is_processing,
+                 COALESCE(v2_rd.product_name, v2_rd_yesterday.product_name) as v2_product_name,
+                 false as is_processing,
                  sah.payment as payment_completed,
                  s.parent_slot_id,
                  s.extension_days,
@@ -132,49 +128,21 @@ export async function getSlots(req: AuthRequest, res: Response) {
             AND v2_rd.item_id = SUBSTRING(s.url FROM 'itemId=([0-9]+)')
             AND v2_rd.vendor_item_id = SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)')
             AND v2_rd.date = CURRENT_DATE
+          LEFT JOIN v2_rank_daily v2_rd_yesterday ON 
+            v2_rd_yesterday.keyword = COALESCE(s.trim_keyword, REPLACE(s.keyword, ' ', '')) 
+            AND v2_rd_yesterday.product_id = SUBSTRING(s.url FROM 'products/([0-9]+)')
+            AND v2_rd_yesterday.item_id = SUBSTRING(s.url FROM 'itemId=([0-9]+)')
+            AND v2_rd_yesterday.vendor_item_id = SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)')
+            AND v2_rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
           LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
           WHERE s.user_id = $1
         `;
-      } else {
-        // 운영자는 기존 rank_daily 사용
-        query = `
-          SELECT s.*, 
-                 u.email as user_email, 
-                 u.full_name as user_name, 
-                 s.approved_price, 
-                 s.product_name, 
-                 COALESCE(rd_today.thumbnail, s.thumbnail) as thumbnail,
-                 COALESCE(rd_today.rank, 0) as current_rank,
-                 rd_yesterday.rank as yesterday_rank,
-                 rd_today.fail_count as fail_count,
-                 CASE 
-                   WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
-                   ELSE false
-                 END as is_processing,
-                 sah.payment as payment_completed,
-                 s.parent_slot_id,
-                 s.extension_days,
-                 s.extended_at,
-                 s.extended_by,
-                 s.extension_type,
-                 CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
-                 EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension,
-                 'rank_daily' as rank_source
-          FROM slots s
-          JOIN users u ON s.user_id = u.id
-          LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
-          LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
-          LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
-          WHERE s.user_id = $1
-        `;
-      }
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
     }
     // 관리자/개발자가 모든 슬롯 조회
     else if (userRole === 'operator' || userRole === 'developer') {
-      // 개발자 권한일 때는 v2_rank_daily 사용
-      if (userRole === 'developer') {
-        query = `
+      // 모든 권한이 v2_rank_daily 사용
+      query = `
           SELECT s.*, 
                  u.email as user_email, 
                  u.full_name as user_name,
@@ -182,15 +150,12 @@ export async function getSlots(req: AuthRequest, res: Response) {
                  s.approved_price, 
                  s.product_name, 
                  COALESCE(v2_rd.thumbnail, s.thumbnail) as thumbnail,
-                 COALESCE(v2_rd.rank, 0) as current_rank,
-                 v2_rd.prev_rank as yesterday_rank,
+                 v2_rd.rank as current_rank,
+                 COALESCE(v2_rd_yesterday.rank, 0) as yesterday_rank,
                  v2_rd.rating,
                  v2_rd.review_count,
-                 v2_rd.product_name as v2_product_name,
-                 CASE 
-                   WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND v2_rd.rank IS NULL THEN true
-                   ELSE false
-                 END as is_processing,
+                 COALESCE(v2_rd.product_name, v2_rd_yesterday.product_name) as v2_product_name,
+                 false as is_processing,
                  sah.payment as payment_completed,
                  s.parent_slot_id,
                  s.extension_days,
@@ -208,43 +173,15 @@ export async function getSlots(req: AuthRequest, res: Response) {
           AND v2_rd.item_id = SUBSTRING(s.url FROM 'itemId=([0-9]+)')
           AND v2_rd.vendor_item_id = SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)')
           AND v2_rd.date = CURRENT_DATE
+        LEFT JOIN v2_rank_daily v2_rd_yesterday ON 
+          v2_rd_yesterday.keyword = COALESCE(s.trim_keyword, REPLACE(s.keyword, ' ', '')) 
+          AND v2_rd_yesterday.product_id = SUBSTRING(s.url FROM 'products/([0-9]+)')
+          AND v2_rd_yesterday.item_id = SUBSTRING(s.url FROM 'itemId=([0-9]+)')
+          AND v2_rd_yesterday.vendor_item_id = SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)')
+          AND v2_rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
         LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
         WHERE 1=1
       `;
-      } else {
-        // 운영자는 기존 rank_daily 사용
-        query = `
-          SELECT s.*, 
-                 u.email as user_email, 
-                 u.full_name as user_name,
-                 u.is_active as user_is_active, 
-                 s.approved_price, 
-                 s.product_name, 
-                 COALESCE(rd_today.thumbnail, s.thumbnail) as thumbnail,
-                 COALESCE(rd_today.rank, 0) as current_rank,
-                 rd_yesterday.rank as yesterday_rank,
-                 rd_today.fail_count as fail_count,
-                 CASE 
-                   WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
-                   ELSE false
-                 END as is_processing,
-                 sah.payment as payment_completed,
-                 s.parent_slot_id,
-                 s.extension_days,
-                 s.extended_at,
-                 s.extended_by,
-                 s.extension_type,
-                 CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
-                 EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension,
-                 'rank_daily' as rank_source
-        FROM slots s
-        JOIN users u ON s.user_id = u.id
-        LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
-        LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
-        LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
-        WHERE 1=1
-      `;
-      }
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE 1=1';
     } 
     // 일반 사용자는 자신의 슬롯만 조회
@@ -257,12 +194,14 @@ export async function getSlots(req: AuthRequest, res: Response) {
                u.full_name as user_name, 
                s.approved_price, 
                s.product_name, 
-               COALESCE(rd_today.thumbnail, s.thumbnail) as thumbnail,
-               COALESCE(rd_today.rank, 0) as current_rank,
-               rd_yesterday.rank as yesterday_rank,
-               rd_today.fail_count as fail_count,
+               COALESCE(v2_rd.thumbnail, s.thumbnail) as thumbnail,
+               v2_rd.rank as current_rank,
+               COALESCE(v2_rd_yesterday.rank, 0) as yesterday_rank,
+               v2_rd.rating,
+               v2_rd.review_count,
+               COALESCE(v2_rd.product_name, v2_rd_yesterday.product_name) as v2_product_name,
                CASE 
-                 WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND rd_today.rank IS NULL THEN true
+                 WHEN s.created_at <= NOW() - INTERVAL '10 minutes' AND v2_rd.rank IS NULL THEN true
                  ELSE false
                END as is_processing,
                sah.payment as payment_completed,
@@ -272,11 +211,22 @@ export async function getSlots(req: AuthRequest, res: Response) {
                s.extended_by,
                s.extension_type,
                CASE WHEN s.parent_slot_id IS NOT NULL THEN true ELSE false END as is_extended,
-               EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension
+               EXISTS(SELECT 1 FROM slots child WHERE child.parent_slot_id = s.id) as has_extension,
+               'v2_rank_daily' as rank_source
         FROM slots s
         JOIN users u ON s.user_id = u.id
-        LEFT JOIN rank_daily rd_today ON rd_today.slot_id = s.id AND rd_today.date = CURRENT_DATE
-        LEFT JOIN rank_daily rd_yesterday ON rd_yesterday.slot_id = s.id AND rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
+        LEFT JOIN v2_rank_daily v2_rd ON 
+          v2_rd.keyword = COALESCE(s.trim_keyword, REPLACE(s.keyword, ' ', '')) 
+          AND v2_rd.product_id = SUBSTRING(s.url FROM 'products/([0-9]+)')
+          AND v2_rd.item_id = SUBSTRING(s.url FROM 'itemId=([0-9]+)')
+          AND v2_rd.vendor_item_id = SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)')
+          AND v2_rd.date = CURRENT_DATE
+        LEFT JOIN v2_rank_daily v2_rd_yesterday ON 
+          v2_rd_yesterday.keyword = COALESCE(s.trim_keyword, REPLACE(s.keyword, ' ', '')) 
+          AND v2_rd_yesterday.product_id = SUBSTRING(s.url FROM 'products/([0-9]+)')
+          AND v2_rd_yesterday.item_id = SUBSTRING(s.url FROM 'itemId=([0-9]+)')
+          AND v2_rd_yesterday.vendor_item_id = SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)')
+          AND v2_rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
         LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
         WHERE s.user_id = $1
       `;
@@ -345,6 +295,11 @@ export async function getSlots(req: AuthRequest, res: Response) {
     //   }
     // }
     
+    // 디버그: v2_product_name 확인
+    console.log('[DEBUG] 첫 번째 슬롯의 v2_product_name:', slots[0]?.v2_product_name);
+    console.log('[DEBUG] 첫 번째 슬롯의 product_name:', slots[0]?.product_name);
+    console.log('[DEBUG] 첫 번째 슬롯의 rank:', slots[0]?.rank);
+    
     // 슬롯 ID 목록 추출
     const slotIds = slots.map(slot => slot.id);
     
@@ -390,10 +345,44 @@ export async function getSlots(req: AuthRequest, res: Response) {
     
     // current_rank를 rank로 맵핑 (프론트엔드 호환성)
     // 개발자는 current_rank를 유지, 다른 권한은 rank로 맵핑
-    if (userRole !== 'developer') {
-      slots.forEach(slot => {
-        slot.rank = slot.current_rank;
-        delete slot.current_rank;
+    console.log('🔑 권한 체크:', { userRole, isDeveloper: userRole === 'developer' });
+    
+    // 갤럭시 슬롯만 로그
+    const galaxySlot = slots.find(s => s.keyword?.includes('갤럭시s25울트라'));
+    if (galaxySlot) {
+      console.log('🎯 갤럭시 슬롯 맵핑 전:', {
+        keyword: galaxySlot.keyword,
+        trim_keyword: galaxySlot.trim_keyword,
+        current_rank: galaxySlot.current_rank,
+        rank: galaxySlot.rank,
+        rank_source: galaxySlot.rank_source,
+        url_product_id: galaxySlot.url_product_id,
+        url_item_id: galaxySlot.url_item_id,
+        url_vendor_item_id: galaxySlot.url_vendor_item_id,
+        debug_keyword: galaxySlot.debug_keyword,
+        debug_v2_keyword: galaxySlot.debug_v2_keyword,
+        debug_v2_product_id: galaxySlot.debug_v2_product_id,
+        debug_v2_item_id: galaxySlot.debug_v2_item_id,
+        debug_v2_vendor_item_id: galaxySlot.debug_v2_vendor_item_id,
+      });
+    }
+    
+    // 모든 권한에서 current_rank를 rank로 맵핑
+    console.log('🔄 모든 사용자 - rank로 맵핑 실행');
+    slots.forEach(slot => {
+      slot.rank = slot.current_rank;
+      delete slot.current_rank;
+    });
+    
+    // 맵핑 후 갤럭시 슬롯 확인
+    if (galaxySlot) {
+      console.log('🎯 갤럭시 슬롯 맵핑 후:', {
+        keyword: galaxySlot.keyword,
+        current_rank: galaxySlot.current_rank,
+        rank: galaxySlot.rank,
+        yesterday_rank: galaxySlot.yesterday_rank,
+        is_processing: galaxySlot.is_processing,
+        rank_source: galaxySlot.rank_source
       });
     }
     
@@ -2072,6 +2061,185 @@ export async function extendSlot(req: AuthRequest, res: Response) {
 }
 
 // 대량 슬롯 연장 (발급 건별)
+// 슬롯 순위 히스토리 조회
+export async function getSlotRankHistory(req: AuthRequest, res: Response) {
+  try {
+    const { id } = req.params;
+    const { startDate, endDate } = req.query;
+    const userRole = req.user?.role;
+
+    // 슬롯 정보 조회 (리스트와 동일한 필드들 확인)
+    const slotResult = await pool.query(
+      `SELECT keyword, trim_keyword, url, 
+              pre_allocation_start_date, 
+              pre_allocation_end_date,
+              created_at,
+              approved_at,
+              -- 리스트에서 시작일/종료일로 사용하는 필드들 확인
+              approved_at as list_start_date,
+              pre_allocation_end_date as list_end_date
+       FROM slots WHERE id = $1`,
+      [id]
+    );
+
+    if (slotResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '슬롯을 찾을 수 없습니다.'
+      });
+    }
+
+    const slot = slotResult.rows[0];
+    
+    // 시작일은 무조건 created_at 또는 approved_at 기준 (한국 시간으로 계산)
+    let actualStartDate = startDate;
+    if (!actualStartDate) {
+      if (slot.approved_at) {
+        const koreanTime = new Date(slot.approved_at.getTime() + 9 * 60 * 60 * 1000);
+        actualStartDate = koreanTime.toISOString().split('T')[0];
+      } else if (slot.created_at) {
+        const koreanTime = new Date(slot.created_at.getTime() + 9 * 60 * 60 * 1000);
+        actualStartDate = koreanTime.toISOString().split('T')[0];
+      }
+    }
+    
+    // 종료일도 한국 시간 기준으로 계산
+    let actualEndDate = endDate;
+    if (!actualEndDate) {
+      if (slot.pre_allocation_end_date) {
+        const koreanEndTime = new Date(slot.pre_allocation_end_date.getTime() + 9 * 60 * 60 * 1000);
+        actualEndDate = koreanEndTime.toISOString().split('T')[0];
+      } else {
+        const today = new Date();
+        const koreanToday = new Date(today.getTime() + 9 * 60 * 60 * 1000);
+        actualEndDate = koreanToday.toISOString().split('T')[0];
+      }
+    }
+
+    if (!actualStartDate) {
+      return res.status(400).json({
+        success: false,
+        error: '시작일을 확인할 수 없습니다.'
+      });
+    }
+
+    // 날짜 범위 생성
+    const dates = [];
+    const start = new Date(actualStartDate);
+    const end = new Date(actualEndDate);
+    
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      dates.push(new Date(d).toISOString().split('T')[0]);
+    }
+
+    // v2_rank_daily에서 순위 히스토리 조회
+    const keyword = slot.trim_keyword || slot.keyword?.replace(/\s/g, '');
+    const productId = slot.url?.match(/products\/([0-9]+)/)?.[1];
+    const itemId = slot.url?.match(/itemId=([0-9]+)/)?.[1];
+    const vendorItemId = slot.url?.match(/vendorItemId=([0-9]+)/)?.[1];
+
+    console.log('🔍 순위 히스토리 조회:', {
+      slotId: id,
+      keyword,
+      productId,
+      itemId,
+      vendorItemId,
+      startDate: actualStartDate,
+      endDate: actualEndDate,
+      slotInfo: {
+        pre_allocation_start_date: slot.pre_allocation_start_date,
+        pre_allocation_end_date: slot.pre_allocation_end_date,
+        approved_at: slot.approved_at,
+        created_at: slot.created_at
+      }
+    });
+    
+    // 콘드로이친 슬롯 디버깅
+    if (keyword.includes('콘드로이친')) {
+      console.log('🔍 콘드로이친 슬롯 상세 정보:', {
+        keyword,
+        actualStartDate,
+        actualEndDate,
+        dates: dates
+      });
+    }
+
+    const rankQuery = `
+      SELECT date, rank, prev_rank
+      FROM v2_rank_daily 
+      WHERE keyword = $1 
+        AND product_id = $2 
+        AND item_id = $3 
+        AND vendor_item_id = $4
+        AND date >= $5::date 
+        AND date <= $6::date
+      ORDER BY date ASC
+    `;
+
+    const rankResult = await pool.query(rankQuery, [
+      keyword,
+      productId,
+      itemId,
+      vendorItemId,
+      actualStartDate,
+      actualEndDate
+    ]);
+
+    // 날짜별 순위 데이터 맵핑
+    const rankMap = new Map();
+    console.log('🔍 DB에서 가져온 순위 데이터:', rankResult.rows);
+    
+    rankResult.rows.forEach(row => {
+      // DB 데이터도 한국 시간 기준으로 매핑
+      const koreanDate = new Date(row.date.getTime() + 9 * 60 * 60 * 1000);
+      const dateKey = koreanDate.getUTCFullYear() + '-' + 
+                     String(koreanDate.getUTCMonth() + 1).padStart(2, '0') + '-' + 
+                     String(koreanDate.getUTCDate()).padStart(2, '0');
+      console.log('🔍 날짜 매핑:', { originalDate: row.date, koreanDate, dateKey, rank: row.rank });
+      
+      rankMap.set(dateKey, {
+        rank: row.rank,
+        prev_rank: row.prev_rank
+      });
+    });
+
+    // 모든 날짜에 대해 데이터 생성 (없는 날짜는 null)
+    const rankHistory = dates.map(date => {
+      const rankData = rankMap.get(date);
+      const result = {
+        date,
+        rank: rankData?.rank || null,
+        prev_rank: rankData?.prev_rank || null
+      };
+      
+      // 순위가 있는 데이터만 로그
+      if (result.rank) {
+        console.log('🔍 최종 결과:', result);
+      }
+      
+      return result;
+    });
+    
+    console.log('🔍 전체 날짜 범위:', dates);
+
+    res.json({
+      success: true,
+      data: rankHistory,
+      dateRange: {
+        startDate: actualStartDate,
+        endDate: actualEndDate
+      }
+    });
+
+  } catch (error) {
+    console.error('순위 히스토리 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '순위 히스토리 조회 중 오류가 발생했습니다.'
+    });
+  }
+}
+
 export async function extendBulkSlots(req: AuthRequest, res: Response) {
   const { allocationHistoryId, extensionDays } = req.body;
   const userId = req.user?.id;

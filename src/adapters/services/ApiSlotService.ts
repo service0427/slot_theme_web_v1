@@ -74,7 +74,7 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).fieldValues = item.fieldValues;
           
           // rank 관련 필드 추가
-          (slot as any).rank = item.rank || 0;
+          (slot as any).rank = item.rank;
           (slot as any).yesterday_rank = item.yesterday_rank;
           (slot as any).is_processing = item.is_processing;
           (slot as any).fail_count = item.fail_count;
@@ -96,8 +96,9 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).rank = item.rank;
           (slot as any).first_rank = item.first_rank;
           
-          // product_name 추가
+          // product_name 추가 (v2_rank_daily 테이블의 product_name 우선)
           (slot as any).product_name = item.product_name;
+          (slot as any).v2_product_name = item.v2_product_name;
           
           // 연장 관련 필드 추가
           slot.parent_slot_id = item.parent_slot_id;
@@ -507,7 +508,7 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).fieldValues = item.fieldValues;
           
           // rank 관련 필드 추가
-          (slot as any).rank = item.rank || 0;
+          (slot as any).rank = item.rank;
           (slot as any).yesterday_rank = item.yesterday_rank;
           (slot as any).is_processing = item.is_processing;
           (slot as any).fail_count = item.fail_count;
@@ -529,8 +530,9 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).rank = item.rank;
           (slot as any).first_rank = item.first_rank;
           
-          // product_name 추가
+          // product_name 추가 (v2_rank_daily 테이블의 product_name 우선)
           (slot as any).product_name = item.product_name;
+          (slot as any).v2_product_name = item.v2_product_name;
           
           // 연장 관련 필드 추가
           slot.parent_slot_id = item.parent_slot_id;

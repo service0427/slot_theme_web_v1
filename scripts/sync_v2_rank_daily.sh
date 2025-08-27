@@ -208,6 +208,8 @@ EOF
               AND vendor_item_id = '$vendor_item_id'
               AND check_date >= '$CHECK_DATE'::date - interval '1 day'
               AND check_date <= '$CHECK_DATE'::date
+              AND site_code = 'cpck'
+              AND is_check_completed = true
         ),
         today_data AS (
             SELECT 
@@ -225,6 +227,8 @@ EOF
             FROM rank_history
             WHERE check_date = '$CHECK_DATE'
               AND check_count > 9
+              AND site_code = 'cpck'
+              AND is_check_completed = true
             ORDER BY check_count DESC
             LIMIT 1
         )
@@ -234,9 +238,24 @@ EOF
                     -- rank_data 배열이 있을 때
                     WHEN array_length(ranks_array, 1) > 0 THEN
                         CASE
-                            -- 어제 순위가 있으면: 어제보다 바로 높은 순위 선택
+                            -- 어제 순위가 있으면
                             WHEN yesterday_rank IS NOT NULL THEN
-                                (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                                CASE
+                                    -- 5등 이하일 때: 어제 순위와 동일한 순위 제외하고 낮은 순위 중 최대값
+                                    WHEN yesterday_rank > 5 THEN
+                                        COALESCE(
+                                            (SELECT MAX(r) FROM unnest(ranks_array) r WHERE r < yesterday_rank),
+                                            -- 어제보다 낮은 순위가 없으면 가장 가까운 값(최소값)
+                                            (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                                        )
+                                    -- 5등 이내일 때: 어제 순위 포함해서 낮거나 같은 순위 중 최대값
+                                    ELSE
+                                        COALESCE(
+                                            (SELECT MAX(r) FROM unnest(ranks_array) r WHERE r <= yesterday_rank),
+                                            -- 어제보다 낮거나 같은 순위가 없으면 가장 가까운 값(최소값)
+                                            (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                                        )
+                                END
                             -- 어제 순위가 없으면: 최대값 (가장 낮은 순위)
                             ELSE
                                 (SELECT MAX(r) FROM unnest(ranks_array) r)

@@ -9,6 +9,7 @@ import { BaseSlotEditModal } from './BaseSlotEditModal';
 import { CombinedSlotRow } from './CombinedSlotRow';
 import { BasePreAllocationForm, PreAllocationData } from './BasePreAllocationForm';
 import { BaseBulkEditModal } from './BaseBulkEditModal';
+import { BaseRankHistoryModal } from './BaseRankHistoryModal';
 import { UserSlot } from '@/core/models/UserSlot';
 import { BaseAdvancedSearchDropdown, SearchFilters } from './BaseAdvancedSearchDropdown';
 
@@ -474,6 +475,15 @@ export function BaseSlotListPage({
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPreAllocationForm, setShowPreAllocationForm] = useState(false);
   
+  // 순위 히스토리 모달 상태
+  const [rankHistoryModal, setRankHistoryModal] = useState({
+    isOpen: false,
+    slotId: '',
+    keyword: '',
+    startDate: '',
+    endDate: ''
+  });
+  
   // 일괄 수정 관련 state
   const [bulkEditMode, setBulkEditMode] = useState(false);
   const [selectedSlotIds, setSelectedSlotIds] = useState<Set<string>>(new Set());
@@ -819,6 +829,31 @@ export function BaseSlotListPage({
       console.error('슬롯 업데이트 실패:', error);
       alert('슬롯 수정에 실패했습니다.');
     }
+  };
+
+  // 순위 히스토리 모달 열기
+  const handleOpenRankHistory = (slot: UserSlot) => {
+    console.log('handleOpenRankHistory 호출됨:', slot.id);
+    const keyword = slot.customFields?.keyword || '';
+    
+    setRankHistoryModal({
+      isOpen: true,
+      slotId: slot.id,
+      keyword,
+      startDate: '', // 백엔드에서 결정
+      endDate: '' // 백엔드에서 결정
+    });
+  };
+
+  // 순위 히스토리 모달 닫기
+  const handleCloseRankHistory = () => {
+    setRankHistoryModal({
+      isOpen: false,
+      slotId: '',
+      keyword: '',
+      startDate: '',
+      endDate: ''
+    });
   };
 
   // 슬롯 수정 처리
@@ -1398,23 +1433,23 @@ export function BaseSlotListPage({
                           </th>
                         ))}
                         {/* 상품명 */}
-                        <th className="w-32 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                        <th className="w-48 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           상품명
                         </th>
                         {/* 시스템 필드들 */}
                         <th className="w-16 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           순위
                         </th>
-                        <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                        <th className="w-20 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           시작일
                         </th>
-                        <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                        <th className="w-20 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           종료일
                         </th>
-                        <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                        <th className="w-16 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           상태
                         </th>
-                        <th className="w-24 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
+                        <th className="w-16 px-3 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
                           액션
                         </th>
                       </tr>
@@ -1472,6 +1507,10 @@ export function BaseSlotListPage({
                                 loadUserSlots();
                               }
                             } : undefined}
+                            onOpenRankHistory={() => {
+                              console.log('[BaseSlotListPage] 순위 히스토리 모달 열기 (CombinedSlotRow):', slot.id);
+                              handleOpenRankHistory(slot);
+                            }}
                             onBulkPaste={handleBulkPaste}
                             isSelected={selectedSlotIds.has(slot.id)}
                             onSelectionChange={bulkEditMode ? (slotId, checked) => handleToggleSlotSelection(slotId) : undefined}
@@ -1517,6 +1556,7 @@ export function BaseSlotListPage({
                           loadUserSlots();
                         }
                       }}
+                      onOpenRankHistory={() => handleOpenRankHistory(slot)}
                     />
                   ))}
                 </div>
@@ -1577,6 +1617,7 @@ export function BaseSlotListPage({
                         setEditingSlot(slot);
                         setShowEditModal(true);
                       }}
+                      onOpenRankHistory={() => handleOpenRankHistory(slot)}
                       showCheckbox={bulkEditMode && canBulkEdit(slot)}
                       isSelected={selectedSlotIds.has(slot.id)}
                       onSelectionChange={() => handleToggleSlotSelection(slot.id)}
@@ -1691,6 +1732,16 @@ export function BaseSlotListPage({
         isOpen={showPreAllocationForm}
         onClose={() => setShowPreAllocationForm(false)}
         onSubmit={handlePreAllocationCreate}
+      />
+
+      {/* 순위 히스토리 모달 */}
+      <BaseRankHistoryModal
+        isOpen={rankHistoryModal.isOpen}
+        onClose={handleCloseRankHistory}
+        slotId={rankHistoryModal.slotId}
+        keyword={rankHistoryModal.keyword}
+        startDate={rankHistoryModal.startDate}
+        endDate={rankHistoryModal.endDate}
       />
 
     </div>

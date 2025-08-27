@@ -6,9 +6,10 @@ interface BaseUserSlotCardProps {
   onPause?: () => void;
   onResume?: () => void;
   onEdit?: () => void;
+  onOpenRankHistory?: () => void;
 }
 
-export function BaseUserSlotCard({ slot, onPause, onResume }: BaseUserSlotCardProps) {
+export function BaseUserSlotCard({ slot, onPause, onResume, onOpenRankHistory }: BaseUserSlotCardProps) {
   const { config } = useConfig();
   
   // enabled된 필드들만 가져와서 order 순으로 정렬
@@ -79,6 +80,78 @@ export function BaseUserSlotCard({ slot, onPause, onResume }: BaseUserSlotCardPr
               </span>
             </div>
           )}
+        </div>
+
+        {/* 상품명 추가 */}
+        <div className="border-t pt-4 mb-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium text-gray-700">상품명</span>
+            <span className="text-sm text-gray-900 truncate max-w-xs">
+              {(slot as any).v2_product_name || (slot as any).product_name || '상품명없음'}
+            </span>
+          </div>
+        </div>
+
+        {/* 순위 정보 추가 */}
+        <div className="border-t pt-4 mb-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium text-gray-700">순위</span>
+            <div className="flex items-center gap-2">
+              {onOpenRankHistory ? (
+                <button
+                  onClick={onOpenRankHistory}
+                  className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
+                  title="순위 히스토리 보기"
+                >
+                  {(() => {
+                    // rank가 명시적으로 0이면 "순위없음"
+                    if ((slot as any).rank === 0) {
+                      return '순위없음';
+                    }
+                    // rank가 있으면 순위 표시
+                    if ((slot as any).rank > 0) {
+                      return (slot as any).rank;
+                    }
+                    // rank가 없는 경우 (null, undefined, 빈값)
+                    if ((slot as any).yesterday_rank > 0) {
+                      return `측정중 (어제: ${(slot as any).yesterday_rank}위)`;
+                    }
+                    return '측정중';
+                  })()}
+                </button>
+              ) : (
+                <span className={(slot as any).rank > 0 ? "font-semibold text-gray-900" : "text-gray-400"}>
+                  {(() => {
+                    if ((slot as any).rank === 0) {
+                      return '순위없음';
+                    }
+                    if ((slot as any).rank > 0) {
+                      return (slot as any).rank;
+                    }
+                    if ((slot as any).yesterday_rank > 0) {
+                      return `측정중 (어제: ${(slot as any).yesterday_rank}위)`;
+                    }
+                    return '측정중';
+                  })()}
+                </span>
+              )}
+              {(slot as any).rank > 0 && (slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
+                <span className={`text-xs ${
+                  (slot as any).yesterday_rank > (slot as any).rank 
+                    ? 'text-green-600' 
+                    : (slot as any).yesterday_rank < (slot as any).rank 
+                      ? 'text-red-600' 
+                      : 'text-gray-500'
+                }`}>
+                  {(slot as any).yesterday_rank > (slot as any).rank 
+                    ? `▲${(slot as any).yesterday_rank - (slot as any).rank}` 
+                    : (slot as any).yesterday_rank < (slot as any).rank 
+                      ? `▼${(slot as any).rank - (slot as any).yesterday_rank}` 
+                      : '-'}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* 성과 지표 */}

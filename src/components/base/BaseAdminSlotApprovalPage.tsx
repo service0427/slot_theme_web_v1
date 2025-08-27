@@ -6,6 +6,8 @@ import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 import { fieldConfigService, FieldConfig } from '@/adapters/services/ApiFieldConfigService';
 import { BaseSlotExtensionModal } from './BaseSlotExtensionModal';
 import { BaseAdvancedSearchDropdown, SearchFilters } from './BaseAdvancedSearchDropdown';
+import { BaseRankHistoryModal } from './BaseRankHistoryModal';
+import { useAuthContext } from '@/adapters/react/hooks/useAuthContext';
 
 interface AdminSlotApprovalThemeProps {
   containerClass?: string;
@@ -38,6 +40,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const { loadAllSlots, approveSlot, rejectSlot } = useSlotContext();
   const { config } = useConfig();
   const { getSetting } = useSystemSettings();
+  const { user } = useAuthContext();
   
   // 현재 테마 가져오기
   const currentTheme = getSetting('theme', 'theme') || 'modern';
@@ -65,6 +68,15 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [statusFilter, setStatusFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // 순위 히스토리 모달 상태
+  const [rankHistoryModal, setRankHistoryModal] = useState({
+    isOpen: false,
+    slotId: '',
+    keyword: '',
+    startDate: '',
+    endDate: ''
+  });
   const [viewingHistorySlot, setViewingHistorySlot] = useState<string | null>(null);
   const [slotHistory, setSlotHistory] = useState<any[]>([]);
   // localStorage에서 리스트 개수 설정 불러오기
@@ -645,6 +657,32 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     }
   };
 
+  // 순위 히스토리 모달 열기
+  const handleOpenRankHistory = (slot: UserSlot) => {
+    
+    const keyword = getSlotFieldValue(slot, 'keyword') || '';
+    // 백엔드에서 자동으로 판단하도록 빈 문자열로 전달
+    
+    setRankHistoryModal({
+      isOpen: true,
+      slotId: slot.id,
+      keyword,
+      startDate: '', // 백엔드에서 결정
+      endDate: '' // 백엔드에서 결정
+    });
+  };
+
+  // 순위 히스토리 모달 닫기
+  const handleCloseRankHistory = () => {
+    setRankHistoryModal({
+      isOpen: false,
+      slotId: '',
+      keyword: '',
+      startDate: '',
+      endDate: ''
+    });
+  };
+
   // 슬롯 수정 핸들러
   const handleEditSlot = (slot: UserSlot) => {
     const formData: Record<string, string> = {};
@@ -1193,8 +1231,8 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   })}
                   {/* 순위 */}
                   <td className="px-3 py-2 text-center text-sm">
-                    {console.log('슬롯 데이터:', slot)}
-                    {console.log('순위 체크:', {
+                    {(slot as any).keyword?.includes('갤럭시s25울트라') && console.log('🎯 갤럭시 슬롯:', {
+                      keyword: (slot as any).keyword,
                       current_rank: (slot as any).current_rank,
                       rank: (slot as any).rank,
                       rank_source: (slot as any).rank_source,
@@ -1204,39 +1242,67 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                       <span className="text-gray-400">-</span>
                     ) : slot.status === 'pending' ? (
                       <span className="text-gray-400">-</span>
-                    ) : ((slot as any).current_rank > 0 || (slot as any).rank > 0) ? (
+                    ) : (
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center justify-center gap-1">
-                          <span className="font-semibold text-gray-900">{(slot as any).current_rank || (slot as any).rank}</span>
-                          {(slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
+                          <button
+                            onClick={() => handleOpenRankHistory(slot)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
+                            title="순위 히스토리 보기"
+                          >
+                            {(() => {
+                              // rank가 명시적으로 0이면 "순위없음"
+                              if ((slot as any).rank === 0) {
+                                return '순위없음';
+                              }
+                              // rank가 있으면 순위 표시
+                              if ((slot as any).rank > 0) {
+                                return (slot as any).rank;
+                              }
+                              // rank가 없는 경우 (null, undefined, 빈값)
+                              if ((slot as any).yesterday_rank > 0) {
+                                return `측정중 (어제: ${(slot as any).yesterday_rank}위)`;
+                              }
+                              return '측정중';
+                            })()}
+                          </button>
+                          {(slot as any).rank > 0 && (slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
                             <span className={`text-xs ${
-                              (slot as any).yesterday_rank > ((slot as any).current_rank || (slot as any).rank)
+                              (slot as any).yesterday_rank > (slot as any).rank
                                 ? 'text-green-600' 
-                                : (slot as any).yesterday_rank < ((slot as any).current_rank || (slot as any).rank)
+                                : (slot as any).yesterday_rank < (slot as any).rank
                                   ? 'text-red-600' 
                                   : 'text-gray-500'
                             }`}>
-                              {(slot as any).yesterday_rank > ((slot as any).current_rank || (slot as any).rank)
-                                ? `(▲${(slot as any).yesterday_rank - ((slot as any).current_rank || (slot as any).rank)})` 
-                                : (slot as any).yesterday_rank < ((slot as any).current_rank || (slot as any).rank)
-                                  ? `(▼${((slot as any).current_rank || (slot as any).rank) - (slot as any).yesterday_rank})` 
+                              {(slot as any).yesterday_rank > (slot as any).rank
+                                ? `(▲${(slot as any).yesterday_rank - (slot as any).rank})` 
+                                : (slot as any).yesterday_rank < (slot as any).rank
+                                  ? `(▼${(slot as any).rank - (slot as any).yesterday_rank})` 
                                   : '(-)'}
                             </span>
                           )}
                         </div>
-                        {/* 개발자만 v2_rank_daily 데이터 소스 표시 */}
+                        {/* v2_rank_daily 데이터 소스 표시 */}
                         {(slot as any).rank_source === 'v2_rank_daily' && (
                           <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">V2</span>
                         )}
                       </div>
-                    ) : (
-                      <span className="text-gray-400">순위없음</span>
                     )}
                   </td>
                   {/* URL 파싱 필드들 - 상품ID만 표시 */}
                   <td className="px-3 py-2 text-center text-sm text-gray-900">
                     <span className="text-xs">
-                      {getSlotFieldValue(slot, 'url_product_id') || '-'}
+                      {(() => {
+                        // URL에서 직접 파싱 시도
+                        const url = getSlotFieldValue(slot, 'url') || '';
+                        const productMatch = url.match(/\/products\/(\d+)/);
+                        const productId = productMatch ? productMatch[1] : null;
+                        
+                        // 기존 방식으로도 시도
+                        const fieldValue = getSlotFieldValue(slot, 'url_product_id');
+                        
+                        return productId || fieldValue || '-';
+                      })()}
                     </span>
                   </td>
                   {/* 아이템ID, 판매자ID - 주석처리
@@ -2175,6 +2241,16 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           }}
         />
       )}
+
+      {/* 순위 히스토리 모달 */}
+      <BaseRankHistoryModal
+        isOpen={rankHistoryModal.isOpen}
+        onClose={handleCloseRankHistory}
+        slotId={rankHistoryModal.slotId}
+        keyword={rankHistoryModal.keyword}
+        startDate={rankHistoryModal.startDate}
+        endDate={rankHistoryModal.endDate}
+      />
 
     </div>
   );

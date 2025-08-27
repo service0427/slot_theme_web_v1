@@ -3,6 +3,20 @@
 # ========================================
 # v2_rank_daily 동기화 검증 스크립트
 # 동기화 후 데이터 무결성 및 품질 검증
+# 
+# 사용법:
+#   1. 일반 검증: ./verify_v2_sync.sh [날짜]
+#      예: ./verify_v2_sync.sh 2024-08-26
+#      
+#   2. 특정 키워드 디버깅: ./verify_v2_sync.sh [날짜] [키워드] [상품ID]
+#      예: ./verify_v2_sync.sh 2024-08-26 "화장품" 12345678
+#      
+#      특정 키워드가 동기화되지 않는 이유를 단계별로 확인:
+#      - slots 테이블 존재 여부
+#      - 외부 DB v2_products 상품 정보
+#      - 외부 DB v2_rank_history 순위 정보
+#      - site_code='cpck' / is_check_completed 조건 확인
+#      - v2_rank_daily 최종 저장 여부
 # ========================================
 
 # 색상 정의
@@ -360,7 +374,175 @@ detect_anomalies() {
 }
 
 # ========================================
-# 6. 최종 보고서
+# 6. 특정 키워드 디버깅
+# ========================================
+debug_specific_keyword() {
+    local debug_keyword="$1"
+    local debug_product_id="$2"
+    
+    if [ -z "$debug_keyword" ] || [ -z "$debug_product_id" ]; then
+        return
+    fi
+    
+    echo ""
+    log_info "========================================="
+    log_info "특정 키워드 디버깅: $debug_keyword (상품ID: $debug_product_id)"
+    log_info "========================================="
+    
+    # 1. 우리 DB의 slots 테이블에 있는지 확인
+    log_info "[1단계] slots 테이블 확인..."
+    SLOT_EXISTS=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A <<EOF
+        SELECT COUNT(*) 
+        FROM slots 
+        WHERE COALESCE(trim_keyword, REPLACE(keyword, ' ', '')) = '$debug_keyword'
+          AND url LIKE '%products/${debug_product_id}%';
+EOF
+    )
+    
+    if [ "$SLOT_EXISTS" -eq 0 ]; then
+        log_fail "❌ slots 테이블에 해당 키워드가 없음 (동기화 대상 아님)"
+        return
+    else
+        log_success "✅ slots 테이블에 존재"
+        
+        # URL 파싱 정보 확인
+        SLOT_INFO=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A <<EOF
+            SELECT 
+                url,
+                SUBSTRING(url FROM 'itemId=([0-9]+)') as item_id,
+                SUBSTRING(url FROM 'vendorItemId=([0-9]+)') as vendor_item_id
+            FROM slots 
+            WHERE COALESCE(trim_keyword, REPLACE(keyword, ' ', '')) = '$debug_keyword'
+              AND url LIKE '%products/${debug_product_id}%'
+            LIMIT 1;
+EOF
+        )
+        
+        IFS='|' read -r url item_id vendor_item_id <<< "$SLOT_INFO"
+        log_info "  - URL: $url"
+        log_info "  - item_id: $item_id"
+        log_info "  - vendor_item_id: $vendor_item_id"
+    fi
+    
+    # 2. 외부 DB의 v2_products 테이블에 상품 정보가 있는지 확인
+    log_info ""
+    log_info "[2단계] 외부 DB v2_products 확인..."
+    PRODUCT_EXISTS=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+        SELECT COUNT(*) 
+        FROM v2_products 
+        WHERE product_id = '$debug_product_id'
+          AND item_id = '$item_id'
+          AND vendor_item_id = '$vendor_item_id';
+EOF
+    )
+    
+    if [ "$PRODUCT_EXISTS" -eq 0 ]; then
+        log_fail "❌ 외부 DB에 상품 정보 없음"
+    else
+        log_success "✅ 외부 DB에 상품 정보 존재"
+        
+        # 상품명과 썸네일 확인
+        PRODUCT_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+            SELECT 
+                LENGTH(product_data->>'title') as title_length,
+                LENGTH(product_data->'thumbnailImages'->0->>'url') as thumbnail_length
+            FROM v2_products 
+            WHERE product_id = '$debug_product_id'
+              AND item_id = '$item_id'
+              AND vendor_item_id = '$vendor_item_id'
+            LIMIT 1;
+EOF
+        )
+        
+        IFS='|' read -r title_len thumb_len <<< "$PRODUCT_INFO"
+        log_info "  - 상품명 길이: ${title_len:-0}자"
+        log_info "  - 썸네일 URL 길이: ${thumb_len:-0}자"
+    fi
+    
+    # 3. 외부 DB의 v2_rank_history 테이블에 순위 정보가 있는지 확인
+    log_info ""
+    log_info "[3단계] 외부 DB v2_rank_history 확인..."
+    RANK_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+        SELECT 
+            COUNT(*) as total_records,
+            COUNT(CASE WHEN site_code = 'cpck' THEN 1 END) as cpck_records,
+            COUNT(CASE WHEN is_check_completed = true THEN 1 END) as completed_records,
+            COUNT(CASE WHEN check_count > 9 THEN 1 END) as valid_check_count,
+            MAX(check_count) as max_check_count,
+            MAX(latest_rank) as latest_rank
+        FROM v2_rank_history 
+        WHERE keyword = '$debug_keyword'
+          AND product_id = '$debug_product_id'
+          AND item_id = '$item_id'
+          AND vendor_item_id = '$vendor_item_id'
+          AND check_date = '$CHECK_DATE';
+EOF
+    )
+    
+    if [ -z "$RANK_INFO" ] || [ "$RANK_INFO" = "0|||||" ]; then
+        log_fail "❌ 외부 DB에 순위 정보 없음"
+    else
+        IFS='|' read -r total cpck completed valid_check max_check latest_rank <<< "$RANK_INFO"
+        
+        if [ "$total" -eq 0 ]; then
+            log_fail "❌ 해당 날짜의 순위 정보 없음"
+        else
+            log_success "✅ 외부 DB에 순위 정보 존재 (${total}건)"
+            log_info "  - site_code='cpck' 레코드: ${cpck}건"
+            log_info "  - is_check_completed=true 레코드: ${completed}건"
+            log_info "  - check_count>9 레코드: ${valid_check}건"
+            log_info "  - 최대 check_count: ${max_check:-0}"
+            log_info "  - latest_rank: ${latest_rank:-없음}"
+            
+            # 필터 조건 충족 여부 확인
+            if [ "$cpck" -eq 0 ]; then
+                log_fail "  ⚠️  site_code='cpck' 조건 미충족!"
+            fi
+            if [ "$completed" -eq 0 ]; then
+                log_fail "  ⚠️  is_check_completed=true 조건 미충족!"
+            fi
+            if [ "$valid_check" -eq 0 ]; then
+                log_fail "  ⚠️  check_count>9 조건 미충족!"
+            fi
+        fi
+    fi
+    
+    # 4. 우리 DB의 v2_rank_daily에 최종 저장되었는지 확인
+    log_info ""
+    log_info "[4단계] v2_rank_daily 테이블 확인..."
+    DAILY_INFO=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A <<EOF
+        SELECT 
+            rank,
+            product_name,
+            LENGTH(thumbnail) as thumbnail_length,
+            rating,
+            review_count
+        FROM v2_rank_daily 
+        WHERE keyword = '$debug_keyword'
+          AND product_id = '$debug_product_id'
+          AND date = '$CHECK_DATE';
+EOF
+    )
+    
+    if [ -z "$DAILY_INFO" ]; then
+        log_fail "❌ v2_rank_daily에 데이터 없음"
+        log_info "  → 위의 단계 중 실패한 부분 확인 필요"
+    else
+        IFS='|' read -r rank product_name thumb_len rating review <<< "$DAILY_INFO"
+        log_success "✅ v2_rank_daily에 데이터 존재"
+        log_info "  - 순위: ${rank:-없음}"
+        log_info "  - 상품명: ${product_name:-없음}"
+        log_info "  - 썸네일 길이: ${thumb_len:-0}자"
+        log_info "  - 평점: ${rating:-0}"
+        log_info "  - 리뷰수: ${review:-0}"
+    fi
+    
+    echo ""
+    log_info "========================================="
+}
+
+# ========================================
+# 7. 최종 보고서
 # ========================================
 generate_report() {
     echo ""
@@ -432,6 +614,17 @@ main() {
     log_info "v2_rank_daily 동기화 검증 시작"
     log_info "검증 날짜: $CHECK_DATE"
     echo ""
+    
+    # 특정 키워드 디버깅 모드 확인
+    if [ ! -z "$2" ] && [ ! -z "$3" ]; then
+        debug_specific_keyword "$2" "$3"
+        echo ""
+        read -p "일반 검증도 계속하시겠습니까? (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 0
+        fi
+    fi
     
     # 각 검증 단계 실행
     verify_basic_stats

@@ -7,6 +7,7 @@ interface BaseUserSlotListItemProps {
   onPause?: () => void;
   onResume?: () => void;
   onEdit?: () => void;
+  onOpenRankHistory?: () => void;
   showCheckbox?: boolean;
   isSelected?: boolean;
   onSelectionChange?: () => void;
@@ -18,6 +19,7 @@ export function BaseUserSlotListItem({
   onPause, 
   onResume, 
   onEdit,
+  onOpenRankHistory,
   showCheckbox = false,
   isSelected = false,
   onSelectionChange
@@ -131,16 +133,20 @@ export function BaseUserSlotListItem({
         <span className="text-gray-400 text-sm hidden">-</span>
       </td>
       {/* 관리자가 설정한 필드들 또는 기본 필드들 */}
-      {fieldConfigs && fieldConfigs.length > 0 ? fieldConfigs.map(field => {
-        const value = getFieldValue(field, slot.customFields);
-        return (
-          <td key={field.field_key} className="px-4 py-4 border-r">
-            <div className="text-sm text-gray-900">
-              {renderFieldValue(field, value)}
-            </div>
-          </td>
-        );
-      }) : (
+      {fieldConfigs && fieldConfigs.length > 0 ? (
+        <>
+          {fieldConfigs.map(field => {
+            const value = getFieldValue(field, slot.customFields);
+            return (
+              <td key={field.field_key} className="px-4 py-4 border-r">
+                <div className="text-sm text-gray-900">
+                  {renderFieldValue(field, value)}
+                </div>
+              </td>
+            );
+          })}
+        </>
+      ) : (
         // fieldConfigs가 없을 때 기본 필드들 표시 (luxury 테마용)
         <>
           <td className="px-4 py-4">
@@ -193,17 +199,61 @@ export function BaseUserSlotListItem({
           </td>
         </>
       )}
+      {/* 상품명 - 항상 표시 (v2_rank_daily의 product_name 우선) */}
+      <td className="px-4 py-4 border-r">
+        <div className="text-sm text-gray-900" title={(slot as any).v2_product_name || (slot as any).product_name || '상품명없음'}>
+          {(slot as any).v2_product_name || (slot as any).product_name || '상품명없음'}
+        </div>
+      </td>
       {/* 시스템 필드들 */}
       {/* 순위 */}
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
         {slot.status === 'empty' ? (
           <span className="text-gray-400">-</span>
-        ) : (slot as any).is_processing ? (
-          <span className="text-blue-600 font-medium">측정중</span>
-        ) : (slot as any).rank && (slot as any).rank > 0 ? (
+        ) : (
           <div className="flex items-center justify-center gap-1">
-            <span className="font-semibold text-gray-900">{(slot as any).rank}</span>
-            {(slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
+            {onOpenRankHistory ? (
+              <button
+                onClick={() => {
+                  console.log('순위 버튼 클릭됨:', slot.id);
+                  onOpenRankHistory();
+                }}
+                className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
+                title="순위 히스토리 보기"
+              >
+                {(() => {
+                  // rank가 명시적으로 0이면 "순위없음"
+                  if ((slot as any).rank === 0) {
+                    return '순위없음';
+                  }
+                  // rank가 있으면 순위 표시
+                  if ((slot as any).rank > 0) {
+                    return (slot as any).rank;
+                  }
+                  // rank가 없는 경우 (null, undefined, 빈값)
+                  if ((slot as any).yesterday_rank > 0) {
+                    return `측정중 (어제: ${(slot as any).yesterday_rank}위)`;
+                  }
+                  return '측정중';
+                })()}
+              </button>
+            ) : (
+              <span className={(slot as any).rank > 0 ? "font-semibold text-gray-900" : "text-gray-400"}>
+                {(() => {
+                  if ((slot as any).rank === 0) {
+                    return '순위없음';
+                  }
+                  if ((slot as any).rank > 0) {
+                    return (slot as any).rank;
+                  }
+                  if ((slot as any).yesterday_rank > 0) {
+                    return `측정중 (어제: ${(slot as any).yesterday_rank}위)`;
+                  }
+                  return '측정중';
+                })()}
+              </span>
+            )}
+            {(slot as any).rank > 0 && (slot as any).yesterday_rank !== null && (slot as any).yesterday_rank !== undefined && (slot as any).yesterday_rank > 0 && (
               <span className={`text-xs ${
                 (slot as any).yesterday_rank > (slot as any).rank 
                   ? 'text-green-600' 
@@ -219,8 +269,6 @@ export function BaseUserSlotListItem({
               </span>
             )}
           </div>
-        ) : (
-          <span className="text-gray-400">순위없음</span>
         )}
       </td>
       <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-500">
