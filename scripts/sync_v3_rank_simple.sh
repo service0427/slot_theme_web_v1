@@ -95,7 +95,8 @@ extract_our_slots() {
             COALESCE(SUBSTRING(url FROM 'itemId=([0-9]+)'), '') as item_id,
             COALESCE(SUBSTRING(url FROM 'vendorItemId=([0-9]+)'), '') as vendor_item_id
         FROM slots
-        WHERE url IS NOT NULL
+        WHERE status = 'active'
+          AND url IS NOT NULL
           AND url LIKE '%coupang.com%'
           AND url LIKE '%products/%'
           AND url LIKE '%itemId=%'
@@ -218,7 +219,6 @@ EOF
               AND (item_id = '$item_id' OR item_id IS NULL OR item_id = '' OR '$item_id' = '')
               AND (vendor_item_id = '$vendor_item_id' OR vendor_item_id IS NULL OR vendor_item_id = '' OR '$vendor_item_id' = '')
               AND progress_date = '$CHECK_DATE'
-              AND rcheck_count > 9
               AND site_code = 'cpck'
               AND is_rcheck_completed = true
             ORDER BY rcheck_count DESC

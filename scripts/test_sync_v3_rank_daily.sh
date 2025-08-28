@@ -306,7 +306,6 @@ EOF
                 rcheck_count
             FROM rank_history
             WHERE progress_date = '$CHECK_DATE'
-              AND rcheck_count > 9
               AND site_code = 'cpck'
               AND is_rcheck_completed = true
             ORDER BY rcheck_count DESC
@@ -356,7 +355,6 @@ EOF
             echo "    - progress_date = '$CHECK_DATE'"
             echo "    - site_code = 'cpck'"
             echo "    - is_rcheck_completed = true"
-            echo "    - rcheck_count > 9"
             echo ""
             
             # 단계별 데이터 존재 확인
@@ -403,10 +401,8 @@ EOF
               AND progress_date = '$CHECK_DATE'
               AND site_code = 'cpck'
               AND is_rcheck_completed = true
-              AND rcheck_count > 9;
 EOF
             )
-            echo "    4) + rcheck_count > 9: ${RCHECK_CHECK:-0}건"
             
             # 실제 데이터 샘플 보기
             if [ "${BASIC_CHECK:-0}" -gt 0 ]; then

@@ -59,7 +59,6 @@ SELECT
     'rank_history 결과' as step,
     COUNT(*) as total_rows,
     COUNT(CASE WHEN progress_date = '$CHECK_DATE' THEN 1 END) as today_rows,
-    COUNT(CASE WHEN rcheck_count > 9 THEN 1 END) as valid_rcheck
 FROM rank_history;
 EOF
 
@@ -91,7 +90,6 @@ today_data AS (
         rcheck_count
     FROM rank_history
     WHERE progress_date = '$CHECK_DATE'
-      AND rcheck_count > 9
       AND site_code = 'cpck'
       AND is_rcheck_completed = true
     ORDER BY rcheck_count DESC
@@ -128,7 +126,6 @@ WHERE keyword = '$KEYWORD'
   AND progress_date = '$CHECK_DATE'
   AND site_code = 'cpck'
   AND is_rcheck_completed = true
-  AND rcheck_count > 9
 LIMIT 1;
 EOF
 
@@ -165,7 +162,6 @@ today_data AS (
         rcheck_count
     FROM rank_history
     WHERE progress_date = '$CHECK_DATE'
-      AND rcheck_count > 9
       AND site_code = 'cpck'
       AND is_rcheck_completed = true
     ORDER BY rcheck_count DESC

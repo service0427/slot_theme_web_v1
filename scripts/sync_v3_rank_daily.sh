@@ -215,7 +215,6 @@ EOF
               AND progress_date = '$CHECK_DATE'::date - interval '1 day'
               AND site_code = 'cpck'
               AND is_rcheck_completed = true
-              AND rcheck_count > 9
         ),
         today_data AS (
             SELECT 
@@ -244,7 +243,6 @@ EOF
               AND (item_id = '$item_id' OR item_id IS NULL OR item_id = '' OR '$item_id' = '')
               AND (vendor_item_id = '$vendor_item_id' OR vendor_item_id IS NULL OR vendor_item_id = '' OR '$vendor_item_id' = '')
               AND progress_date = '$CHECK_DATE'
-              AND rcheck_count > 9
               AND site_code = 'cpck'
               AND is_rcheck_completed = true
             ORDER BY rcheck_count DESC
