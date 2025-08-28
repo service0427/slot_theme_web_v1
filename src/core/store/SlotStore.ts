@@ -8,6 +8,30 @@ export interface SlotState {
   slotPrice: number;
   isLoading: boolean;
   error: string | null;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  } | null;
+  systemStats: {
+    operationMode: string;
+    totalSlots: number;
+    statusBreakdown: {
+      empty: number;
+      pending: number;
+      rejected: number;
+      active: number;
+      waiting: number;
+      scheduled: number;
+      paused: number;
+      expired: number;
+      all: number;
+    };
+    themes: string[];
+    testSlots: number;
+    refundedSlots: number;
+  } | null;
 }
 
 export class SlotStore extends Store<SlotState> {
@@ -20,7 +44,9 @@ export class SlotStore extends Store<SlotState> {
       pendingSlots: [],
       slotPrice: 0,
       isLoading: false,
-      error: null
+      error: null,
+      pagination: null,
+      systemStats: null
     });
 
     // 슬롯 가격 로드
@@ -41,17 +67,18 @@ export class SlotStore extends Store<SlotState> {
     }
   }
 
-  async loadUserSlots(): Promise<void> {
+  async loadUserSlots(page: number = 1, limit: number = 50): Promise<void> {
     if (!this.userId) return;
     
     this.setState({ isLoading: true, error: null });
     
     try {
-      const result = await this.slotService.getUserSlots(this.userId);
+      const result = await this.slotService.getUserSlots(this.userId, page, limit);
       
       if (result.success && result.data) {
         this.setState({
-          slots: result.data,
+          slots: result.data.items,
+          pagination: result.data.pagination,
           isLoading: false
         });
       } else {
@@ -177,19 +204,20 @@ export class SlotStore extends Store<SlotState> {
     }
   }
 
-  // 관리자 기능 - 모든 슬롯 조회
-  async loadAllSlots(statusFilter?: string): Promise<UserSlot[]> {
+  // 관리자 기능 - 모든 슬롯 조회 (페이지네이션 포함)
+  async loadAllSlots(statusFilter?: string, page: number = 1, limit: number = 50, searchQuery?: string): Promise<UserSlot[]> {
     this.setState({ isLoading: true, error: null });
     
     try {
-      const result = await this.slotService.getAllSlots(statusFilter);
+      const result = await this.slotService.getAllSlots(statusFilter, page, limit, searchQuery);
       
       if (result.success && result.data) {
         this.setState({
-          pendingSlots: result.data,
+          pendingSlots: result.data.items,
+          pagination: result.data.pagination,
           isLoading: false
         });
-        return result.data;
+        return result.data.items;
       } else {
         this.setState({
           error: result.error || '슬롯 조회에 실패했습니다.',
@@ -208,7 +236,19 @@ export class SlotStore extends Store<SlotState> {
 
   // 관리자 기능 - 대기중인 슬롯만 조회 (기존 호환성 유지)
   async loadPendingSlots(): Promise<UserSlot[]> {
-    return this.loadAllSlots('pending');
+    return this.loadAllSlots('pending', 1, 50);
+  }
+
+  // 관리자 기능 - 시스템 전체 통계 조회
+  async loadSystemStats(): Promise<void> {
+    try {
+      const result = await this.slotService.getSystemStats();
+      if (result.success && result.data) {
+        this.setState({ systemStats: result.data });
+      }
+    } catch (error) {
+      console.error('시스템 통계 로드 실패:', error);
+    }
   }
 
   // 관리자 기능 - 대기중인 슬롯 개수만 조회 (대시보드용)

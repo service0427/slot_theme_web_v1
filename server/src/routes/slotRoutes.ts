@@ -22,7 +22,8 @@ import {
   getSlotRankChain,
   bulkUpdateSlots,
   getSlotRankHistory,
-  getSlotsByAllocation
+  getSlotsByAllocation,
+  getSystemStats
 } from '../controllers/slotController';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
@@ -36,6 +37,9 @@ router.get('/', getSlots);
 
 // 슬롯 개수 조회 (관리자 대시보드용)
 router.get('/count', getSlotCount);
+
+// 시스템 전체 통계 조회 (관리자 전용)
+router.get('/system-stats', getSystemStats);
 
 // 슬롯 발급 내역 조회 (관리자 전용) - 특정 ID 라우트보다 먼저 와야 함
 router.get('/allocation-history', getSlotAllocationHistory);

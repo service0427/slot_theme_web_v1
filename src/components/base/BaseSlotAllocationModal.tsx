@@ -39,7 +39,7 @@ export function BaseSlotAllocationModal({
     userId: userId,
     slotCount: 10,
     startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 10일 후 (기본값)
+    endDate: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 10일 기간 (시작일 포함)
     workCount: undefined,
     amount: undefined,
     description: '',
@@ -152,13 +152,13 @@ export function BaseSlotAllocationModal({
         userId: userId,
         slotCount: 10,
         startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 10일간 (시작일 포함)
         workCount: undefined,
         amount: undefined,
         description: '',
         isTest: false
       });
-      setSelectedDuration(7);
+      setSelectedDuration(10);
     } catch (error) {
       console.error('선슬롯 발행 실패:', error);
       alert('선슬롯 발행에 실패했습니다.');
@@ -178,7 +178,7 @@ export function BaseSlotAllocationModal({
       if (field === 'startDate') {
         const startDate = new Date(value);
         const duration = newData.isTest ? 3 : selectedDuration;
-        startDate.setDate(startDate.getDate() + duration);
+        startDate.setDate(startDate.getDate() + duration - 1); // 시작일 포함
         newData.endDate = startDate.toISOString().split('T')[0];
       }
       
@@ -186,7 +186,7 @@ export function BaseSlotAllocationModal({
       if (field === 'isTest') {
         const startDate = new Date(newData.startDate);
         const duration = value ? 3 : selectedDuration;
-        startDate.setDate(startDate.getDate() + duration);
+        startDate.setDate(startDate.getDate() + duration - 1); // 시작일 포함
         newData.endDate = startDate.toISOString().split('T')[0];
       }
       
@@ -215,7 +215,7 @@ export function BaseSlotAllocationModal({
     // 종료일 재계산
     if (formData.startDate) {
       const startDate = new Date(formData.startDate);
-      startDate.setDate(startDate.getDate() + duration);
+      startDate.setDate(startDate.getDate() + duration - 1); // 시작일 포함
       setFormData(prev => ({
         ...prev,
         endDate: startDate.toISOString().split('T')[0]
@@ -353,7 +353,7 @@ export function BaseSlotAllocationModal({
               }) : '-'}
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              시작일로부터 {formData.isTest ? '3' : selectedDuration}일 후
+              시작일로부터 {formData.isTest ? '3' : selectedDuration}일간
             </p>
           </div>
 

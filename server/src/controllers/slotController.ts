@@ -230,9 +230,9 @@ export async function getSlots(req: AuthRequest, res: Response) {
           AND v2_rd_yesterday.vendor_item_id = SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)')
           AND v2_rd_yesterday.date = CURRENT_DATE - INTERVAL '1 day'
         LEFT JOIN slot_allocation_history sah ON s.allocation_history_id = sah.id
-        WHERE s.user_id = $1
+        WHERE s.user_id = $1 AND s.status != 'refunded'
       `;
-      countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1';
+      countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1 AND s.status != \'refunded\'';
     }
 
     // 검색 조건 추가
@@ -251,12 +251,30 @@ export async function getSlots(req: AuthRequest, res: Response) {
       if (status === 'inactive') {
         query += ` AND u.is_active = false`;
         countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = false)`;
+      } else if (status === 'waiting') {
+        // 진행대기: active 상태이면서 시작일이 미래 (날짜 기준)
+        query += ` AND s.status = 'active' AND s.pre_allocation_start_date IS NOT NULL AND DATE(s.pre_allocation_start_date) > CURRENT_DATE`;
+        countQuery += ` AND s.status = 'active' AND s.pre_allocation_start_date IS NOT NULL AND DATE(s.pre_allocation_start_date) > CURRENT_DATE`;
+        query += ` AND u.is_active = true`;
+        countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = true)`;
+      } else if (status === 'active') {
+        // 진행중: active 상태이면서 (시작일 없거나 시작일 지남) AND (종료일 없거나 종료일 안 지남) - 날짜 기준
+        query += ` AND s.status = 'active' AND (s.pre_allocation_start_date IS NULL OR DATE(s.pre_allocation_start_date) <= CURRENT_DATE) AND (s.pre_allocation_end_date IS NULL OR DATE(s.pre_allocation_end_date) >= CURRENT_DATE)`;
+        countQuery += ` AND s.status = 'active' AND (s.pre_allocation_start_date IS NULL OR DATE(s.pre_allocation_start_date) <= CURRENT_DATE) AND (s.pre_allocation_end_date IS NULL OR DATE(s.pre_allocation_end_date) >= CURRENT_DATE)`;
+        query += ` AND u.is_active = true`;
+        countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = true)`;
+      } else if (status === 'completed') {
+        // 완료: active 상태이면서 종료일이 과거 (날짜 기준)
+        query += ` AND s.status = 'active' AND s.pre_allocation_end_date IS NOT NULL AND DATE(s.pre_allocation_end_date) < CURRENT_DATE`;
+        countQuery += ` AND s.status = 'active' AND s.pre_allocation_end_date IS NOT NULL AND DATE(s.pre_allocation_end_date) < CURRENT_DATE`;
+        query += ` AND u.is_active = true`;
+        countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = true)`;
       } else {
+        // 기타 상태 (empty, refunded, paused 등)
         params.push(status);
         countParams.push(status);
         query += ` AND s.status = $${params.length}`;
         countQuery += ` AND s.status = $${countParams.length}`;
-        // 기본적으로 활성화된 사용자의 슬롯만 조회 (inactive가 아닌 경우)
         query += ` AND u.is_active = true`;
         countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = true)`;
       }
@@ -266,8 +284,12 @@ export async function getSlots(req: AuthRequest, res: Response) {
       countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = true)`;
     }
 
-    // 정렬 및 페이징
-    query += ' ORDER BY s.created_at DESC';
+    // 정렬 및 페이징 (관리자는 DESC, 사용자는 ASC)
+    if (userRole === 'operator' || userRole === 'developer') {
+      query += ' ORDER BY s.created_at DESC';
+    } else {
+      query += ' ORDER BY s.created_at ASC';
+    }
     params.push(limit, offset);
     query += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
 
@@ -2903,7 +2925,7 @@ export async function getSlotsByAllocation(req: AuthRequest, res: Response) {
       FROM slots s
       JOIN users u ON s.user_id = u.id
       WHERE s.allocation_history_id = $1
-      ORDER BY s.slot_number ASC, s.created_at ASC
+      ORDER BY s.created_at DESC
     `, [allocationHistoryId]);
 
     res.json({
@@ -2915,6 +2937,123 @@ export async function getSlotsByAllocation(req: AuthRequest, res: Response) {
     res.status(500).json({
       success: false,
       error: "슬롯 조회 중 오류가 발생했습니다."
+    });
+  }
+}
+
+// 시스템 전체 통계 조회
+export async function getSystemStats(req: AuthRequest, res: Response) {
+  try {
+    const userRole = req.user?.role;
+    
+    // 권한 확인
+    if (userRole !== "operator" && userRole !== "developer") {
+      return res.status(403).json({
+        success: false,
+        error: "관리자/개발자 권한이 필요합니다."
+      });
+    }
+
+    // 전체 슬롯 개수 (모든 사용자 포함)
+    const totalResult = await pool.query('SELECT COUNT(*) FROM slots');
+    const totalSlots = parseInt(totalResult.rows[0].count);
+
+    // 상태별 카운트 쿼리 (활성 사용자만)
+    const statusBreakdownResult = await pool.query(`
+      SELECT 
+        -- 기본 상태 (활성 사용자만)
+        COUNT(CASE WHEN s.status = 'empty' AND u.is_active = true THEN 1 END) as empty,
+        COUNT(CASE WHEN s.status = 'pending' AND u.is_active = true THEN 1 END) as pending,
+        COUNT(CASE WHEN s.status = 'paused' AND u.is_active = true THEN 1 END) as paused,
+        
+        -- active 상태 세분화 (선슬롯발행 날짜 기준, 활성 사용자만)
+        COUNT(CASE 
+          WHEN s.status = 'active' AND s.pre_allocation_start_date IS NOT NULL 
+            AND DATE(s.pre_allocation_start_date) > CURRENT_DATE AND u.is_active = true
+          THEN 1 
+        END) as waiting,
+        
+        COUNT(CASE 
+          WHEN s.status = 'active' 
+            AND (s.pre_allocation_start_date IS NULL OR DATE(s.pre_allocation_start_date) <= CURRENT_DATE)
+            AND (s.pre_allocation_end_date IS NULL OR DATE(s.pre_allocation_end_date) >= CURRENT_DATE)
+            AND u.is_active = true
+          THEN 1 
+        END) as active,
+        
+        COUNT(CASE 
+          WHEN s.status = 'active' AND s.pre_allocation_end_date IS NOT NULL 
+            AND DATE(s.pre_allocation_end_date) < CURRENT_DATE AND u.is_active = true
+          THEN 1 
+        END) as completed,
+        
+        -- 환불 상태 (활성 사용자만)
+        COUNT(CASE WHEN s.status = 'refunded' AND u.is_active = true THEN 1 END) as refunded,
+        
+        -- 테스트 슬롯 (활성 사용자만)
+        COUNT(CASE WHEN s.is_test = true AND u.is_active = true THEN 1 END) as test_slots
+      FROM slots s
+      JOIN users u ON s.user_id = u.id
+    `);
+
+    // 비활성 사용자의 슬롯 카운트
+    const inactiveResult = await pool.query(`
+      SELECT COUNT(*)
+      FROM slots s
+      JOIN users u ON s.user_id = u.id
+      WHERE u.is_active = false
+    `);
+
+    // 테마 목록 조회 (system_settings에서)
+    const themeResult = await pool.query(`
+      SELECT value 
+      FROM system_settings 
+      WHERE key = 'available_themes'
+    `);
+    
+    const themes = themeResult.rows.length > 0 
+      ? JSON.parse(themeResult.rows[0].value)
+      : ['default', 'modern', 'luxury'];
+
+    // 운영 모드 확인
+    const operationModeResult = await pool.query(`
+      SELECT value 
+      FROM system_settings 
+      WHERE key = 'slot_operation_mode'
+    `);
+    
+    const operationMode = operationModeResult.rows.length > 0
+      ? operationModeResult.rows[0].value
+      : 'pre-allocation';
+
+    const breakdown = statusBreakdownResult.rows[0];
+
+    res.json({
+      success: true,
+      data: {
+        operationMode,
+        totalSlots,
+        statusBreakdown: {
+          empty: parseInt(breakdown.empty),
+          pending: parseInt(breakdown.pending),
+          waiting: parseInt(breakdown.waiting),
+          active: parseInt(breakdown.active),
+          completed: parseInt(breakdown.completed),
+          paused: parseInt(breakdown.paused),
+          inactive: parseInt(inactiveResult.rows[0].count),
+          refunded: parseInt(breakdown.refunded)
+        },
+        themes,
+        testSlots: parseInt(breakdown.test_slots),
+        refundedSlots: parseInt(breakdown.refunded)
+      }
+    });
+
+  } catch (error) {
+    console.error("Get system stats error:", error);
+    res.status(500).json({
+      success: false,
+      error: "시스템 통계 조회 중 오류가 발생했습니다."
     });
   }
 }

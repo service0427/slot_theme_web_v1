@@ -15,6 +15,36 @@ export interface SlotResult<T = any> {
   error?: string;
 }
 
+export interface PaginatedSlotResult {
+  items: UserSlot[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface SystemStats {
+  operationMode: string;
+  totalSlots: number;
+  statusBreakdown: {
+    empty: number;
+    pending: number;
+    active: number;
+    waiting: number;
+    completed: number;
+    paused: number;
+    expired: number;
+    inactive: number;
+    refunded: number;
+    all: number;
+  };
+  themes: string[];
+  testSlots: number;
+  refundedSlots: number;
+}
+
 export interface ISlotService {
   getSlotPrice(): Promise<number>;
   getUserSlots(userId: string): Promise<SlotResult<UserSlot[]>>;
@@ -26,8 +56,9 @@ export interface ISlotService {
   // 관리자 기능
   approveSlot(slotId: string, approvedPrice?: number): Promise<SlotResult<void>>;
   rejectSlot(slotId: string, reason: string): Promise<SlotResult<void>>;
-  getAllSlots(statusFilter?: string): Promise<SlotResult<UserSlot[]>>;
+  getAllSlots(statusFilter?: string, page?: number, limit?: number, searchQuery?: string): Promise<SlotResult<PaginatedSlotResult>>;
   getAllPendingSlots(): Promise<SlotResult<UserSlot[]>>;
+  getSystemStats(): Promise<SlotResult<SystemStats>>;
   // 슬롯 개수 조회
   getSlotCount(statusFilter?: string): Promise<SlotResult<{ count: number }>>;
   getPendingSlotCount(): Promise<SlotResult<{ count: number }>>;
@@ -51,8 +82,9 @@ export abstract class BaseSlotService implements ISlotService {
   abstract deleteSlot(slotId: string): Promise<SlotResult<void>>;
   abstract approveSlot(slotId: string, approvedPrice?: number): Promise<SlotResult<void>>;
   abstract rejectSlot(slotId: string, reason: string): Promise<SlotResult<void>>;
-  abstract getAllSlots(statusFilter?: string): Promise<SlotResult<UserSlot[]>>;
+  abstract getAllSlots(statusFilter?: string, page?: number, limit?: number, searchQuery?: string): Promise<SlotResult<PaginatedSlotResult>>;
   abstract getAllPendingSlots(): Promise<SlotResult<UserSlot[]>>;
+  abstract getSystemStats(): Promise<SlotResult<SystemStats>>;
   abstract getSlotCount(statusFilter?: string): Promise<SlotResult<{ count: number }>>;
   abstract getPendingSlotCount(): Promise<SlotResult<{ count: number }>>;
   abstract fillEmptySlot(slotId: string, params: CreateSlotParams): Promise<SlotResult<UserSlot>>;

@@ -4,6 +4,7 @@ import { UserSlot } from '@/core/models/UserSlot';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 import { fieldConfigService, FieldConfig } from '@/adapters/services/ApiFieldConfigService';
+import { ApiSlotService } from '@/adapters/services/ApiSlotService';
 import { BaseSlotExtensionModal } from './BaseSlotExtensionModal';
 import { BaseAdvancedSearchDropdown, SearchFilters } from './BaseAdvancedSearchDropdown';
 import { BaseRankHistoryModal } from './BaseRankHistoryModal';
@@ -37,7 +38,7 @@ interface BaseAdminSlotApprovalPageProps {
 export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps> = ({
   theme = {}
 }) => {
-  const { loadAllSlots, approveSlot, rejectSlot } = useSlotContext();
+  const { loadAllSlots, loadSystemStats, approveSlot, rejectSlot, systemStats: contextSystemStats, pagination: contextPagination } = useSlotContext();
   const { config } = useConfig();
   const { getSetting } = useSystemSettings();
   const { user } = useAuthContext();
@@ -52,7 +53,6 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [pendingSlots, setPendingSlots] = useState<UserSlot[]>([]);
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [allSlots, setAllSlots] = useState<UserSlot[]>([]);
-  const [totalSlots, setTotalSlots] = useState<UserSlot[]>([]); // 필터링 전 전체 슬롯
   const [isLoading, setIsLoading] = useState(true);
   const [rejectingSlot, setRejectingSlot] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -68,6 +68,10 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [statusFilter, setStatusFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // 컨텍스트에서 페이지네이션 정보 가져오기
+  const totalPages = contextPagination?.totalPages || 1;
+  const totalCount = contextPagination?.total || 0;
   
   // 순위 히스토리 모달 상태
   const [rankHistoryModal, setRankHistoryModal] = useState({
@@ -89,7 +93,9 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [extendingSlot, setExtendingSlot] = useState<UserSlot | null>(null);
   const [showExtensionModal, setShowExtensionModal] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
-  const [inactiveCount, setInactiveCount] = useState(0);
+  
+  // 컨텍스트에서 시스템 통계 사용
+  const systemStats = contextSystemStats;
 
   // 기본 스타일
   const defaultTheme: AdminSlotApprovalThemeProps = {
@@ -128,17 +134,15 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openDropdownId]);
 
+  // 필드 설정과 시스템 통계 초기 로드 (1회만)
   useEffect(() => {
-    // 필드 설정 로드
     const loadFieldConfigs = async () => {
       try {
         const configs = await fieldConfigService.getFieldConfigs();
-        // configs가 배열로 직접 오는 경우와 success/data 구조로 오는 경우 모두 처리
         const configData = Array.isArray(configs) ? configs : 
           ((configs as any).success && (configs as any).data ? (configs as any).data : []);
         
         if (configData && configData.length > 0) {
-          // URL 파싱 필드와 시스템 생성 필드 제외
           const visibleFields = configData.filter((field: FieldConfig) => 
             !field.is_system_generated && 
             !['url_product_id', 'url_item_id', 'url_vendor_item_id'].includes(field.field_key)
@@ -152,89 +156,37 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
 
     loadFieldConfigs();
     
-    // 전체 슬롯 로드 (카운트 계산용)
-    if (statusFilter === 'all' || !totalSlots.length) {
-      loadAllSlots(undefined).then(allSlotsData => {
-        setTotalSlots(allSlotsData);
-      });
+    // 시스템 통계 로드 (1회만)
+    if (!systemStats) {
+      loadSystemStats();
     }
-    
-    // 비활성 슬롯 카운트 로드
-    loadAllSlots('inactive').then(inactiveSlots => {
-      setInactiveCount(inactiveSlots.length);
-    });
-    
-    // 필터링된 슬롯 로드
-    loadAllSlots(statusFilter === 'all' ? undefined : statusFilter).then(slots => {
-      if (slots.length > 0) {
-        // console.log('[DEBUG] 첫 번째 슬롯 상세:', {
-        //   id: slots[0].id,
-        //   thumbnail: (slots[0] as any).thumbnail,
-        //   rank: (slots[0] as any).rank,
-        //   first_rank: (slots[0] as any).first_rank,
-        //   status: slots[0].status,
-        //   keyword: (slots[0] as any).keyword
-        // });
+  }, [loadSystemStats, systemStats]);
+
+  // 슬롯 데이터 로드
+  useEffect(() => {
+    const loadSlotsData = async () => {
+      setIsLoading(true);
+      try {
+        const slots = await loadAllSlots(
+          statusFilter === 'all' ? undefined : statusFilter,
+          currentPage,
+          itemsPerPage,
+          searchQuery || undefined
+        );
+        
+        setAllSlots(slots);
+        setPendingSlots(slots);
+      } catch (error) {
+        console.error('슬롯 로드 실패:', error);
+        setAllSlots([]);
+        setPendingSlots([]);
+      } finally {
+        setIsLoading(false);
       }
-      
-      let filteredSlots = slots;
-      const now = new Date();
-      
-      // 상태별 필터링 (날짜 조건 포함)
-      if (statusFilter !== 'all') {
-        if (isPreAllocationMode) {
-          // 선슬롯발행 모드 - 특별한 필터링 필요
-          if (statusFilter === 'waiting' || statusFilter === 'active' || statusFilter === 'completed') {
-            // waiting, active, completed는 모두 DB상 active 상태이므로, 백엔드에서 모든 active를 받아와야 함
-            // 그래서 백엔드에 'active'를 요청했어야 하는데, 현재는 'waiting'을 요청함
-            // 이 경우 백엔드에서 모든 슬롯을 받아와서 프론트에서 필터링
-            loadAllSlots('active').then(activeSlotsAll => {
-              
-              let refiltered = activeSlotsAll;
-              if (statusFilter === 'waiting') {
-                // 진행대기: active 상태이면서 시작일 전
-                refiltered = activeSlotsAll.filter(slot => 
-                  slot.startDate && new Date(slot.startDate) > now
-                );
-              } else if (statusFilter === 'active') {
-                // 진행중: active 상태이면서 기간 내
-                refiltered = activeSlotsAll.filter(slot => 
-                  (!slot.startDate || new Date(slot.startDate) <= now) &&
-                  (!slot.endDate || new Date(slot.endDate) >= now)
-                );
-              } else if (statusFilter === 'completed') {
-                // 완료: active 상태이면서 종료일 지남
-                refiltered = activeSlotsAll.filter(slot => 
-                  slot.endDate && new Date(slot.endDate) < now
-                );
-              }
-              
-              setAllSlots(refiltered);
-              setPendingSlots(refiltered);
-            });
-            return; // early return
-          } else {
-            // empty, pending, paused, rejected는 그대로 사용
-            filteredSlots = slots;
-          }
-        } else {
-          // 일반 모드: 백엔드에서 이미 필터링된 상태 그대로 사용
-          // 하지만 active인 경우 날짜 확인
-          if (statusFilter === 'active') {
-            filteredSlots = slots.filter(slot => 
-              slot.status === 'active' && 
-              (!slot.startDate || new Date(slot.startDate) <= now) &&
-              (!slot.endDate || new Date(slot.endDate) >= now)
-            );
-          }
-        }
-      }
-      
-      setAllSlots(filteredSlots);
-      setPendingSlots(filteredSlots);
-      setIsLoading(false);
-    });
-  }, [statusFilter, isPreAllocationMode]);
+    };
+    
+    loadSlotsData();
+  }, [statusFilter, isPreAllocationMode, currentPage, itemsPerPage, searchQuery, loadAllSlots]);
 
   // 상세 검색 필터 적용 함수
   const applySearchFilters = (filters: SearchFilters) => {
@@ -332,46 +284,15 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     setSearchQuery(filters.searchQuery);
   };
 
-  // 검색 및 가격 필터링
+  // 검색 및 필터 변경 시 1페이지로 리셋
   useEffect(() => {
-    // 상세 검색 사용 중이면 일반 검색 무시
-    if (advancedFilters) return;
-    
-    let filtered = [...allSlots];
-    
-    // 텍스트 검색
-    if (searchQuery) {
-      const searchLower = searchQuery.toLowerCase();
-      filtered = filtered.filter(slot => {
-        return (
-          getSlotFieldValue(slot, 'keyword')?.toLowerCase().includes(searchLower) ||
-          slot.userName?.toLowerCase().includes(searchLower) ||
-          slot.userEmail?.toLowerCase().includes(searchLower) ||
-          getSlotFieldValue(slot, 'url')?.toLowerCase().includes(searchLower)
-        );
-      });
+    if (searchQuery || priceFilter || advancedFilters) {
+      setCurrentPage(1);
     }
-    
-    // 가격 필터
-    if (priceFilter) {
-      const priceNum = parseFloat(priceFilter);
-      if (!isNaN(priceNum)) {
-        filtered = filtered.filter(slot => {
-          const slotPrice = slot.approvedPrice || slot.price || slot.amount || 0;
-          return slotPrice >= priceNum;
-        });
-      }
-    }
-    
-    setPendingSlots(filtered);
-    setCurrentPage(1);
-  }, [searchQuery, priceFilter, allSlots]);
+  }, [searchQuery, priceFilter, advancedFilters]);
 
-  // 페이징 처리
-  const totalPages = Math.ceil(pendingSlots.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentSlots = pendingSlots.slice(startIndex, endIndex);
+  // 페이징 처리 - 서버 사이드 페이지네이션 사용하므로 슬라이싱 불필요
+  const currentSlots = pendingSlots;
 
   const handleApprove = async (slotId: string) => {
     if (!config.useCashSystem) {
@@ -802,32 +723,30 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     return <div className={mergedTheme.loadingClass}>로딩 중...</div>;
   }
 
-  // 상태별 통계 (전체 슬롯 기준으로 계산)
-  const now = new Date();
-  const slotsForCount = totalSlots.length > 0 ? totalSlots : allSlots; // totalSlots가 있으면 사용, 없으면 allSlots
-  const statusCounts = {
-    all: slotsForCount.length,
-    empty: slotsForCount.filter(s => s.status === 'empty').length,
-    pending: slotsForCount.filter(s => s.status === 'pending').length,
-    waiting: slotsForCount.filter(s => {
-      if (s.status !== 'active') return false;
-      const start = s.startDate ? new Date(s.startDate) : null;
-      return start && now < start;
-    }).length,
-    active: slotsForCount.filter(s => {
-      if (s.status !== 'active') return false;
-      const start = s.startDate ? new Date(s.startDate) : null;
-      const end = s.endDate ? new Date(s.endDate) : null;
-      return (!start || now >= start) && (!end || now <= end);
-    }).length,
-    completed: slotsForCount.filter(s => {
-      if (s.status !== 'active') return false;
-      const end = s.endDate ? new Date(s.endDate) : null;
-      return end && now > end;
-    }).length,
-    paused: slotsForCount.filter(s => s.status === 'paused').length,
-    rejected: slotsForCount.filter(s => s.status === 'rejected').length,
-    inactive: inactiveCount // 비활성화된 사용자의 슬롯 수
+  // 상태별 통계 - 시스템 통계 우선 사용
+  const statusCounts = systemStats ? {
+    all: systemStats.totalSlots,
+    empty: systemStats.statusBreakdown.empty,
+    pending: systemStats.statusBreakdown.pending,
+    waiting: systemStats.statusBreakdown.waiting || 0,
+    active: systemStats.statusBreakdown.active,
+    completed: systemStats.statusBreakdown.completed || 0,
+    paused: systemStats.statusBreakdown.paused,
+    refunded: systemStats.statusBreakdown.refunded,
+    expired: systemStats.statusBreakdown.expired || 0,
+    inactive: systemStats.statusBreakdown.inactive || 0
+  } : {
+    // 폴백 - 시스템 통계가 없을 때만 사용
+    all: 0,
+    empty: 0,
+    pending: 0,
+    waiting: 0,
+    active: 0,
+    completed: 0,
+    paused: 0,
+    refunded: 0,
+    expired: 0,
+    inactive: 0
   };
 
   const getStatusBadge = (status: string) => {
@@ -867,17 +786,30 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           <div>
             <h1 className={mergedTheme.titleClass}>{isPreAllocationMode ? '슬롯 관리' : '슬롯 승인'}</h1>
             <p className={mergedTheme.subtitleClass}>
-              전체 슬롯: {statusCounts.all}개
-              {isPreAllocationMode && (
+              전체 슬롯: {systemStats?.totalSlots || statusCounts.all}개
+              {isPreAllocationMode && systemStats && (
                 <span className="ml-2">
-                  (대기: {statusCounts.empty}, 진행대기: {statusCounts.waiting}, 
-                  진행중: {statusCounts.active}, 완료: {statusCounts.completed}, 일시정지: {statusCounts.paused})
+                  (빈슬롯: {systemStats.statusBreakdown.empty}, 
+                  진행대기: {systemStats.statusBreakdown.waiting}, 
+                  진행중: {systemStats.statusBreakdown.active}, 
+                  완료: {systemStats.statusBreakdown.completed}, 
+                  일시정지: {systemStats.statusBreakdown.paused}, 
+                  환불: {systemStats.statusBreakdown.refunded}, 
+                  비활성: {systemStats.statusBreakdown.inactive})
                 </span>
               )}
-              {!isPreAllocationMode && (
+              {!isPreAllocationMode && systemStats && (
                 <span className="ml-2">
-                  (승인대기: {statusCounts.pending}, 활성: {statusCounts.active}, 거부: {statusCounts.rejected})
+                  (승인대기: {systemStats.statusBreakdown.pending}, 
+                  활성: {systemStats.statusBreakdown.active}, 
+                  환불: {systemStats.statusBreakdown.refunded}, 
+                  비활성: {systemStats.statusBreakdown.inactive})
                 </span>
+              )}
+              {searchQuery && (
+                <div className="mt-1 text-sm text-blue-600">
+                  📌 검색 결과: {totalCount}개 ("{searchQuery}" 검색)
+                </div>
               )}
             </p>
           </div>
@@ -976,14 +908,28 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
               </button>
               <button
                 onClick={() => {
+                  setStatusFilter('refunded');
+                  setAdvancedFilters(null);
+                  setResetAdvancedSearch(true);
+                }}
+                className={`px-4 py-2 rounded-lg ${
+                  statusFilter === 'refunded' 
+                    ? 'bg-purple-600 text-white' 
+                    : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                }`}
+              >
+                환불완료 ({statusCounts.refunded})
+              </button>
+              <button
+                onClick={() => {
                   setStatusFilter('inactive');
                   setAdvancedFilters(null);
                   setResetAdvancedSearch(true);
                 }}
                 className={`px-4 py-2 rounded-lg ${
                   statusFilter === 'inactive' 
-                    ? 'bg-red-600 text-white' 
-                    : 'bg-red-100 text-red-800 hover:bg-red-200'
+                    ? 'bg-gray-600 text-white' 
+                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                 }`}
               >
                 비활성 ({statusCounts.inactive})
@@ -1556,7 +1502,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
           {totalPages > 1 && (
             <div className="px-3 py-2 flex items-center justify-between border-t">
               <div className="text-sm text-gray-600">
-                전체 {pendingSlots.length}개 중 {startIndex + 1}-{Math.min(endIndex, pendingSlots.length)}개 표시
+                전체 {statusFilter === '' ? (systemStats?.totalSlots || totalCount) : totalCount}개 중 {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalCount)}개 표시
               </div>
               <div className="flex gap-2">
                 <button

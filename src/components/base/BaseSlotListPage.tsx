@@ -441,7 +441,7 @@ export function BaseSlotListPage({
   UserSlotCard,
   UserSlotListItem
 }: BaseSlotListPageProps) {
-  const { slots, slotPrice, createSlot, pauseSlot, resumeSlot, loadUserSlots, fillEmptySlot, updateSlot, isLoading } = useSlotContext();
+  const { slots, slotPrice, createSlot, pauseSlot, resumeSlot, loadUserSlots, fillEmptySlot, updateSlot, isLoading, pagination } = useSlotContext();
   const { config } = useConfig();
   const { getSetting } = useSystemSettings();
   const { user } = useAuthContext();
@@ -490,9 +490,11 @@ export function BaseSlotListPage({
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
 
   useEffect(() => {
-    loadUserSlots();
-    loadFieldConfigs();
-  }, []);
+    loadUserSlots(currentPage, itemsPerPage);
+    if (currentPage === 1) { // 첫 로드시에만 필드 설정 로드
+      loadFieldConfigs();
+    }
+  }, [currentPage, itemsPerPage]);
 
   // 슬롯의 formData 변경 핸들러
   const handleFormDataChange = (slotId: string, newFormData: Record<string, string>) => {
@@ -717,14 +719,9 @@ export function BaseSlotListPage({
     return empty;
   }, [slots, slotOperationMode]);
 
-  // 페이징 처리
-  const paginatedSlots = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredSlots.slice(startIndex, endIndex);
-  }, [filteredSlots, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filteredSlots.length / itemsPerPage);
+  // 서버사이드 페이지네이션 사용
+  const paginatedSlots = filteredSlots; // 서버에서 이미 페이징된 데이터
+  const totalPages = pagination?.totalPages || 1;
 
   // 일괄 수정 관련 함수들
   const canBulkEdit = (slot: UserSlot) => {
@@ -1007,7 +1004,7 @@ export function BaseSlotListPage({
                   선슬롯발행 생성
                 </button>
                 <span className="text-sm text-gray-600">
-                  할당된 슬롯: {slots.length}개
+                  할당된 슬롯: {pagination?.total || slots.length}개
                 </span>
                 <span className="text-sm text-green-600 font-medium">
                   사용 중: {slots.filter(slot => slot.status !== 'empty').length}개
@@ -1020,7 +1017,7 @@ export function BaseSlotListPage({
               // 일반 사용자는 선슬롯발행 모드에서 통계만 표시
               <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-600">
-                  할당된 슬롯: {slots.length}개
+                  할당된 슬롯: {pagination?.total || slots.length}개
                 </span>
                 <span className="text-sm text-green-600 font-medium">
                   사용 중: {slots.filter(slot => slot.status !== 'empty').length}개

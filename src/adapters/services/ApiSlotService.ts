@@ -16,11 +16,11 @@ export class ApiSlotService extends BaseSlotService {
     this.accessToken = localStorage.getItem('accessToken');
   }
 
-  async getUserSlots(_userId: string): Promise<SlotResult<UserSlot[]>> {
+  async getUserSlots(_userId: string, page: number = 1, limit: number = 50): Promise<SlotResult<PaginatedSlotResult<UserSlot[]>>> {
     try {
       this.updateAccessToken();
       
-      const response = await fetch(`${API_BASE_URL}/slots?limit=100`, {
+      const response = await fetch(`${API_BASE_URL}/slots?page=${page}&limit=${limit}`, {
         headers: {
           'Authorization': `Bearer ${this.accessToken}`
         }
@@ -127,7 +127,10 @@ export class ApiSlotService extends BaseSlotService {
 
         return {
           success: true,
-          data: slots
+          data: {
+            items: slots,
+            pagination: result.data.pagination
+          }
         };
       }
 
@@ -448,15 +451,26 @@ export class ApiSlotService extends BaseSlotService {
     return 0;
   }
 
-  async getAllSlots(statusFilter?: string): Promise<SlotResult<UserSlot[]>> {
+  async getAllSlots(statusFilter?: string, page: number = 1, limit: number = 50, searchQuery?: string): Promise<SlotResult<{
+    items: UserSlot[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }>> {
     try {
       this.updateAccessToken();
       
       const params = new URLSearchParams();
-      // 관리자는 모든 슬롯을 볼 수 있어야 하므로 limit을 충분히 큰 수로 설정
-      params.append('limit', '10000'); // 모든 슬롯을 가져올 수 있도록 큰 수로 설정
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
       if (statusFilter && statusFilter !== 'all') {
         params.append('status', statusFilter);
+      }
+      if (searchQuery) {
+        params.append('search', searchQuery);
       }
       
       const response = await fetch(`${API_BASE_URL}/slots?${params.toString()}`, {
@@ -566,7 +580,15 @@ export class ApiSlotService extends BaseSlotService {
 
         return {
           success: true,
-          data: slots
+          data: {
+            items: slots,
+            pagination: result.data.pagination || {
+              page: 1,
+              limit: limit,
+              total: slots.length,
+              totalPages: 1
+            }
+          }
         };
       }
 
@@ -584,7 +606,17 @@ export class ApiSlotService extends BaseSlotService {
   }
 
   async getAllPendingSlots(): Promise<SlotResult<UserSlot[]>> {
-    return this.getAllSlots('pending');
+    const result = await this.getAllSlots('pending', 1, 1000);
+    if (result.success && result.data) {
+      return {
+        success: true,
+        data: result.data.items
+      };
+    }
+    return {
+      success: false,
+      error: result.error || '슬롯 조회 실패'
+    };
   }
 
   // 슬롯 개수만 가져오는 함수 (관리자 대시보드용)
@@ -627,6 +659,54 @@ export class ApiSlotService extends BaseSlotService {
   // Pending 슬롯 개수만 가져오는 함수
   async getPendingSlotCount(): Promise<SlotResult<{ count: number }>> {
     return this.getSlotCount('pending');
+  }
+
+  // 시스템 전체 통계 가져오기 (관리자 전용)
+  async getSystemStats(): Promise<SlotResult<{
+    operationMode: string;
+    totalSlots: number;
+    statusBreakdown: {
+      empty: number;
+      pending: number;
+      waiting: number;
+      active: number;
+      completed: number;
+      paused: number;
+      inactive: number;
+      refunded: number;
+    };
+    themes: string[];
+    testSlots: number;
+    refundedSlots: number;
+  }>> {
+    try {
+      this.updateAccessToken();
+      
+      const response = await fetch(`${API_BASE_URL}/slots/system-stats`, {
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`
+        }
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || '시스템 통계를 가져오는데 실패했습니다.'
+        };
+      }
+
+      return {
+        success: true,
+        data: result.data
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '시스템 통계 조회 중 오류가 발생했습니다.'
+      };
+    }
   }
 
   async updateSlot(slotId: string, params: UpdateSlotParams): Promise<SlotResult<UserSlot>> {

@@ -22,14 +22,18 @@ export function useSlot(slotStore: SlotStore) {
     return await slotStore.resumeSlot(slotId);
   }, [slotStore]);
 
-  const loadUserSlots = useCallback(async () => {
-    await slotStore.loadUserSlots();
+  const loadUserSlots = useCallback(async (page: number = 1, limit: number = 50) => {
+    await slotStore.loadUserSlots(page, limit);
   }, [slotStore]);
 
   // 관리자 기능
-  const loadAllSlots = useCallback(async (statusFilter?: string) => {
-    const slots = await slotStore.loadAllSlots(statusFilter);
+  const loadAllSlots = useCallback(async (statusFilter?: string, page?: number, limit?: number, searchQuery?: string) => {
+    const slots = await slotStore.loadAllSlots(statusFilter, page || 1, limit || 50, searchQuery);
     return slots;
+  }, [slotStore]);
+
+  const loadSystemStats = useCallback(async () => {
+    await slotStore.loadSystemStats();
   }, [slotStore]);
 
   const loadPendingSlots = useCallback(async () => {
@@ -60,6 +64,8 @@ export function useSlot(slotStore: SlotStore) {
     slotPrice: state.slotPrice,
     isLoading: state.isLoading,
     error: state.error,
+    pagination: state.pagination,
+    systemStats: state.systemStats,
     createSlot,
     updateSlot,
     pauseSlot,
@@ -68,6 +74,7 @@ export function useSlot(slotStore: SlotStore) {
     fillEmptySlot,
     // 관리자 기능
     loadAllSlots,
+    loadSystemStats,
     loadPendingSlots,
     loadPendingSlotCount,
     approveSlot,

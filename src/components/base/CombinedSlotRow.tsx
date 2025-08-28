@@ -35,12 +35,21 @@ function CombinedSlotRowComponent({
   
   const isEmptySlot = slot.status === 'empty';
   
-  // 날짜 기반 상태 확인
-  const now = new Date();
-  const start = slot.startDate ? new Date(slot.startDate) : null;
-  const end = slot.endDate ? new Date(slot.endDate) : null;
-  const isWaiting = slot.status === 'active' && start && now < start;
-  const isCompleted = slot.status === 'active' && end && now > end;
+  // 날짜 기반 상태 확인 (시간 제외, 날짜만 비교)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // 시간을 00:00:00으로 설정
+  const start = slot.startDate ? (() => {
+    const startDate = new Date(slot.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    return startDate;
+  })() : null;
+  const end = slot.endDate ? (() => {
+    const endDate = new Date(slot.endDate);
+    endDate.setHours(0, 0, 0, 0);
+    return endDate;
+  })() : null;
+  const isWaiting = slot.status === 'active' && start && today < start;
+  const isCompleted = slot.status === 'active' && end && today > end;
   
   // 모든 슬롯 inline 편집 가능 (엑셀 붙여넣기 지원)
   const canInlineEdit = true;
@@ -434,7 +443,11 @@ function CombinedSlotRowComponent({
             checked={isSelected}
             onChange={(e) => onSelectionChange(slot.id, e.target.checked)}
             className="w-4 h-4"
-            disabled={!((slot.status === 'empty' || slot.status === 'active') && slot.status !== 'refunded' && (!slot.endDate || new Date(slot.endDate) > new Date()))}
+            disabled={!((slot.status === 'empty' || slot.status === 'active') && slot.status !== 'refunded' && (!slot.endDate || (() => {
+              const endDate = new Date(slot.endDate);
+              endDate.setHours(0, 0, 0, 0);
+              return endDate >= today;
+            })()))}
           />
         </td>
       )}
@@ -636,32 +649,40 @@ function CombinedSlotRowComponent({
       </td>
       <td className="px-2 py-4 text-center border-r text-xs">
         {slot.endDate ? (() => {
-          const now = new Date();
-          const end = new Date(slot.endDate);
-          const timeLeft = end.getTime() - now.getTime();
-          const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
+          const startForCalc = slot.startDate ? new Date(slot.startDate) : new Date();
+          startForCalc.setHours(0, 0, 0, 0);
+          const endForCalc = new Date(slot.endDate);
+          endForCalc.setHours(0, 0, 0, 0);
+          const timeLeft = endForCalc.getTime() - startForCalc.getTime();
+          const totalDays = Math.ceil(timeLeft / (1000 * 60 * 60 * 24)) + 1; // 시작일 포함
+          
+          const todayForStatus = new Date();
+          todayForStatus.setHours(0, 0, 0, 0);
+          const remainingTime = endForCalc.getTime() - todayForStatus.getTime();
+          const daysLeft = Math.ceil(remainingTime / (1000 * 60 * 60 * 24));
           
           let colorClass = 'text-gray-400'; // 기본 색상
           let daysText = '';
           
-          if (now > end) {
+          // 전체 운영 기간 표시
+          daysText = `(${totalDays}일)`;
+          
+          // 색상은 남은 일수 기준으로 설정
+          if (todayForStatus > endForCalc) {
             colorClass = 'text-green-600 font-medium'; // 완료 - 녹색
-            daysText = '(완료)';
           } else if (daysLeft === 0) {
-            colorClass = 'text-red-600 font-semibold'; // 오늘 - 빨간색
-            daysText = '(오늘)';
+            colorClass = 'text-red-600 font-semibold'; // 오늘 종료 - 빨간색
           } else if (daysLeft > 0) {
             if (daysLeft <= 3) {
               colorClass = 'text-red-600 font-semibold'; // 3일 미만 - 빨간색
             } else if (daysLeft <= 7) {
               colorClass = 'text-orange-500 font-medium'; // 1주일 미만 - 주황색
             }
-            daysText = `(${daysLeft}일)`;
           }
           
           return (
             <span className={colorClass}>
-              {end.toLocaleDateString('ko-KR', {
+              {endForCalc.toLocaleDateString('ko-KR', {
                 year: '2-digit',
                 month: '2-digit',
                 day: '2-digit'
@@ -675,11 +696,20 @@ function CombinedSlotRowComponent({
       {/* 상태 컬럼 */}
       <td className="px-2 py-4 text-center border-r">
         {(() => {
-          const now = new Date();
-          const start = slot.startDate ? new Date(slot.startDate) : null;
-          const end = slot.endDate ? new Date(slot.endDate) : null;
-          const isWaiting = slot.status === 'active' && start && now < start;
-          const isActive = slot.status === 'active' && (!start || now >= start) && (!end || now <= end);
+          const todayForStatus = new Date();
+          todayForStatus.setHours(0, 0, 0, 0);
+          const startForStatus = slot.startDate ? (() => {
+            const startDate = new Date(slot.startDate);
+            startDate.setHours(0, 0, 0, 0);
+            return startDate;
+          })() : null;
+          const endForStatus = slot.endDate ? (() => {
+            const endDate = new Date(slot.endDate);
+            endDate.setHours(0, 0, 0, 0);
+            return endDate;
+          })() : null;
+          const isWaiting = slot.status === 'active' && startForStatus && todayForStatus < startForStatus;
+          const isActive = slot.status === 'active' && (!startForStatus || todayForStatus >= startForStatus) && (!endForStatus || todayForStatus <= endForStatus);
           const isPaused = slot.status === 'paused';
           
           if (isWaiting || isActive || isPaused) {
