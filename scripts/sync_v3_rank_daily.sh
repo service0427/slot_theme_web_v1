@@ -171,8 +171,8 @@ sync_from_external() {
             COALESCE(product_data->'thumbnailImages'->0->>'url', '') as thumbnail
         FROM v2_products
         WHERE product_id = '$product_id'
-          AND item_id = '$item_id'
-          AND vendor_item_id = '$vendor_item_id'
+          AND (item_id = '$item_id' OR item_id IS NULL OR item_id = '' OR '$item_id' = '')
+          AND (vendor_item_id = '$vendor_item_id' OR vendor_item_id IS NULL OR vendor_item_id = '' OR '$vendor_item_id' = '')
         LIMIT 1;
 EOF
         )
@@ -210,8 +210,8 @@ EOF
             ) ranks
             WHERE keyword = '$keyword'
               AND product_id = '$product_id'
-              AND item_id = '$item_id'
-              AND vendor_item_id = '$vendor_item_id'
+              AND (item_id = '$item_id' OR item_id IS NULL OR item_id = '' OR '$item_id' = '')
+              AND (vendor_item_id = '$vendor_item_id' OR vendor_item_id IS NULL OR vendor_item_id = '' OR '$vendor_item_id' = '')
               AND progress_date = '$CHECK_DATE'::date - interval '1 day'
               AND site_code = 'cpck'
               AND is_rcheck_completed = true
@@ -241,8 +241,8 @@ EOF
             FROM v2_slot_tasks_daily_progress
             WHERE keyword = '$keyword'
               AND product_id = '$product_id'
-              AND item_id = '$item_id'
-              AND vendor_item_id = '$vendor_item_id'
+              AND (item_id = '$item_id' OR item_id IS NULL OR item_id = '' OR '$item_id' = '')
+              AND (vendor_item_id = '$vendor_item_id' OR vendor_item_id IS NULL OR vendor_item_id = '' OR '$vendor_item_id' = '')
               AND progress_date = '$CHECK_DATE'
               AND rcheck_count > 9
               AND site_code = 'cpck'

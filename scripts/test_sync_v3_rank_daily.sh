@@ -256,8 +256,8 @@ test_sync_sample() {
             COALESCE(product_data->'thumbnailImages'->0->>'url', '') as thumbnail
         FROM v2_products
         WHERE product_id = '$product_id'
-          AND item_id = '$item_id'
-          AND vendor_item_id = '$vendor_item_id'
+          AND (item_id = '$item_id' OR item_id IS NULL OR item_id = '' OR '$item_id' = '')
+          AND (vendor_item_id = '$vendor_item_id' OR vendor_item_id IS NULL OR vendor_item_id = '' OR '$vendor_item_id' = '')
         LIMIT 1;
 EOF
         )
@@ -273,7 +273,9 @@ EOF
         # 외부 DB에서 순위 정보 가져오기 (상세 정보 포함)
         # v2_slot_tasks_daily_progress 테이블 사용
         log_debug "순위 정보 조회 중..."
-        RANK_DEBUG_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF
+        
+        # 디버깅용 쿼리 생성
+        RANK_QUERY="WITH rank_history AS (
         WITH rank_history AS (
             SELECT 
                 *,
@@ -281,8 +283,8 @@ EOF
             FROM v2_slot_tasks_daily_progress
             WHERE keyword = '$keyword'
               AND product_id = '$product_id'
-              AND item_id = '$item_id'
-              AND vendor_item_id = '$vendor_item_id'
+              AND (item_id = '$item_id' OR item_id IS NULL OR item_id = '' OR '$item_id' = '')
+              AND (vendor_item_id = '$vendor_item_id' OR vendor_item_id IS NULL OR vendor_item_id = '' OR '$vendor_item_id' = '')
               AND progress_date >= '$CHECK_DATE'::date - interval '1 day'
               AND progress_date <= '$CHECK_DATE'::date
               AND site_code = 'cpck'
@@ -341,7 +343,96 @@ EOF
 EOF
         )
         
-        if [ ! -z "$RANK_DEBUG_INFO" ]; then
+        # 쿼리 실행 실패시 디버깅 정보 출력
+        if [ -z "$RANK_DEBUG_INFO" ]; then
+            echo -e "  ${RED}❌ 순위 정보 조회 실패${NC}"
+            echo ""
+            echo -e "  ${YELLOW}📋 디버깅 정보:${NC}"
+            echo "  실행한 쿼리 조건:"
+            echo "    - keyword = '$keyword'"
+            echo "    - product_id = '$product_id'"
+            echo "    - item_id = '$item_id'"
+            echo "    - vendor_item_id = '$vendor_item_id'"
+            echo "    - progress_date = '$CHECK_DATE'"
+            echo "    - site_code = 'cpck'"
+            echo "    - is_rcheck_completed = true"
+            echo "    - rcheck_count > 9"
+            echo ""
+            
+            # 단계별 데이터 존재 확인
+            echo -e "  ${BLUE}🔍 데이터 존재 여부 확인:${NC}"
+            
+            # 1. 기본 데이터 확인
+            BASIC_CHECK=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+            SELECT COUNT(*) FROM v2_slot_tasks_daily_progress
+            WHERE keyword = '$keyword'
+              AND product_id = '$product_id'
+              AND progress_date = '$CHECK_DATE';
+EOF
+            )
+            echo "    1) 기본 조건 (keyword, product_id, date): ${BASIC_CHECK:-0}건"
+            
+            # 2. site_code 추가
+            SITE_CHECK=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+            SELECT COUNT(*) FROM v2_slot_tasks_daily_progress
+            WHERE keyword = '$keyword'
+              AND product_id = '$product_id'
+              AND progress_date = '$CHECK_DATE'
+              AND site_code = 'cpck';
+EOF
+            )
+            echo "    2) + site_code='cpck': ${SITE_CHECK:-0}건"
+            
+            # 3. is_rcheck_completed 추가
+            COMPLETE_CHECK=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+            SELECT COUNT(*) FROM v2_slot_tasks_daily_progress
+            WHERE keyword = '$keyword'
+              AND product_id = '$product_id'
+              AND progress_date = '$CHECK_DATE'
+              AND site_code = 'cpck'
+              AND is_rcheck_completed = true;
+EOF
+            )
+            echo "    3) + is_rcheck_completed=true: ${COMPLETE_CHECK:-0}건"
+            
+            # 4. rcheck_count 추가
+            RCHECK_CHECK=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+            SELECT COUNT(*) FROM v2_slot_tasks_daily_progress
+            WHERE keyword = '$keyword'
+              AND product_id = '$product_id'
+              AND progress_date = '$CHECK_DATE'
+              AND site_code = 'cpck'
+              AND is_rcheck_completed = true
+              AND rcheck_count > 9;
+EOF
+            )
+            echo "    4) + rcheck_count > 9: ${RCHECK_CHECK:-0}건"
+            
+            # 실제 데이터 샘플 보기
+            if [ "${BASIC_CHECK:-0}" -gt 0 ]; then
+                echo ""
+                echo -e "  ${CYAN}📊 실제 데이터 내용:${NC}"
+                PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB <<EOF 2>/dev/null
+                SELECT site_code, is_rcheck_completed, rcheck_count, min_rank, latest_rank
+                FROM v2_slot_tasks_daily_progress
+                WHERE keyword = '$keyword'
+                  AND product_id = '$product_id'
+                  AND progress_date = '$CHECK_DATE'
+                LIMIT 3;
+EOF
+            fi
+            
+            # 쿼리 실행 명령어 제공
+            echo ""
+            echo -e "  ${YELLOW}💡 외부 DB에서 직접 확인하려면:${NC}"
+            echo "  PGPASSWORD='$EXTERNAL_PASS' psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -c \""
+            echo "    SELECT * FROM v2_slot_tasks_daily_progress"
+            echo "    WHERE keyword = '$keyword'"
+            echo "      AND product_id = '$product_id'"
+            echo "      AND progress_date = '$CHECK_DATE';\""
+            
+            FAILED=$((FAILED + 1))
+        else
             IFS='|' read -r available_ranks yesterday_rank min_rank calculated_rank rating review_count rank_reason <<< "$RANK_DEBUG_INFO"
             
             echo ""
@@ -400,9 +491,6 @@ EOF
                 echo -e "  ${YELLOW}⚠️ 데이터 없음${NC}"
                 FAILED=$((FAILED + 1))
             fi
-        else
-            echo -e "  ${RED}❌ 순위 정보 조회 실패${NC}"
-            FAILED=$((FAILED + 1))
         fi
         
         echo ""
