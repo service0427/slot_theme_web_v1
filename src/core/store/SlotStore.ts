@@ -208,6 +208,8 @@ export class SlotStore extends Store<SlotState> {
   async loadAllSlots(statusFilter?: string, page: number = 1, limit: number = 50, searchQuery?: string): Promise<UserSlot[]> {
     this.setState({ isLoading: true, error: null });
     
+    console.log('[DEBUG] loadAllSlots 호출:', { statusFilter, page, limit, searchQuery });
+    
     try {
       const result = await this.slotService.getAllSlots(statusFilter, page, limit, searchQuery);
       

@@ -473,6 +473,8 @@ export class ApiSlotService extends BaseSlotService {
         params.append('search', searchQuery);
       }
       
+      console.log('[DEBUG] API 호출 URL:', `${API_BASE_URL}/slots?${params.toString()}`);
+      
       const response = await fetch(`${API_BASE_URL}/slots?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${this.accessToken}`

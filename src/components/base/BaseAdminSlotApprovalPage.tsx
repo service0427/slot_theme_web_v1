@@ -63,6 +63,8 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
   const [editingPriceSlot, setEditingPriceSlot] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<SearchFilters | null>(null);
   const [resetAdvancedSearch, setResetAdvancedSearch] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -162,16 +164,34 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     }
   }, [loadSystemStats, systemStats]);
 
+  // 검색어 디바운싱
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms 후에 검색 실행
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // 슬롯 데이터 로드
   useEffect(() => {
     const loadSlotsData = async () => {
-      setIsLoading(true);
+      // 검색어 변경으로 인한 호출인지 확인
+      const isSearchChange = debouncedSearchQuery !== '';
+      
+      // 검색이 아닌 경우에만 전체 로딩 표시
+      if (!isSearchChange) {
+        setIsLoading(true);
+      } else {
+        setIsSearching(true);
+      }
+      
       try {
         const slots = await loadAllSlots(
           statusFilter === 'all' ? undefined : statusFilter,
           currentPage,
           itemsPerPage,
-          searchQuery || undefined
+          debouncedSearchQuery || undefined
         );
         
         setAllSlots(slots);
@@ -182,11 +202,12 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
         setPendingSlots([]);
       } finally {
         setIsLoading(false);
+        setIsSearching(false);
       }
     };
     
     loadSlotsData();
-  }, [statusFilter, isPreAllocationMode, currentPage, itemsPerPage, searchQuery, loadAllSlots]);
+  }, [statusFilter, isPreAllocationMode, currentPage, itemsPerPage, debouncedSearchQuery, loadAllSlots]);
 
   // 상세 검색 필터 적용 함수
   const applySearchFilters = (filters: SearchFilters) => {
@@ -719,7 +740,8 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
     return '';
   };
 
-  if (isLoading) {
+  // 초기 로딩일 때만 전체 로딩 화면 표시
+  if (isLoading && !allSlots.length && !searchQuery) {
     return <div className={mergedTheme.loadingClass}>로딩 중...</div>;
   }
 
@@ -1014,6 +1036,11 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                 advancedFilters ? 'bg-gray-100 cursor-not-allowed' : ''
               }`}
             />
+            {isSearching && (
+              <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              </div>
+            )}
             {advancedFilters && (
               <button
                 onClick={() => {
@@ -1107,7 +1134,23 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {currentSlots.map(slot => (
+              {isLoading || isSearching ? (
+                <tr>
+                  <td colSpan={fieldConfigs.length + 10} className="px-3 py-8 text-center">
+                    <div className="flex justify-center items-center gap-2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                      <span className="text-gray-500">{isSearching ? '검색 중...' : '로딩 중...'}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : currentSlots.length === 0 ? (
+                <tr>
+                  <td colSpan={fieldConfigs.length + 10} className="px-3 py-8 text-center text-gray-500">
+                    {searchQuery ? `"${searchQuery}"에 대한 검색 결과가 없습니다.` : '데이터가 없습니다.'}
+                  </td>
+                </tr>
+              ) : (
+                currentSlots.map(slot => (
                   <tr key={slot.id} className={mergedTheme.tableRowClass}>
                   <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-gray-900">
                     <div>
@@ -1494,7 +1537,7 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   </div>
                 </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
           

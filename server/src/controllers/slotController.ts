@@ -235,16 +235,6 @@ export async function getSlots(req: AuthRequest, res: Response) {
       countQuery = 'SELECT COUNT(*) FROM slots s WHERE s.user_id = $1 AND s.status != \'refunded\'';
     }
 
-    // 검색 조건 추가
-    if (search) {
-      const searchParam = `%${search}%`;
-      const paramIndex = params.length + 1;
-      params.push(searchParam);
-      countParams.push(searchParam);
-      query += ` AND (s.keyword ILIKE $${paramIndex} OR s.url ILIKE $${paramIndex})`;
-      countQuery += ` AND (s.keyword ILIKE $${countParams.length} OR s.url ILIKE $${countParams.length})`;
-    }
-
     // 상태 필터
     if (status) {
       // 'inactive'는 비활성화된 사용자의 슬롯을 조회
@@ -284,6 +274,29 @@ export async function getSlots(req: AuthRequest, res: Response) {
       countQuery += ` AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_active = true)`;
     }
 
+    // 검색어 필터 추가
+    if (search && search !== '') {
+      console.log('[DEBUG] 검색어:', search);
+      params.push(`%${search}%`);
+      countParams.push(`%${search}%`);
+      
+      // keyword, url, product_name, user_name, user_email 검색
+      query += ` AND (
+        s.keyword ILIKE $${params.length} OR 
+        s.url ILIKE $${params.length} OR 
+        s.product_name ILIKE $${params.length} OR 
+        u.full_name ILIKE $${params.length} OR 
+        u.email ILIKE $${params.length}
+      )`;
+      
+      countQuery += ` AND (
+        s.keyword ILIKE $${countParams.length} OR 
+        s.url ILIKE $${countParams.length} OR 
+        s.product_name ILIKE $${countParams.length} OR 
+        EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND (u.full_name ILIKE $${countParams.length} OR u.email ILIKE $${countParams.length}))
+      )`;
+    }
+
     // 정렬 및 페이징 (관리자는 DESC, 사용자는 ASC)
     if (userRole === 'operator' || userRole === 'developer') {
       query += ' ORDER BY s.created_at DESC';
@@ -294,8 +307,10 @@ export async function getSlots(req: AuthRequest, res: Response) {
     query += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
 
     // 디버그: 실행할 쿼리 출력
-    // [DEBUG] Query: query
-    // [DEBUG] Params: params
+    if (search) {
+      console.log('[DEBUG] Query:', query);
+      console.log('[DEBUG] Params:', params);
+    }
     
     // 데이터 조회
     const [dataResult, countResult] = await Promise.all([
