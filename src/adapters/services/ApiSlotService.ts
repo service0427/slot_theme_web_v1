@@ -453,7 +453,8 @@ export class ApiSlotService extends BaseSlotService {
       this.updateAccessToken();
       
       const params = new URLSearchParams();
-      params.append('limit', '500'); // 충분히 큰 수로 설정
+      // 관리자는 모든 슬롯을 볼 수 있어야 하므로 limit을 충분히 큰 수로 설정
+      params.append('limit', '10000'); // 모든 슬롯을 가져올 수 있도록 큰 수로 설정
       if (statusFilter && statusFilter !== 'all') {
         params.append('status', statusFilter);
       }
