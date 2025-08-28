@@ -275,7 +275,7 @@ EOF
         log_debug "순위 정보 조회 중..."
         
         # 디버깅용 쿼리 생성
-        RANK_QUERY="WITH rank_history AS (
+        RANK_DEBUG_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF 2>/dev/null
         WITH rank_history AS (
             SELECT 
                 *,
@@ -370,7 +370,7 @@ EOF
               AND progress_date = '$CHECK_DATE';
 EOF
             )
-            echo "    1) 기본 조건 (keyword, product_id, date): ${BASIC_CHECK:-0}건"
+            echo "    1) 기본 조건 - keyword, product_id, date: ${BASIC_CHECK:-0}건"
             
             # 2. site_code 추가
             SITE_CHECK=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
