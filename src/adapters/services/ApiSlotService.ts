@@ -82,6 +82,9 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).is_processing = item.is_processing;
           (slot as any).fail_count = item.fail_count;
           (slot as any).slot_number = item.slot_number;
+          
+          // 사용자 활성 상태 추가
+          (slot as any).user_is_active = item.user_is_active;
           (slot as any).is_empty = item.is_empty;
           (slot as any).url = item.url;
           (slot as any).keyword = item.keyword;
@@ -517,6 +520,9 @@ export class ApiSlotService extends BaseSlotService {
           (slot as any).is_processing = item.is_processing;
           (slot as any).fail_count = item.fail_count;
           (slot as any).slot_number = item.slot_number;
+          
+          // 사용자 활성 상태 추가
+          (slot as any).user_is_active = item.user_is_active;
           (slot as any).is_empty = item.is_empty;
           (slot as any).url = item.url;
           (slot as any).keyword = item.keyword;

@@ -1173,7 +1173,14 @@ export const BaseAdminSlotApprovalPage: React.FC<BaseAdminSlotApprovalPageProps>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-gray-900">
                     <div>
-                      <div className="font-medium text-xs">{slot.userName || '이름 없음'}</div>
+                      <div className="flex items-center justify-center gap-1">
+                        {(slot as any).user_is_active === false && (
+                          <span className="px-1.5 py-0.5 text-[10px] bg-red-100 text-red-600 rounded font-medium">
+                            비활성
+                          </span>
+                        )}
+                        <div className="font-medium text-xs">{slot.userName || '이름 없음'}</div>
+                      </div>
                       <div className="text-xs text-gray-500">{slot.userEmail || 'user_id'}</div>
                     </div>
                   </td>
