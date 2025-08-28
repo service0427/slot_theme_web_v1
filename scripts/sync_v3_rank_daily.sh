@@ -2,7 +2,8 @@
 
 # ========================================
 # v3_rank_daily 동기화 스크립트
-# v2_slot_tasks_daily_progress 테이블에서 데이터 가져오기
+# v2_slot_tasks_daily_progress 테이블 사용
+# 우리 slots 테이블 기준으로 외부 DB에서 정보 가져오기
 # ========================================
 
 # 색상 정의
@@ -49,84 +50,164 @@ fi
 # 설정 파일 로드
 source "$CONFIG_FILE"
 
-# ========================================
-# 변수 설정
-# ========================================
+# 필수 설정값 확인
+if [ -z "$EXTERNAL_HOST" ] || [ "$EXTERNAL_HOST" = "외부서버IP" ]; then
+    log_error "EXTERNAL_HOST가 설정되지 않았습니다. sync.config 파일을 확인하세요"
+    exit 1
+fi
 
-# 날짜 파라미터 (기본값: 오늘)
-CHECK_DATE="${1:-$(date +%Y-%m-%d)}"
-YESTERDAY=$(date -d "$CHECK_DATE - 1 day" +%Y-%m-%d 2>/dev/null || date -v-1d -j -f "%Y-%m-%d" "$CHECK_DATE" +%Y-%m-%d 2>/dev/null || echo "")
-
-# 디버그 모드
-DEBUG="${DEBUG:-false}"
+log_info "설정 파일 로드 완료: $CONFIG_FILE"
 
 # ========================================
-# 메인 처리
+# 추가 설정값
 # ========================================
+CHECK_DATE=${1:-$(date +%Y-%m-%d)}  # 날짜를 인자로 받을 수 있음 (기본: 오늘)
+TEMP_DIR="/tmp/v3_rank_sync_$$"
 
-main() {
-    log_info "========================================="
-    log_info "v3_rank_daily 동기화 시작"
-    log_info "대상 날짜: $CHECK_DATE"
-    log_info "v2_slot_tasks_daily_progress 테이블 사용"
-    log_info "========================================="
+# 로그 디렉토리 설정
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+LOG_DIR="$PROJECT_DIR/logs"
+LOG_FILE="$LOG_DIR/sync_v3_$(date +%Y%m%d_%H%M%S).log"
+
+# 통계 변수
+TOTAL_SLOTS=0
+TOTAL_PROCESSED=0
+TOTAL_SUCCESS=0
+TOTAL_FAILED=0
+START_TIME=$(date +%s)
+
+# 임시 디렉토리 생성
+mkdir -p $TEMP_DIR
+
+# ========================================
+# 0. 우리 slots 데이터 추출
+# ========================================
+extract_our_slots() {
+    log_info "우리 slots 데이터 추출 중..."
     
-    # 1. 우리 DB의 슬롯 조회
-    log_info "로컬 DB에서 슬롯 정보 조회 중..."
-    
-    SLOTS=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -F'|' <<EOF 2>/dev/null
+    # URL에서 product_id, item_id, vendor_item_id 추출
+    # trim_keyword 사용 (공백 제거된 버전)
+    PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -F'|' -c "
         SELECT DISTINCT 
-            s.id,
-            COALESCE(s.trim_keyword, REPLACE(s.keyword, ' ', '')) as keyword,
-            SUBSTRING(s.url FROM 'products/([0-9]+)') as product_id,
-            COALESCE(SUBSTRING(s.url FROM 'itemId=([0-9]+)'), '') as item_id,
-            COALESCE(SUBSTRING(s.url FROM 'vendorItemId=([0-9]+)'), '') as vendor_item_id
-        FROM slots s
-        WHERE s.status = 'active'
-          AND s.keyword IS NOT NULL
-          AND s.keyword != ''
-          AND s.url IS NOT NULL
-          AND s.url != ''
-        ORDER BY 1;
-EOF
-    )
+            COALESCE(trim_keyword, REPLACE(keyword, ' ', '')) as keyword,
+            SUBSTRING(url FROM 'products/([0-9]+)') as product_id,
+            SUBSTRING(url FROM 'itemId=([0-9]+)') as item_id,
+            SUBSTRING(url FROM 'vendorItemId=([0-9]+)') as vendor_item_id
+        FROM slots
+        WHERE url IS NOT NULL
+          AND url LIKE '%coupang.com%'
+          AND url LIKE '%products/%'
+          AND url LIKE '%itemId=%'
+          AND url LIKE '%vendorItemId=%'
+          AND keyword IS NOT NULL
+          AND keyword != '';
+    " > $TEMP_DIR/our_slots.txt
     
-    if [ -z "$SLOTS" ]; then
-        log_warn "활성 슬롯이 없습니다."
-        exit 0
+    TOTAL_SLOTS=$(wc -l < $TEMP_DIR/our_slots.txt)
+    log_info "추출 완료: ${TOTAL_SLOTS}개 slot 발견"
+    
+    if [ "$TOTAL_SLOTS" -eq 0 ]; then
+        log_error "slots 테이블에 유효한 데이터가 없습니다"
+        exit 1
+    fi
+}
+
+# ========================================
+# 1. 기존 데이터 확인
+# ========================================
+check_existing_data() {
+    log_info "기존 v2_rank_daily 데이터 확인 중..."
+    
+    EXISTING_COUNT=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A -c "
+        SELECT COUNT(*) FROM v2_rank_daily WHERE date = '$CHECK_DATE';
+    ")
+    
+    log_info "날짜 $CHECK_DATE의 기존 데이터: ${EXISTING_COUNT}건"
+    
+    if [ "$EXISTING_COUNT" -gt 0 ]; then
+        log_warn "기존 데이터를 DELETE로 삭제 중..."
+        PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -c "
+            DELETE FROM v2_rank_daily 
+            WHERE date = '$CHECK_DATE'::date;
+        " > /dev/null 2>&1
+        log_info "기존 데이터 삭제 완료"
     fi
     
-    TOTAL_SLOTS=$(echo "$SLOTS" | wc -l)
-    log_info "총 ${TOTAL_SLOTS}개의 활성 슬롯 발견"
+    # 이미 완전한 데이터가 있는 키 목록 생성 (삭제 후에는 빈 파일이 됨)
+    touch $TEMP_DIR/complete_keys.txt
+}
+
+# ========================================
+# 2. 외부 DB에서 정보 동기화
+# ========================================
+sync_from_external() {
+    log_info "외부 DB에서 정보 동기화 시작..."
     
-    # 2. 오늘 날짜의 기존 데이터 삭제
-    log_info "v2_rank_daily에서 $CHECK_DATE 데이터 삭제 중..."
+    local PROCESSED=0
+    local SUCCESS=0
+    local FAILED=0
+    local SKIPPED=0
     
-    DELETE_COUNT=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A <<EOF 2>/dev/null
-        DELETE FROM v2_rank_daily 
-        WHERE date = '$CHECK_DATE'::date
-        RETURNING 1;
-EOF
-    )
-    
-    DELETED_ROWS=$(echo "$DELETE_COUNT" | wc -l)
-    log_info "삭제된 레코드: ${DELETED_ROWS}건"
-    
-    # 3. 각 슬롯에 대해 순위 정보 동기화
-    SUCCESS_COUNT=0
-    FAIL_COUNT=0
-    NO_DATA_COUNT=0
-    
-    while IFS='|' read -r slot_id keyword product_id item_id vendor_item_id; do
-        log_debug "처리 중: $keyword (ID: $slot_id)"
+    while IFS='|' read -r keyword product_id item_id vendor_item_id; do
+        PROCESSED=$((PROCESSED + 1))
         
-        # 외부 DB에서 순위 정보 가져오기 (v2_slot_tasks_daily_progress 사용)
-        RESULT=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A <<EOF 2>/dev/null
+        # 진행상황 표시
+        if [ $((PROCESSED % 50)) -eq 0 ]; then
+            log_info "진행중: ${PROCESSED}/${TOTAL_SLOTS} (성공: $SUCCESS, 실패: $FAILED, 스킵: $SKIPPED)"
+        fi
+        
+        # 이미 완전한 데이터가 있는지 확인
+        CHECK_KEY="${keyword}|${product_id}|${item_id}|${vendor_item_id}"
+        if grep -q "^${CHECK_KEY}$" $TEMP_DIR/complete_keys.txt 2>/dev/null; then
+            SKIPPED=$((SKIPPED + 1))
+            log_debug "완전한 데이터 존재, 스킵: $CHECK_KEY"
+            continue
+        fi
+        
+        # 외부 DB에서 상품 정보 가져오기
+        PRODUCT_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF 2>/dev/null
+        SELECT 
+            REPLACE(COALESCE(product_data->>'title', ''), '|', ' ') as product_name,
+            COALESCE(product_data->'thumbnailImages'->0->>'url', '') as thumbnail
+        FROM v2_products
+        WHERE product_id = '$product_id'
+          AND item_id = '$item_id'
+          AND vendor_item_id = '$vendor_item_id'
+        LIMIT 1;
+EOF
+        )
+        
+        if [ ! -z "$PRODUCT_INFO" ]; then
+            IFS='|' read -r product_name thumbnail <<< "$PRODUCT_INFO"
+            
+            # 상품 정보 저장
+            PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -c "
+                SELECT v2_upsert_product_info(
+                    '$CHECK_DATE'::date,
+                    '$keyword',
+                    '$product_id',
+                    '$item_id',
+                    '$vendor_item_id',
+                    '$product_name',
+                    '$thumbnail'
+                );
+            " > /dev/null 2>&1
+        fi
+        
+        # 외부 DB에서 순위 정보 가져오기 (rank_data JSON 처리 포함)
+        # v2_slot_tasks_daily_progress 테이블 사용, 컬럼명 변경 적용
+        RANK_INFO=$(PGPASSWORD=$EXTERNAL_PASS psql -h $EXTERNAL_HOST -p $EXTERNAL_PORT -U $EXTERNAL_USER -d $EXTERNAL_DB -t -A -F'|' <<EOF 2>/dev/null
         WITH yesterday_data AS (
-            -- 어제 순위 데이터
+            -- 어제 rank_data에서 최대 순위 추출
             SELECT 
-                latest_rank as yesterday_rank
-            FROM v2_slot_tasks_daily_progress
+                MAX(r) as yesterday_rank
+            FROM v2_slot_tasks_daily_progress,
+            LATERAL (
+                SELECT (elem->>'rank')::integer as r
+                FROM jsonb_array_elements(rank_data) elem 
+                WHERE elem->>'rank' IS NOT NULL
+                  AND (elem->>'rank')::integer > 0
+            ) ranks
             WHERE keyword = '$keyword'
               AND product_id = '$product_id'
               AND item_id = '$item_id'
@@ -138,138 +219,200 @@ EOF
         ),
         today_data AS (
             SELECT 
-                p.product_name,
-                p.thumbnail,
-                h.*,
-                COALESCE(y.yesterday_rank, 0) as yesterday_rank
-            FROM v2_slot_tasks_daily_progress h
-            LEFT JOIN v2_products p ON 
-                p.product_id = h.product_id 
-                AND p.item_id = h.item_id 
-                AND p.vendor_item_id = h.vendor_item_id
-            LEFT JOIN yesterday_data y ON 1=1
-            WHERE h.keyword = '$keyword'
-              AND h.product_id = '$product_id'
-              AND h.item_id = '$item_id'
-              AND h.vendor_item_id = '$vendor_item_id'
-              AND h.progress_date = '$CHECK_DATE'
-              AND h.rcheck_count > 9
-              AND h.site_code = 'cpck'
-              AND h.is_rcheck_completed = true
-            ORDER BY h.rcheck_count DESC
+                -- rank_data JSON에서 순위 배열 추출 (0 포함)
+                ARRAY(
+                    SELECT DISTINCT (elem->>'rank')::integer 
+                    FROM jsonb_array_elements(rank_data) elem 
+                    WHERE elem->>'rank' IS NOT NULL
+                    ORDER BY (elem->>'rank')::integer
+                ) as all_ranks_array,
+                -- 0 제외한 순위 배열
+                ARRAY(
+                    SELECT DISTINCT (elem->>'rank')::integer 
+                    FROM jsonb_array_elements(rank_data) elem 
+                    WHERE elem->>'rank' IS NOT NULL
+                      AND (elem->>'rank')::integer > 0
+                    ORDER BY (elem->>'rank')::integer
+                ) as ranks_array,
+                (SELECT yesterday_rank FROM yesterday_data) as yesterday_rank,
+                latest_rank,
+                rating,
+                review_count
+            FROM v2_slot_tasks_daily_progress
+            WHERE keyword = '$keyword'
+              AND product_id = '$product_id'
+              AND item_id = '$item_id'
+              AND vendor_item_id = '$vendor_item_id'
+              AND progress_date = '$CHECK_DATE'
+              AND rcheck_count > 9
+              AND site_code = 'cpck'
+              AND is_rcheck_completed = true
+            ORDER BY rcheck_count DESC
             LIMIT 1
         )
         SELECT 
             CASE 
-                WHEN min_rank IS NOT NULL AND min_rank > 0 AND min_rank <= 500 THEN min_rank
-                WHEN min_rank IS NOT NULL AND min_rank > 500 THEN 0
-                WHEN min_rank IS NULL AND EXISTS (
-                    SELECT 1 FROM jsonb_array_elements(rank_data) elem 
-                    WHERE (elem->>'rank')::integer = 0
-                ) THEN 0
+                -- rank_data에 0만 있을 때
+                WHEN array_length(all_ranks_array, 1) > 0 AND array_length(ranks_array, 1) = 0 THEN 0
+                -- rank_data에 양수 순위가 있을 때
+                WHEN array_length(ranks_array, 1) > 0 THEN
+                    CASE
+                        -- 어제 순위가 있고 0이 아닐 때
+                        WHEN yesterday_rank IS NOT NULL AND yesterday_rank > 0 THEN
+                            CASE
+                                -- 5등 이하일 때: 어제 순위와 동일한 순위 제외하고 낮은 순위 중 최대값
+                                WHEN yesterday_rank > 5 THEN
+                                    COALESCE(
+                                        (SELECT MAX(r) FROM unnest(ranks_array) r WHERE r < yesterday_rank),
+                                        -- 어제보다 낮은 순위가 없으면 가장 가까운 값(최소값)
+                                        (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                                    )
+                                -- 5등 이내일 때: 어제 순위 포함해서 낮거나 같은 순위 중 최대값
+                                ELSE
+                                    COALESCE(
+                                        (SELECT MAX(r) FROM unnest(ranks_array) r WHERE r <= yesterday_rank),
+                                        -- 어제보다 낮거나 같은 순위가 없으면 가장 가까운 값(최소값)
+                                        (SELECT MIN(r) FROM unnest(ranks_array) r WHERE r > yesterday_rank)
+                                    )
+                            END
+                        -- 어제 순위가 없거나 0이면: 최대값 (가장 낮은 순위)
+                        ELSE
+                            (SELECT MAX(r) FROM unnest(ranks_array) r)
+                    END
+                -- rank_data가 아예 없으면 NULL
                 ELSE NULL
-            END as rank,
-            yesterday_rank,
-            COALESCE(product_name, '') as product_name,
-            COALESCE(thumbnail, '') as thumbnail,
-            COALESCE(rating::text, '0') as rating,
-            COALESCE(review_count::text, '0') as review_count
+            END as calculated_rank,
+            COALESCE(rating, 0) as rating,
+            COALESCE(review_count, 0) as review_count
         FROM today_data;
 EOF
         )
         
-        if [ -z "$RESULT" ]; then
-            log_debug "  → 데이터 없음: $keyword"
-            ((NO_DATA_COUNT++))
-            continue
-        fi
-        
-        # 결과 파싱
-        IFS='|' read -r rank yesterday_rank product_name thumbnail rating review_count <<< "$RESULT"
-        
-        # NULL 처리
-        if [ "$rank" = "" ]; then
-            rank="NULL"
-        fi
-        if [ "$yesterday_rank" = "" ] || [ "$yesterday_rank" = "0" ]; then
-            yesterday_rank="0"
-        fi
-        
-        # 로컬 DB에 저장
-        INSERT_RESULT=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A <<EOF 2>&1
-            INSERT INTO v2_rank_daily (
-                date, keyword, product_id, item_id, vendor_item_id,
-                rank, yesterday_rank, product_name, thumbnail, rating, review_count
-            ) VALUES (
-                '$CHECK_DATE'::date,
-                '$keyword',
-                '$product_id',
-                '$item_id',
-                '$vendor_item_id',
-                $([ "$rank" = "NULL" ] && echo "NULL" || echo "$rank"),
-                $yesterday_rank,
-                \$\$${product_name}\$\$,
-                \$\$${thumbnail}\$\$,
-                ${rating:-0},
-                ${review_count:-0}
-            )
-            ON CONFLICT (date, keyword, product_id, item_id, vendor_item_id)
-            DO UPDATE SET
-                rank = EXCLUDED.rank,
-                yesterday_rank = EXCLUDED.yesterday_rank,
-                product_name = EXCLUDED.product_name,
-                thumbnail = EXCLUDED.thumbnail,
-                rating = EXCLUDED.rating,
-                review_count = EXCLUDED.review_count,
-                updated_at = CURRENT_TIMESTAMP
-            RETURNING 1;
-EOF
-        )
-        
-        if [ "$?" -eq 0 ]; then
-            log_debug "  ✓ 저장 성공: $keyword (순위: ${rank:-측정중}, 어제: ${yesterday_rank})"
-            ((SUCCESS_COUNT++))
+        if [ ! -z "$RANK_INFO" ]; then
+            IFS='|' read -r rank rating review_count <<< "$RANK_INFO"
+            
+            # 순위 정보 저장
+            PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -c "
+                SELECT v2_upsert_rank_info(
+                    '$CHECK_DATE'::date,
+                    '$keyword',
+                    '$product_id',
+                    '$item_id',
+                    '$vendor_item_id',
+                    ${rank:-0},
+                    ${rating:-0},
+                    ${review_count:-0}
+                );
+            " > /dev/null 2>&1
+            
+            if [ $? -eq 0 ]; then
+                SUCCESS=$((SUCCESS + 1))
+                log_debug "저장 성공: $keyword - 순위: $rank"
+            else
+                FAILED=$((FAILED + 1))
+                log_error "저장 실패: $keyword - $product_id"
+            fi
         else
-            log_error "  ✗ 저장 실패: $keyword"
-            log_debug "    에러: $INSERT_RESULT"
-            ((FAIL_COUNT++))
+            log_debug "외부 DB에 순위 정보 없음: $keyword - $product_id"
+            FAILED=$((FAILED + 1))
         fi
         
-    done <<< "$SLOTS"
+    done < $TEMP_DIR/our_slots.txt
     
-    # 4. 결과 요약
-    log_info "========================================="
-    log_info "동기화 완료"
-    log_info "성공: ${SUCCESS_COUNT}건"
-    log_info "실패: ${FAIL_COUNT}건"  
-    log_info "데이터 없음: ${NO_DATA_COUNT}건"
-    log_info "========================================="
+    TOTAL_PROCESSED=$PROCESSED
+    TOTAL_SUCCESS=$SUCCESS
+    TOTAL_FAILED=$FAILED
     
-    # 5. 최종 통계 확인
-    STATS=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A <<EOF 2>/dev/null
-        SELECT 
-            COUNT(*) as total,
-            COUNT(CASE WHEN rank IS NOT NULL THEN 1 END) as with_rank,
-            COUNT(CASE WHEN rank = 0 THEN 1 END) as zero_rank,
-            COUNT(CASE WHEN rank IS NULL THEN 1 END) as null_rank,
-            COUNT(CASE WHEN yesterday_rank > 0 THEN 1 END) as with_yesterday
-        FROM v2_rank_daily
-        WHERE date = '$CHECK_DATE'::date;
-EOF
-    )
-    
-    IFS='|' read -r total with_rank zero_rank null_rank with_yesterday <<< "$STATS"
-    
-    log_info "v2_rank_daily 통계 ($CHECK_DATE):"
-    log_info "  - 전체: ${total}건"
-    log_info "  - 순위 있음: ${with_rank}건"
-    log_info "  - 순위 없음(0): ${zero_rank}건"
-    log_info "  - 측정중(NULL): ${null_rank}건"
-    log_info "  - 어제 순위 있음: ${with_yesterday}건"
+    log_info "동기화 완료 - 처리: $PROCESSED, 성공: $SUCCESS, 실패: $FAILED, 스킵: $SKIPPED"
 }
 
 # ========================================
-# 스크립트 실행
+# 3. 동기화 결과 확인
 # ========================================
+verify_sync() {
+    log_info "동기화 결과 확인 중..."
+    
+    END_TIME=$(date +%s)
+    ELAPSED=$((END_TIME - START_TIME))
+    
+    RESULT=$(PGPASSWORD=$LOCAL_PASS psql -h $LOCAL_HOST -p $LOCAL_PORT -U $LOCAL_USER -d $LOCAL_DB -t -A <<EOF
+    SELECT 
+        COUNT(*) as total_records,
+        COUNT(DISTINCT keyword) as unique_keywords,
+        COUNT(CASE WHEN rank IS NOT NULL AND rank > 0 THEN 1 END) as with_rank,
+        COUNT(CASE WHEN product_name IS NOT NULL THEN 1 END) as with_product_name
+    FROM v2_rank_daily
+    WHERE date = '$CHECK_DATE';
+EOF
+    )
+    
+    IFS='|' read -r total keywords with_rank with_name <<< "$RESULT"
+    
+    log_info "========================================="
+    log_info "동기화 완료 - $CHECK_DATE"
+    log_info "========================================="
+    log_info "소요 시간: ${ELAPSED}초"
+    log_info "우리 slots: ${TOTAL_SLOTS}개"
+    log_info "처리 결과: 성공 ${TOTAL_SUCCESS}개, 실패 ${TOTAL_FAILED}개"
+    log_info "-----------------------------------------"
+    log_info "DB 최종 상태:"
+    log_info "  - 총 레코드: $total"
+    log_info "  - 고유 키워드: $keywords"
+    log_info "  - 순위 정보: $with_rank"
+    log_info "  - 상품명: $with_name"
+    log_info "========================================="
+}
 
-main "$@"
+# ========================================
+# 4. 정리 작업
+# ========================================
+cleanup() {
+    log_debug "임시 파일 정리 중..."
+    rm -rf $TEMP_DIR
+}
+
+# 에러 핸들링
+cleanup_on_error() {
+    log_error "스크립트 중단됨. 정리 작업 수행 중..."
+    cleanup
+    exit 1
+}
+
+# 시그널 트랩 설정
+trap cleanup_on_error INT TERM
+
+# ========================================
+# 메인 실행
+# ========================================
+main() {
+    log_info "========================================="
+    log_info "v3_rank_daily 동기화 시작"
+    log_info "대상 날짜: $CHECK_DATE"
+    log_info "외부 테이블: v2_slot_tasks_daily_progress"
+    log_info "========================================="
+    
+    # 0. 우리 slots 데이터 추출
+    extract_our_slots
+    
+    # 1. 기존 데이터 확인
+    check_existing_data
+    
+    # 2. 외부 DB에서 정보 동기화
+    sync_from_external
+    
+    # 3. 결과 확인
+    verify_sync
+    
+    # 4. 정리
+    cleanup
+    
+    log_info "동기화 프로세스 완료"
+}
+
+# 로그 디렉토리 생성 및 파일로 출력
+mkdir -p "$LOG_DIR"
+exec 1> >(tee -a "$LOG_FILE")
+exec 2>&1
+
+# 스크립트 실행
+main
