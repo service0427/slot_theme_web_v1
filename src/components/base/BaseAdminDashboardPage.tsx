@@ -59,7 +59,7 @@ const defaultStyles: AdminDashboardStyles = {
 export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDashboardPageProps) {
   const { user } = useAuthContext();
   const { config } = useConfig();
-  const { loadPendingSlotCount, loadAllSlots } = useSlotContext();
+  const { loadPendingSlotCount, loadSystemStats, systemStats } = useSlotContext();
   const cashContext = config.useCashSystem ? useCashContext() : null;
   const { getSetting } = useSystemSettings();
   const chatEnabled = getSetting('chatEnabled', 'feature');
@@ -71,7 +71,8 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
     waiting: 0,
     completed: 0,
     paused: 0,
-    rejected: 0
+    rejected: 0,
+    inactive: 0
   });
   const [pendingChargesCount, setPendingChargesCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,46 +80,8 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
   useEffect(() => {
     const loadStats = async () => {
       try {
-        // 모든 슬롯 로드
-        const allSlots = await loadAllSlots();
-        
-        // 상태별 카운트 계산
-        const stats = {
-          empty: 0,
-          pending: 0,
-          active: 0,
-          waiting: 0,
-          completed: 0,
-          paused: 0,
-          rejected: 0
-        };
-        
-        const now = new Date();
-        
-        allSlots.forEach(slot => {
-          if (slot.status === 'empty') {
-            stats.empty++;
-          } else if (slot.status === 'pending') {
-            stats.pending++;
-          } else if (slot.status === 'paused') {
-            stats.paused++;
-          } else if (slot.status === 'rejected') {
-            stats.rejected++;
-          } else if (slot.status === 'active') {
-            const start = slot.startDate ? new Date(slot.startDate) : null;
-            const end = slot.endDate ? new Date(slot.endDate) : null;
-            
-            if (start && now < start) {
-              stats.waiting++;
-            } else if (end && now > end) {
-              stats.completed++;
-            } else {
-              stats.active++;
-            }
-          }
-        });
-        
-        setSlotStats(stats);
+        // 시스템 통계 로드 (전체 슬롯 카운트 - limit 없음)
+        await loadSystemStats();
         
         // 캐시 충전 대기 로드
         if (config.useCashSystem && cashContext) {
@@ -133,7 +96,23 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
     };
     
     loadStats();
-  }, []);
+  }, [loadSystemStats]);
+
+  // systemStats 변경 시 슬롯 통계 업데이트
+  useEffect(() => {
+    if (systemStats && systemStats.statusBreakdown) {
+      setSlotStats({
+        empty: systemStats.statusBreakdown.empty || 0,
+        pending: systemStats.statusBreakdown.pending || 0,
+        active: systemStats.statusBreakdown.active || 0,
+        waiting: systemStats.statusBreakdown.waiting || 0,
+        completed: systemStats.statusBreakdown.completed || 0,
+        paused: systemStats.statusBreakdown.paused || 0,
+        rejected: systemStats.statusBreakdown.refunded || 0,
+        inactive: systemStats.statusBreakdown.inactive || 0
+      });
+    }
+  }, [systemStats]);
 
   if (isLoading) {
     return <div className={styles.container}>로딩 중...</div>;
@@ -167,7 +146,7 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
           <h3 className={styles.card.title}>슬롯 관리</h3>
           <div className={styles.card.description}>
             <div className="space-y-1">
-              <div className="font-semibold text-gray-800">• 총 슬롯: {slotStats.empty + slotStats.pending + slotStats.waiting + slotStats.active + slotStats.completed + slotStats.paused + slotStats.rejected}개</div>
+              <div className="font-semibold text-gray-800">• 총 슬롯: {slotStats.empty + slotStats.pending + slotStats.waiting + slotStats.active + slotStats.completed + slotStats.paused + slotStats.rejected + slotStats.inactive}개</div>
               {slotStats.empty > 0 && <div>• 입력 대기: {slotStats.empty}개</div>}
               {slotStats.pending > 0 && <div>• 승인 대기: {slotStats.pending}개</div>}
               {slotStats.waiting > 0 && <div>• 대기중: {slotStats.waiting}개</div>}
@@ -175,6 +154,7 @@ export function BaseAdminDashboardPage({ styles = defaultStyles }: BaseAdminDash
               {slotStats.completed > 0 && <div>• 완료: {slotStats.completed}개</div>}
               {slotStats.paused > 0 && <div>• 일시정지: {slotStats.paused}개</div>}
               {slotStats.rejected > 0 && <div>• 거절됨: {slotStats.rejected}개</div>}
+              {slotStats.inactive > 0 && <div className="text-gray-500">• 비활성(계정): {slotStats.inactive}개</div>}
             </div>
           </div>
         </Link>
