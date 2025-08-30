@@ -733,57 +733,59 @@ export class ApiSlotService extends BaseSlotService {
         `${API_BASE_URL}/slots/${slotId}/fill` : 
         `${API_BASE_URL}/slots/${slotId}/update-fields`;
       
+      // 엔드포인트에 따라 다른 body 구조 사용
+      const bodyData = isEmptySlot ? {
+        // /fill 엔드포인트용
+        keyword: customFields.keyword || customFields.keywords || '',
+        url: customFields.url || customFields.landingUrl || '',
+        mid: customFields.mid || '',
+        customFields: customFields
+      } : {
+        // /update-fields 엔드포인트용 - customFields 객체로 감싸서 전송
+        customFields: {
+          keyword: customFields.keyword || customFields.keywords || '',
+          url: customFields.url || customFields.landingUrl || '',
+          mid: customFields.mid || ''
+        }
+      };
+      
+      console.log('[ApiSlotService] updateSlot endpoint:', endpoint);
+      console.log('[ApiSlotService] updateSlot bodyData:', JSON.stringify(bodyData, null, 2));
+      
       const response = await fetch(endpoint, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.accessToken}`
         },
-        body: JSON.stringify({
-          keyword: customFields.keyword || customFields.keywords || '',
-          url: customFields.url || customFields.landingUrl || '',
-          mid: customFields.mid || '',
-          customFields: customFields
-        })
+        body: JSON.stringify(bodyData)
       });
 
       const result = await response.json();
+      console.log('[ApiSlotService] updateSlot response:', result);
 
       if (!response.ok) {
+        console.error('[ApiSlotService] updateSlot error:', result);
         return {
           success: false,
           error: result.error || '슬롯 수정에 실패했습니다.'
         };
       }
 
-      if (result.success && result.data) {
-        const customFields: Record<string, string> = {
-          keywords: result.data.keyword,
-          landingUrl: result.data.url,
-          mid: result.data.mid || '',
-          seq: result.data.seq?.toString() || ''
+      // result.success가 false일 수도 있음
+      if (!result.success) {
+        console.error('[ApiSlotService] updateSlot failed:', result);
+        return {
+          success: false,
+          error: result.error || '슬롯 수정에 실패했습니다.'
         };
+      }
 
-        const slot = new UserSlotModel(
-          result.data.id,
-          result.data.user_id,
-          result.data.status,
-          customFields,
-          0,
-          result.data.impression_count || 0,
-          result.data.click_count || 0,
-          new Date(result.data.created_at),
-          new Date(result.data.updated_at),
-          result.data.approved_at ? new Date(result.data.approved_at) : undefined,
-          undefined,
-          result.data.rejection_reason,
-          undefined,
-          undefined
-        );
-
+      // update-fields는 data 없이 success만 반환할 수 있음
+      if (result.success) {
         return {
           success: true,
-          data: slot
+          data: undefined as any // data가 없어도 성공 처리
         };
       }
 

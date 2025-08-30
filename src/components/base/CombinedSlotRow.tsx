@@ -223,8 +223,10 @@ function CombinedSlotRowComponent({
     setFormData(newData);
     
     // 부모 컴포넌트에 변경사항 전달 (렌더링 후에)
+    console.log('[DEBUG] CombinedSlotRow handleFieldChange:', { slotId: slot.id, fieldKey, value, hasCallback: !!slot.onFormDataChange });
     if (slot.onFormDataChange) {
       setTimeout(() => {
+        console.log('[DEBUG] CombinedSlotRow onFormDataChange 호출:', { slotId: slot.id, newData });
         slot.onFormDataChange(slot.id, newData);
       }, 0);
     }

@@ -9,6 +9,7 @@ import { BaseSlotEditModal } from './BaseSlotEditModal';
 import { CombinedSlotRow } from './CombinedSlotRow';
 import { BasePreAllocationForm, PreAllocationData } from './BasePreAllocationForm';
 import { BaseBulkEditModal } from './BaseBulkEditModal';
+import { BaseBulkInputModal } from './BaseBulkInputModal';
 import { BaseRankHistoryModal } from './BaseRankHistoryModal';
 import { UserSlot } from '@/core/models/UserSlot';
 import { BaseAdvancedSearchDropdown, SearchFilters } from './BaseAdvancedSearchDropdown';
@@ -485,9 +486,10 @@ export function BaseSlotListPage({
   });
   
   // 일괄 수정 관련 state
-  const [bulkEditMode, setBulkEditMode] = useState(false);
+  // bulkEditMode 제거 - 체크박스 항상 표시
   const [selectedSlotIds, setSelectedSlotIds] = useState<Set<string>>(new Set());
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [showBulkInputModal, setShowBulkInputModal] = useState(false);
 
   useEffect(() => {
     loadUserSlots(currentPage, itemsPerPage);
@@ -498,6 +500,7 @@ export function BaseSlotListPage({
 
   // 슬롯의 formData 변경 핸들러
   const handleFormDataChange = (slotId: string, newFormData: Record<string, string>) => {
+    console.log('[DEBUG] handleFormDataChange:', slotId, newFormData);
     setSlotsFormData(prev => ({
       ...prev,
       [slotId]: newFormData
@@ -758,7 +761,12 @@ export function BaseSlotListPage({
   const handleBulkEditSuccess = () => {
     setShowBulkEditModal(false);
     setSelectedSlotIds(new Set());
-    setBulkEditMode(false);
+    loadUserSlots();
+  };
+
+  const handleBulkInputSuccess = () => {
+    setShowBulkInputModal(false);
+    setSelectedSlotIds(new Set());
     loadUserSlots();
   };
 
@@ -1171,15 +1179,19 @@ export function BaseSlotListPage({
             <option value={100}>100개씩</option>
           </select>
           
-          {/* 선슬롯발행 모드에서 전체 저장 버튼 */}
-          {slotOperationMode === 'pre-allocation' && (
+          {/* 저장 버튼 제거 - 다중 슬롯 입력 모달로 대체 */}
+          {false && slotOperationMode === 'pre-allocation' && (
             <button
               onClick={async () => {
                 // slotsFormData에서 데이터가 있는 슬롯 찾기
+                console.log('[DEBUG] 저장 버튼 클릭 - slotsFormData:', slotsFormData);
+                console.log('[DEBUG] paginatedSlots 개수:', paginatedSlots.length);
+                
                 const editableSlots = [];
                 
                 for (const slot of paginatedSlots.filter(s => s.status === 'empty' || s.status === 'active')) {
                   const formData = slotsFormData[slot.id];
+                  console.log(`[DEBUG] 슬롯 ${slot.id} formData:`, formData);
                   
                   // formData가 있고 데이터가 있는 경우만 처리
                   if (formData) {
@@ -1396,30 +1408,21 @@ export function BaseSlotListPage({
             <div className="mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-blue-600">전체 슬롯 목록</h3>
-                {user?.role !== 'operator' && (
-                  <button
-                    onClick={() => setBulkEditMode(!bulkEditMode)}
-                    className={bulkEditMode ? "bg-red-600 text-white px-4 py-2 rounded-lg" : "bg-gray-600 text-white px-4 py-2 rounded-lg"}
-                  >
-                    {bulkEditMode ? '일괄 수정 취소' : '일괄 수정 모드'}
-                  </button>
-                )}
+                {/* 일괄 수정 모드 버튼 제거 - 체크박스 항상 표시 */}
               </div>
               <div className="bg-white rounded-lg shadow border overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full table-fixed">
                     <thead className="bg-blue-50 border-b">
                       <tr>
-                        {bulkEditMode && (
-                          <th className="w-12 px-1 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
-                            <input
-                              type="checkbox"
-                              checked={selectedSlotIds.size === paginatedSlots.filter(canBulkEdit).length && paginatedSlots.filter(canBulkEdit).length > 0}
-                              onChange={handleSelectAll}
-                              className="w-4 h-4"
-                            />
-                          </th>
-                        )}
+                        <th className="w-12 px-1 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          <input
+                            type="checkbox"
+                            checked={selectedSlotIds.size === paginatedSlots.filter(canBulkEdit).length && paginatedSlots.filter(canBulkEdit).length > 0}
+                            onChange={handleSelectAll}
+                            className="w-4 h-4"
+                          />
+                        </th>
                         <th className="w-12 px-1 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
                           번호
                         </th>
@@ -1522,7 +1525,7 @@ export function BaseSlotListPage({
                             }}
                             onBulkPaste={handleBulkPaste}
                             isSelected={selectedSlotIds.has(slot.id)}
-                            onSelectionChange={bulkEditMode ? (slotId, checked) => handleToggleSlotSelection(slotId) : undefined}
+                            onSelectionChange={(slotId, checked) => handleToggleSlotSelection(slotId)}
                           />
                         );
                       })}
@@ -1574,16 +1577,14 @@ export function BaseSlotListPage({
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    {bulkEditMode && (
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                        <input
-                          type="checkbox"
-                          checked={selectedSlotIds.size === paginatedSlots.filter(canBulkEdit).length && paginatedSlots.filter(canBulkEdit).length > 0}
-                          onChange={handleSelectAll}
-                          className="w-4 h-4"
-                        />
-                      </th>
-                    )}
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                      <input
+                        type="checkbox"
+                        checked={selectedSlotIds.size === paginatedSlots.filter(canBulkEdit).length && paginatedSlots.filter(canBulkEdit).length > 0}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">번호</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">썸네일</th>
                     {/* 관리자가 설정한 필드들 */}
@@ -1627,7 +1628,7 @@ export function BaseSlotListPage({
                         setShowEditModal(true);
                       }}
                       onOpenRankHistory={() => handleOpenRankHistory(slot)}
-                      showCheckbox={bulkEditMode && canBulkEdit(slot)}
+                      showCheckbox={canBulkEdit(slot)}
                       isSelected={selectedSlotIds.has(slot.id)}
                       onSelectionChange={() => handleToggleSlotSelection(slot.id)}
                     />
@@ -1713,16 +1714,29 @@ export function BaseSlotListPage({
         slot={editingSlot}
       />
 
-      {/* 일괄 수정 플로팅 액션 바 */}
-      {bulkEditMode && selectedSlotIds.size > 0 && (
+      {/* 플로팅 액션 바 - 체크박스 선택 시 표시 */}
+      {selectedSlotIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg z-40">
           <div className="flex items-center gap-4">
             <span className="font-medium">{selectedSlotIds.size}개 선택됨</span>
             <button
+              onClick={() => setShowBulkInputModal(true)}
+              className="bg-white text-blue-600 px-4 py-2 rounded-md hover:bg-gray-100"
+            >
+              다중 슬롯 입력
+            </button>
+            <button
               onClick={() => setShowBulkEditModal(true)}
               className="bg-white text-blue-600 px-4 py-2 rounded-md hover:bg-gray-100"
             >
-              일괄 수정
+              일괄 정보 변경
+            </button>
+            <div className="h-6 w-px bg-white/30 mx-2"></div>
+            <button
+              onClick={() => setSelectedSlotIds(new Set())}
+              className="bg-red-500 text-white px-3 py-2 rounded-md hover:bg-red-600"
+            >
+              선택 해제
             </button>
           </div>
         </div>
@@ -1734,6 +1748,14 @@ export function BaseSlotListPage({
         onClose={() => setShowBulkEditModal(false)}
         selectedSlots={selectedSlots}
         onSuccess={handleBulkEditSuccess}
+      />
+
+      {/* 다중 슬롯 입력 모달 */}
+      <BaseBulkInputModal
+        isOpen={showBulkInputModal}
+        onClose={() => setShowBulkInputModal(false)}
+        selectedSlots={selectedSlots}
+        onSuccess={handleBulkInputSuccess}
       />
 
       {/* 선슬롯발행 생성 폼 */}
